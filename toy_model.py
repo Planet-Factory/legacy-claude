@@ -9,7 +9,7 @@ import time, sys
 
 # define temporal parameters, including the length of time between calculation of fields and the length of a day on the planet (used for calculating Coriolis as well)
 day = 60*60*24
-dt = 60*5														###### <----- TIMESTEP
+dt = 60*1														###### <----- TIMESTEP
 
 # power incident on (lat,lon) at time t
 def solar(insolation, lat, lon, t):
@@ -76,7 +76,7 @@ for i in range(nlat):
 # define various useful differential functions:
 # gradient of scalar field a in the local x direction at point i,j
 def scalar_gradient_x(a,i,j):
-	return (a[i,(j+1)%nlon]-a[i,(j-1)%nlon])/dx[i]
+	return 0#(a[i,(j+1)%nlon]-a[i,(j-1)%nlon])/dx[i]
 # gradient of scalar field a in the local y direction at point i,j
 def scalar_gradient_y(a,i,j):
 	if i == 0 or i == nlat-1:
@@ -113,36 +113,43 @@ plt.ion()
 plt.show()
 
 # if you want to include advection set this to be True (currently this breaks the model!)
-advection = False
+advection = True
 
 while True:
 
 	# print current time in simulation to command line
 	print("t = " + str(round(24*t/day,2)) + " days", end='\r')
+	print(u.max())
 
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
 	for i in range(nlat):
 		for j in range(nlon):
-			temperature_planet[i,j] += dt*(albedo[i,j]*circle*solar(insolation,lat[i],lon[j],t) + sphere*epsilon*sigma*temperature_atmosp[i,j]**4 - sphere*sigma*temperature_planet[i,j]**4)/(heat_capacity_earth[i,j]*sphere)
-			temperature_atmosp[i,j] += dt*(sphere*epsilon*sigma*temperature_planet[i,j]**4 - 2*sphere*epsilon*sigma*temperature_atmosp[i,j]**4)/(heat_capacity_atmos*sphere)
-	
+			temperature_planet[i,j] += dt*(albedo[i,j]*solar(insolation,lat[i],lon[j],t) + epsilon*sigma*temperature_atmosp[i,j]**4 - sigma*temperature_planet[i,j]**4)/heat_capacity_earth[i,j]
+			temperature_atmosp[i,j] += dt*(epsilon*sigma*temperature_planet[i,j]**4 - 2*epsilon*sigma*temperature_atmosp[i,j]**4)/heat_capacity_atmos
+
 	# update air pressure
 	air_pressure = air_density*specific_gas*temperature_atmosp
+
+	u_temp = np.zeros_like(u)
+	v_temp = np.zeros_like(v)
 
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
 	for i in np.arange(1,nlat-1):
 		for j in range(nlon):
-			u[i,j] += dt*( -u[i,j]*scalar_gradient_x(u,i,j) - v[i,j]*scalar_gradient_y(u,i,j) + coriolis[i]*v[i,j] - scalar_gradient_x(air_pressure,i,j)/air_density[i,j] )
-			v[i,j] += dt*( -u[i,j]*scalar_gradient_x(v,i,j) - v[i,j]*scalar_gradient_y(v,i,j) - coriolis[i]*u[i,j] - scalar_gradient_y(air_pressure,i,j)/air_density[i,j] )
+			u_temp[i,j] += 0.001*dt*( -u[i,j]*scalar_gradient_x(u,i,j) - v[i,j]*scalar_gradient_y(u,i,j) + coriolis[i]*v[i,j] - scalar_gradient_x(air_pressure,i,j)/air_density[i,j] )
+			v_temp[i,j] += 0.001*dt*( -u[i,j]*scalar_gradient_x(v,i,j) - v[i,j]*scalar_gradient_y(v,i,j) - coriolis[i]*u[i,j] - scalar_gradient_y(air_pressure,i,j)/air_density[i,j] )
+
+	u += u_temp
+	v += v_temp
 
 	if advection:
 		# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
 		atmosp_addition = dt*(thermal_diffusivity_air*laplacian(temperature_atmosp) + divergence_with_scalar(temperature_atmosp))
-		temperature_atmosp[5:-5,:] += atmosp_addition[5:-5,:]
+		# temperature_atmosp[5:-5,:] += atmosp_addition[5:-5,:]
 
 		# as density is now variable, allow for mass advection
 		density_addition = dt*divergence_with_scalar(air_density)
-		air_density[5:-5,:5] += density_addition[5:-5,:5]
+		# air_density[5:-5,:5] += density_addition[5:-5,:5]
 
 		temperature_planet += dt*(thermal_diffusivity_roc*laplacian(temperature_planet))
 	
