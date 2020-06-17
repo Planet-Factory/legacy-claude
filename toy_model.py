@@ -22,7 +22,7 @@ def solar(insolation, lat, lon, t):
 t = 0
 
 # how many degrees between latitude and longitude gridpoints
-resolution = 3
+resolution = 5
 
 # define coordinate arrays
 lat = np.arange(-90,91,resolution)
@@ -124,7 +124,7 @@ while True:
 	print("t = " + str(round(t/day,2)) + " days", end='\r')
 	print(u.max(),u.min(),v.max(),v.min(),air_density.max(),air_density.min())
 
-	if t < day*2:
+	if t < day*7:
 		dt = 60*71
 		velocity = False
 	else:
