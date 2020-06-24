@@ -1,4 +1,6 @@
 # CLimate Analysis using Digital Estimations (CLAuDE)
+This is the project to model the climates of hypothetical planets, which could be Earth with slightly different parameters or entirely alien worlds. 
+
 The tool which we'll use to accomplish this is CLimate Analysis using Digital Estimations (CLAuDE), an intuitive, 
 simplistic model of atmospheric dynamics.
 
