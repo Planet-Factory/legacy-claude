@@ -15,11 +15,12 @@ resolution = 3					# how many degrees between latitude and longitude gridpoints
 nlevels = 4						# how many vertical layers in the atmosphere
 planet_radius = 6.4E6			# define the planet's radius (m)
 insolation = 1370				# TOA radiation from star (W m^-2)
+gravity = 10 					# define surface gravity for planet (m s^-2)
 
 advection = True 				# if you want to include advection set this to be True (currently this breaks the model!)
 advection_boundary = 7			# how many gridpoints away from poles to apply advection
 
-save = False
+save = True
 load = False
 
 ###########################
@@ -31,6 +32,7 @@ nlat = len(lat)
 nlon = len(lon)
 lon_plot, lat_plot = np.meshgrid(lon, lat)
 heights = np.arange(0,100E3,100E3/nlevels)
+heights_plot, lat_z_plot = np.meshgrid(lat,heights)
 
 # initialise arrays for various physical fields
 temperature_planet = np.zeros((nlat,nlon)) + 270
@@ -62,6 +64,7 @@ epsilon = np.zeros(nlevels)
 epsilon[0] = 0.75
 for i in np.arange(1,nlevels):	
 	epsilon[i] = epsilon[i-1]*0.5
+	air_density[:,:,i] = air_density[:,:,i-1]*0.5
 heat_capacity_atmos = 1E7
 
 specific_gas = 287
@@ -164,6 +167,15 @@ plt.subplots_adjust(left=0.1, right=0.75)
 ax[0].set_title('Ground temperature')
 ax[1].set_title('Atmosphere temperature')
 # allow for live updating as calculations take place
+
+g, bx = plt.subplots(nlevels,figsize=(9,9),sharex=True)
+g.canvas.set_window_title('CLAuDE atmospheric levels')
+for k in range(nlevels):
+	bx[k].contourf(lon_plot, lat_plot, temperature_atmosp[:,:,k], cmap='seismic')
+	bx[k].set_title(str(heights[k])+' km')
+	bx[k].set_ylabel('Latitude')
+bx[-1].set_xlabel('Longitude')
+
 plt.ion()
 plt.show()
 
@@ -187,7 +199,7 @@ while True:
 
 	# print current time in simulation to command line
 	print("t = " + str(round(t/day,2)) + " days", end='\r')
-	print('U:',u.max(),u.min(),'V: ',v.max(),v.min())
+	print('U:',u.max(),u.min(),'V: ',v.max(),v.min(),'W: ',w.max(),w.min())
 
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
 	for i in range(nlat):
@@ -215,9 +227,16 @@ while True:
 		for i in np.arange(1,nlat-1):
 			for j in range(nlon):
 				for k in range(nlevels):
-					u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
-					v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
-					w_temp[i,j,k] += 0
+					if k == 0:
+						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
+						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
+					elif k == nlevels-1:
+						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
+						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
+					else:
+						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
+						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
+						w_temp[i,j,k] += 0
 
 		u += u_temp
 		v += v_temp
@@ -228,10 +247,11 @@ while True:
 
 		if advection:
 			# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
-			atmosp_addition = dt*(thermal_diffusivity_air*laplacian(temperature_atmosp) + divergence_with_scalar(temperature_atmosp))
-			temperature_atmosp[advection_boundary:-advection_boundary,:,:] -= atmosp_addition[advection_boundary:-advection_boundary,:,:]
-			temperature_atmosp[advection_boundary-1,:,:] -= 0.5*atmosp_addition[advection_boundary-1,:,:]
-			temperature_atmosp[-advection_boundary,:,:] -= 0.5*atmosp_addition[-advection_boundary,:,:]
+			# atmosp_addition = dt*(thermal_diffusivity_air*laplacian(temperature_atmosp))
+			# atmosp_addition = dt*divergence_with_scalar(temperature_atmosp)
+			# temperature_atmosp[advection_boundary:-advection_boundary,:,:] -= atmosp_addition[advection_boundary:-advection_boundary,:,:]
+			# temperature_atmosp[advection_boundary-1,:,:] -= 0.5*atmosp_addition[advection_boundary-1,:,:]
+			# temperature_atmosp[-advection_boundary,:,:] -= 0.5*atmosp_addition[-advection_boundary,:,:]
 
 			# as density is now variable, allow for mass advection
 			density_addition = dt*divergence_with_scalar(air_density)
@@ -245,22 +265,44 @@ while True:
 	test = ax[0].contourf(lon_plot, lat_plot, temperature_planet, cmap='seismic')
 	ax[0].set_title('$\it{Ground} \quad \it{temperature}$')
 
-	ax[1].contourf(lon_plot, lat_plot, temperature_atmosp[:,:,0], cmap='seismic')
-	ax[1].streamplot(lon_plot,lat_plot,u[:,:,0],v[:,:,0],density=0.75,color='black')
+	test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmosp,axis=1)), cmap='seismic')
+	ax[1].streamplot(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1)),np.transpose(np.mean(w,axis=1)),color='black',density=0.75)
+
 	ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
-	for i in ax: 
-		i.set_xlim((lon.min(),lon.max()))
-		i.set_ylim((lat.min(),lat.max()))
-		i.set_ylabel('Latitude')
-		i.axhline(y=0,color='black',alpha=0.3)
-	ax[-1].set_xlabel('Longitude')
+	
+	ax[0].set_xlim((lon.min(),lon.max()))
+	ax[0].set_ylim((lat.min(),lat.max()))
+	ax[0].set_ylabel('Latitude')
+	ax[0].axhline(y=0,color='black',alpha=0.3)
+	ax[0].set_xlabel('Longitude')
+
+	ax[1].set_xlim((-90,90))
+	ax[1].set_ylim((0,heights.max()))
+	ax[1].set_ylabel('Height (m)')
+	ax[1].set_xlabel('Latitude')
+
 	cbar_ax = f.add_axes([0.85, 0.15, 0.05, 0.7])
 	f.colorbar(test, cax=cbar_ax)
 	cbar_ax.set_title('Temperature (K)')
 	f.suptitle( 'Time ' + str(round(24*t/day,2)) + ' hours' )
+	
+	for k in range(nlevels):
+		test = bx[nlevels-1-k].contourf(lon_plot, lat_plot, temperature_atmosp[:,:,k], cmap='seismic')
+		bx[nlevels-1-k].streamplot(lon_plot, lat_plot, u[:,:,k], v[:,:,k],density=0.75,color='black')
+		# g.colorbar(test,cax=bx[nlevels-1-k])
+		bx[nlevels-1-k].set_title(str(heights[k]/1E3)+' km')
+		bx[nlevels-1-k].set_ylabel('Latitude')
+		bx[nlevels-1-k].set_xlim((lon.min(),lon.max()))
+		bx[nlevels-1-k].set_ylim((lat.min(),lat.max()))
+	bx[-1].set_xlabel('Longitude')
+
 	plt.pause(0.01)
+	
 	ax[0].cla()
 	ax[1].cla()
+	for k in range(nlevels):
+		bx[k].cla()
+
 
 	# advance time by one timestep
 	t += dt
