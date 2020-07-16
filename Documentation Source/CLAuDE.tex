@@ -1,0 +1,101 @@
+\documentclass{article}
+
+\usepackage{hyperref}
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage[ruled]{algorithm2e}
+\usepackage[margin=1in]{geometry}
+\usepackage{appendix}
+\usepackage{float}
+\usepackage{verbatim}
+\setcounter{section}{-1}
+
+\title{CLimate Analysis using Digital Estimations Non-Offical Manual (CLAuDE NOM)}
+\author{TechWizard}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+
+The CLimate Analysis using Digital Estimations model is a simplified planetary climate model. It will be used to educate people on how climate physics works and to experiment with different 
+parameters and see how much influence a tiny change can have (like for instance the rotation rate of the planet around its axis). It is built to be accessible to and runnable by everyone, 
+whether they have a super computer or a dated laptop. The model is written in Python and written during the weekly streams of Dr. Simon Clark \cite{twitch}. Each subsequent section starts with a 
+number, this number indicates which coding stream corresponds to that section. This does not only make it easier to cross reference but if the explanation is unclear or you just want to watch 
+the stream about that specific topic, you know which stream to watch. There is a useful playlist on Simon's Twitch which has all the streams without ad breaks or interruptions \cite{playlist}. 
+
+This manual will provide an overview of the formulae used and will explain aspects of these formulae. For each equation each symbol will be explained what it is. In such an explanation, the units 
+will be presented in SI units \cite{SI} between brackets like: $T$: The temperature of the planet ($K$). Which indicates that $T$ is the temperature of the planet in degrees Kelvin. If you need 
+to relate SI units to your preferred system of units, please refer to the internet for help with that. There are great calculators online where you only need to plug in a number and select the 
+right units.
+
+Within this manual we will not concern ourselves with plotting the data, instead we focus on the physics side of things and translating formular into code. If you are interested in how the
+plotting of the data works, or how loading and saving data works, please refer to the relevant stream on Simon's Twitch page \cite{twitch}.
+
+This manual is for the toy model, which is as of now still in development. Therefore this manual will be in chronological order, explaining everything in the same order as it has been done. 
+There are plans to eventually modularise the whole model into seperate parts that can be extended by the community. When that will hit development, a new manual for that version of the model
+will be made that treats things per topic instead of chronological order. 
+
+One important thing to note, the layout may change significantly when new sections are added. This is due to the amount of code that is added/changed. If a lot of code changes, a lot of so called
+'algorithm' blocks are present which have different placement rules than just plain text. Therefore it may occur that an algorithm is referenced even though it is one or two pages later. This is 
+a pain to fix and if something later on changes the whole layout may be messed up again and is a pain to fix again. Hence I opt to let \LaTeX (the software/typeset language used to create this 
+manual) figure out the placement of the algorithm blocks, which may or may not be in the right places.
+
+\input{Streams/Stream1.tex}
+
+\input{Streams/Stream2.tex}
+
+\input{Streams/Stream3.tex}
+
+\input{Streams/Stream4.tex}
+
+\input{Streams/Stream5.tex}
+
+\input{Streams/Stream6.tex}
+
+\input{Streams/Stream7.tex}
+
+\newpage
+\input{Streams/TTNMETAF.tex}
+
+\newpage
+\bibliography{references}
+\bibliographystyle{plain}
+
+\begin{comment}
+\subsection{Hydrostatic balance}
+Hydrostatic balance is the relation between the pressure at the surface of the planet and the pressure higher up in the atmosphere \cite{hydrostatic}. This all works under the assumption that 
+the vertical acceleration is relatively small in magnitude compared to the gravity of the planet, which it almost always is when looking at the atmosphere or the ocean. The corresponding 
+formula is described in \autoref{eq:hydrostatic}. The symbols here represent:
+
+\begin{itemize}
+    \item $\delta p$: The change in the atmospheric pressure ($Pa$).
+    \item $\delta z$: The change in altitude or height ($m$).
+    \item $\rho$: The density of the atmosphere ($kgm^{-3}$).
+    \item $g$: The gravitational acceleration, on Earth this is $9.81$ ($ms^{-2}$).
+\end{itemize}
+
+\begin{equation}
+    \frac{\delta p}{\delta z} = -\rho g
+    \label{eq:hydrostatic}
+\end{equation}
+
+Now we need to translate this into code, luckily this is quite easy as shown in \autoref{alg:hydrostatic}. We first calculate the difference between the current mean pressure and the mean 
+pressure we get from \autoref{eq:hydrostatic}. Then we add the difference to the pressure, effectively correcting the average pressure for the current atmospheric layer to what it is supposed to 
+be. By correcting it with the mean difference we still have the local variation in pressure while on average we are closer to the true value we calculate in \autoref{eq:hydrostatic}.
+
+\begin{algorithm}
+    \For{$alt \in [1, nlevels]$}{
+        $correction \leftarrow mean(p[:, :, alt - 1]) - mean(\rho[:, :, alt])(heights[alt] - heights[alt - 1])g$ \;
+        $p[:, :, alt] \leftarrow \rho[:, :, alt] + correction$ \;
+    }
+    \caption{Calculating the effects of Hydrostatic Balance on the average pressure}
+    \label{alg:hydrostatic}
+\end{algorithm}
+\end{comment}
+\end{document}
