@@ -103,15 +103,15 @@ dz[-1] = dz[-2]
 
 # define various useful differential functions:
 # gradient of scalar field a in the local x direction at point i,j
-def scalar_gradient_x(a,i,j,k=999):
-	if k == 999:
+def scalar_gradient_x(a,i,j,k=-1):
+	if k == -1:
 		return (a[i,(j+1)%nlon]-a[i,(j-1)%nlon])/dx[i]
 	else:
 		return (a[i,(j+1)%nlon,k]-a[i,(j-1)%nlon,k])/dx[i]
 
 # gradient of scalar field a in the local y direction at point i,j
-def scalar_gradient_y(a,i,j,k=999):
-	if k == 999:
+def scalar_gradient_y(a,i,j,k=-1):
+	if k == -1:
 		if i == 0:
 			return 2*(a[i+1,j]-a[i,j])/dy
 		elif i == nlat-1:
