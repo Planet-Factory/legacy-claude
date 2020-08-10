@@ -11,16 +11,17 @@ import time, sys, pickle
 
 day = 60*60*24					# define length of day (used for calculating Coriolis as well) (s)
 dt = 60*9						# <----- TIMESTEP (s)
-resolution = 3					# how many degrees between latitude and longitude gridpoints
-nlevels = 4						# how many vertical layers in the atmosphere
+resolution = 5					# how many degrees between latitude and longitude gridpoints
+nlevels = 5						# how many vertical layers in the atmosphere
+top = 10E3						# top of atmosphere (m)
 planet_radius = 6.4E6			# define the planet's radius (m)
 insolation = 1370				# TOA radiation from star (W m^-2)
-gravity = 10 					# define surface gravity for planet (m s^-2)
+gravity = 9.81 					# define surface gravity for planet (m s^-2)
 
-advection = True 				# if you want to include advection set this to be True (currently this breaks the model!)
-advection_boundary = 7			# how many gridpoints away from poles to apply advection
+advection = True 				# if you want to include advection set this to be True
+advection_boundary = 3			# how many gridpoints away from poles to apply advection
 
-save = True
+save = False
 load = False
 
 ###########################
@@ -31,7 +32,7 @@ lon = np.arange(0,360,resolution)
 nlat = len(lat)
 nlon = len(lon)
 lon_plot, lat_plot = np.meshgrid(lon, lat)
-heights = np.arange(0,100E3,100E3/nlevels)
+heights = np.arange(0,top,top/nlevels)
 heights_plot, lat_z_plot = np.meshgrid(lat,heights)
 
 # initialise arrays for various physical fields
@@ -41,7 +42,25 @@ air_pressure = np.zeros_like(temperature_atmosp)
 u = np.zeros_like(temperature_atmosp)
 v = np.zeros_like(temperature_atmosp)
 w = np.zeros_like(temperature_atmosp)
-air_density = np.zeros_like(temperature_atmosp) + 1.3
+air_density = np.zeros_like(temperature_atmosp)
+
+# read temperature and density in from standard atmosphere
+f = open("standard_atmosphere.txt", "r")
+standard_height = []
+standard_temp = []
+standard_density = []
+for x in f:
+	h, t, r = x.split()
+	standard_height.append(float(h))
+	standard_temp.append(float(t))
+	standard_density.append(float(r))
+f.close()
+
+density_profile = np.interp(x=heights/1E3,xp=standard_height,fp=standard_density)
+temp_profile = np.interp(x=heights/1E3,xp=standard_height,fp=standard_temp)
+for k in range(nlevels):
+	air_density[:,:,k] = density_profile[k]
+	temperature_atmosp[:,:,k] = temp_profile[k]
 
 albedo = np.zeros_like(temperature_planet) + 0.5
 heat_capacity_earth = np.zeros_like(temperature_planet) + 1E7
@@ -51,21 +70,12 @@ for i in range(nlat):
 	for j in range(nlon):
 		albedo[i,j] += np.random.uniform(-albedo_variance,albedo_variance)
 
-# if including an ocean, uncomment the below
-# albedo[5:55,9:20] = 0.2
-# albedo[23:50,45:70] = 0.2
-# albedo[2:30,85:110] = 0.2
-# heat_capacity_earth[5:55,9:20] = 1E6
-# heat_capacity_earth[23:50,45:70] = 1E6
-# heat_capacity_earth[2:30,85:110] = 1E6
-
 # define physical constants
 epsilon = np.zeros(nlevels)
 epsilon[0] = 0.75
 for i in np.arange(1,nlevels):	
 	epsilon[i] = epsilon[i-1]*0.5
-	air_density[:,:,i] = air_density[:,:,i-1]*0.5
-heat_capacity_atmos = 1E7
+heat_capacity_atmos = 1E6
 
 specific_gas = 287
 thermal_diffusivity_air = 20E-6
@@ -159,7 +169,7 @@ def solar(insolation, lat, lon, t):
 #################### SHOW TIME ####################
 
 # set up plot
-f, ax = plt.subplots(2,figsize=(9,9))
+f, ax = plt.subplots(2,figsize=(9,7))
 f.canvas.set_window_title('CLAuDE')
 ax[0].contourf(lon_plot, lat_plot, temperature_planet, cmap='seismic')
 ax[1].contourf(lon_plot, lat_plot, temperature_atmosp[:,:,0], cmap='seismic')
@@ -168,7 +178,7 @@ ax[0].set_title('Ground temperature')
 ax[1].set_title('Atmosphere temperature')
 # allow for live updating as calculations take place
 
-g, bx = plt.subplots(nlevels,figsize=(9,9),sharex=True)
+g, bx = plt.subplots(nlevels,figsize=(9,7),sharex=True)
 g.canvas.set_window_title('CLAuDE atmospheric levels')
 for k in range(nlevels):
 	bx[k].contourf(lon_plot, lat_plot, temperature_atmosp[:,:,k], cmap='seismic')
@@ -198,8 +208,9 @@ while True:
 		velocity = True
 
 	# print current time in simulation to command line
-	print("t = " + str(round(t/day,2)) + " days", end='\r')
+	print("+++ t = " + str(round(t/day,2)) + " days +++", end='\r')
 	print('U:',u.max(),u.min(),'V: ',v.max(),v.min(),'W: ',w.max(),w.min())
+	print(np.mean(np.mean(air_density,axis=0),axis=0))
 
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
 	for i in range(nlat):
@@ -207,14 +218,15 @@ while True:
 			temperature_planet[i,j] += dt*((1-albedo[i,j])*solar(insolation,lat[i],lon[j],t) + epsilon[0]*sigma*temperature_atmosp[i,j,0]**4 - sigma*temperature_planet[i,j]**4)/heat_capacity_earth[i,j]
 			for k in range(nlevels):
 				if k == 0:
-					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(temperature_planet[i,j]**4 + epsilon[k+1]*temperature_atmosp[i,j,k+1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos)
+					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(temperature_planet[i,j]**4 + epsilon[k+1]*temperature_atmosp[i,j,k+1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos*dz[k])
 				elif k == nlevels-1:
-					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(epsilon[k-1]*temperature_atmosp[i,j,k-1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos)
+					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(epsilon[k-1]*temperature_atmosp[i,j,k-1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos*dz[k])
 				else:
-					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(epsilon[k+1]*temperature_atmosp[i,j,k+1]**4 + epsilon[k-1]*temperature_atmosp[i,j,k-1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos)
+					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(epsilon[k+1]*temperature_atmosp[i,j,k+1]**4 + epsilon[k-1]*temperature_atmosp[i,j,k-1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos*dz[k])
 
 	# update air pressure
 	air_pressure = air_density*specific_gas*temperature_atmosp
+	print(heights/1E3,np.mean(np.mean(air_pressure,axis=0),axis=0))
 
 	if velocity:
 
@@ -226,7 +238,7 @@ while True:
 		# calculate acceleration of atmosphere using primitive equations on beta-plane
 		for i in np.arange(1,nlat-1):
 			for j in range(nlon):
-				for k in range(nlevels):
+				for k in range(nlevels-2):
 					if k == 0:
 						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
 						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
@@ -236,22 +248,22 @@ while True:
 					else:
 						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
 						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
-						w_temp[i,j,k] += 0
+						w_temp[i,j,k] += -1E-3*dt*( scalar_gradient_z(air_pressure,i,j,k)/air_density[i,j,k] + gravity )
 
 		u += u_temp
 		v += v_temp
 		w += w_temp
 
-		u *= 0.99
-		v *= 0.99
+		u[:,:,0] *= 0.99
+		v[:,:,0] *= 0.99
 
 		if advection:
 			# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
 			# atmosp_addition = dt*(thermal_diffusivity_air*laplacian(temperature_atmosp))
-			# atmosp_addition = dt*divergence_with_scalar(temperature_atmosp)
-			# temperature_atmosp[advection_boundary:-advection_boundary,:,:] -= atmosp_addition[advection_boundary:-advection_boundary,:,:]
-			# temperature_atmosp[advection_boundary-1,:,:] -= 0.5*atmosp_addition[advection_boundary-1,:,:]
-			# temperature_atmosp[-advection_boundary,:,:] -= 0.5*atmosp_addition[-advection_boundary,:,:]
+			atmosp_addition = dt*divergence_with_scalar(temperature_atmosp)
+			temperature_atmosp[advection_boundary:-advection_boundary,:,:] -= atmosp_addition[advection_boundary:-advection_boundary,:,:]
+			temperature_atmosp[advection_boundary-1,:,:] -= 0.5*atmosp_addition[advection_boundary-1,:,:]
+			temperature_atmosp[-advection_boundary,:,:] -= 0.5*atmosp_addition[-advection_boundary,:,:]
 
 			# as density is now variable, allow for mass advection
 			density_addition = dt*divergence_with_scalar(air_density)
