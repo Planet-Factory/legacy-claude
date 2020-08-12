@@ -13,7 +13,7 @@ day = 60*60*24					# define length of day (used for calculating Coriolis as well
 dt = 60*9						# <----- TIMESTEP (s)
 resolution = 5					# how many degrees between latitude and longitude gridpoints
 nlevels = 5						# how many vertical layers in the atmosphere
-top = 10E3						# top of atmosphere (m)
+top = 50E3						# top of atmosphere (m)
 planet_radius = 6.4E6			# define the planet's radius (m)
 insolation = 1370				# TOA radiation from star (W m^-2)
 gravity = 9.81 					# define surface gravity for planet (m s^-2)
@@ -22,7 +22,7 @@ advection = True 				# if you want to include advection set this to be True
 advection_boundary = 3			# how many gridpoints away from poles to apply advection
 
 save = False
-load = False
+load = True
 
 ###########################
 
@@ -43,6 +43,13 @@ u = np.zeros_like(temperature_atmosp)
 v = np.zeros_like(temperature_atmosp)
 w = np.zeros_like(temperature_atmosp)
 air_density = np.zeros_like(temperature_atmosp)
+
+#######################
+upward_radiation = np.zeros(nlevels)
+downward_radiation = np.zeros(nlevels)
+optical_depth = np.zeros(nlevels)
+Q = np.zeros(nlevels)
+#######################
 
 # read temperature and density in from standard atmosphere
 f = open("standard_atmosphere.txt", "r")
@@ -81,6 +88,8 @@ specific_gas = 287
 thermal_diffusivity_air = 20E-6
 thermal_diffusivity_roc = 1.5E-6
 sigma = 5.67E-8
+
+air_pressure = air_density*specific_gas*temperature_atmosp
 
 # define planet size and various geometric constants
 circumference = 2*np.pi*planet_radius
@@ -127,12 +136,21 @@ def scalar_gradient_y(a,i,j,k=999):
 			return (a[i+1,j,k]-a[i-1,j,k])/dy
 
 def scalar_gradient_z(a,i,j,k):
-	if k == 0:
-		return (a[i,j,k+1]-a[i,j,k])/dz[k]
-	elif k == nlevels-1:
-		return (a[i,j,k]-a[i,j,k-1])/dz[k]
+	output = np.zeros_like(a)
+	if output.ndim == 1:
+		if k == 0:
+			return (a[k+1]-a[k])/dz[k]
+		elif k == nlevels-1:
+			return (a[k]-a[k-1])/dz[k]
+		else:
+			return (a[k+1]-a[k-1])/(2*dz[k])
 	else:
-		return (a[i,j,k+1]-a[i,j,k-1])/(2*dz[k])
+		if k == 0:
+			return (a[i,j,k+1]-a[i,j,k])/dz[k]
+		elif k == nlevels-1:
+			return (a[i,j,k]-a[i,j,k-1])/dz[k]
+		else:
+			return (a[i,j,k+1]-a[i,j,k-1])/(2*dz[k])
 
 # laplacian of scalar field a
 def laplacian(a):
@@ -140,13 +158,13 @@ def laplacian(a):
 	if output.ndim == 2:
 		for i in np.arange(1,nlat-1):
 			for j in range(nlon):
-				output[i,j] = (scalar_gradient_x(a,i,(j+1)%nlon) - scalar_gradient_x(a,i,(j-1)%nlon)/dx[i]) + (scalar_gradient_y(a,i+1,j) - scalar_gradient_y(a,i-1,j))/dy
+				output[i,j] = (scalar_gradient_x(a,i,(j+1)%nlon) - scalar_gradient_x(a,i,(j-1)%nlon))/dx[i] + (scalar_gradient_y(a,i+1,j) - scalar_gradient_y(a,i-1,j))/dy
 		return output
 	if output.ndim == 3:
 		for i in np.arange(1,nlat-1):
 			for j in range(nlon):
 				for k in range(nlevels-1):
-					output[i,j,k] = (scalar_gradient_x(a,i,(j+1)%nlon,k) - scalar_gradient_x(a,i,(j-1)%nlon,k)/dx[i]) + (scalar_gradient_y(a,i+1,j,k) - scalar_gradient_y(a,i-1,j,k))/dy + (scalar_gradient_z(a,i,j,k+1)-scalar_gradient_z(a,i,j,k-1))/2*dz[k]
+					output[i,j,k] = (scalar_gradient_x(a,i,(j+1)%nlon,k) - scalar_gradient_x(a,i,(j-1)%nlon,k))/dx[i] + (scalar_gradient_y(a,i+1,j,k) - scalar_gradient_y(a,i-1,j,k))/dy + (scalar_gradient_z(a,i,j,k+1)-scalar_gradient_z(a,i,j,k-1))/2*dz[k]
 		return output
 
 # divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field
@@ -165,6 +183,9 @@ def solar(insolation, lat, lon, t):
 	value = insolation*np.cos(lat*np.pi/180)*np.cos((lon-sun_longitude)*np.pi/180)
 	if value < 0:	return 0
 	else:	return value
+
+def surface_optical_depth(lat):
+	return 3.75 + np.cos(lat*np.pi/90)*4.5/2
 
 #################### SHOW TIME ####################
 
@@ -215,18 +236,26 @@ while True:
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
 	for i in range(nlat):
 		for j in range(nlon):
-			temperature_planet[i,j] += dt*((1-albedo[i,j])*solar(insolation,lat[i],lon[j],t) + epsilon[0]*sigma*temperature_atmosp[i,j,0]**4 - sigma*temperature_planet[i,j]**4)/heat_capacity_earth[i,j]
-			for k in range(nlevels):
-				if k == 0:
-					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(temperature_planet[i,j]**4 + epsilon[k+1]*temperature_atmosp[i,j,k+1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos*dz[k])
-				elif k == nlevels-1:
-					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(epsilon[k-1]*temperature_atmosp[i,j,k-1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos*dz[k])
-				else:
-					temperature_atmosp[i,j,k] += dt*epsilon[k]*sigma*(epsilon[k+1]*temperature_atmosp[i,j,k+1]**4 + epsilon[k-1]*temperature_atmosp[i,j,k-1]**4 - 2*temperature_atmosp[i,j,k]**4)/(air_density[i,j,k]*heat_capacity_atmos*dz[k])
+
+			temperature_planet[i,j] += dt*((1-albedo[i,j])*solar(insolation,lat[i],lon[j],t))/heat_capacity_earth[i,j]
+
+			pressure_profile = air_pressure[i,j,:]
+			fl = 0.1
+			optical_depth = surface_optical_depth(lat[i])*(fl*(pressure_profile/pressure_profile[0]) + (1-fl)*(pressure_profile/pressure_profile[0])**4)
+
+			upward_radiation[0] = sigma*temperature_planet[i,j]**4
+			for k in np.arange(1,nlevels):
+				upward_radiation[k] = upward_radiation[k-1] + (optical_depth[k]-optical_depth[k-1])*(upward_radiation[k-1] - sigma*np.mean(temperature_atmosp[:,:,k])**4)
+			downward_radiation[-1] = 0
+			for k in np.arange(0,nlevels-1)[::-1]:
+				downward_radiation[k] = downward_radiation[k+1] + (optical_depth[k]-optical_depth[k-1])*(sigma*np.mean(temperature_atmosp[:,:,k])**4 - downward_radiation[k+1])
+			for k in np.arange(nlevels):
+				Q[k] = -scalar_gradient_z(upward_radiation-downward_radiation,0,0,k)/(1E3*density_profile[k])
+
+			temperature_atmosp[i,j,:] += Q
 
 	# update air pressure
 	air_pressure = air_density*specific_gas*temperature_atmosp
-	print(heights/1E3,np.mean(np.mean(air_pressure,axis=0),axis=0))
 
 	if velocity:
 
@@ -238,7 +267,7 @@ while True:
 		# calculate acceleration of atmosphere using primitive equations on beta-plane
 		for i in np.arange(1,nlat-1):
 			for j in range(nlon):
-				for k in range(nlevels-2):
+				for k in range(nlevels):
 					if k == 0:
 						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
 						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
@@ -248,7 +277,7 @@ while True:
 					else:
 						u_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(u,i,j,k) - v[i,j,k]*scalar_gradient_y(u,i,j,k) + coriolis[i]*v[i,j,k] - scalar_gradient_x(air_pressure,i,j,k)/air_density[i,j,k] )
 						v_temp[i,j,k] += dt*( -u[i,j,k]*scalar_gradient_x(v,i,j,k) - v[i,j,k]*scalar_gradient_y(v,i,j,k) - coriolis[i]*u[i,j,k] - scalar_gradient_y(air_pressure,i,j,k)/air_density[i,j,k] )
-						w_temp[i,j,k] += -1E-3*dt*( scalar_gradient_z(air_pressure,i,j,k)/air_density[i,j,k] + gravity )
+						w_temp[i,j,k] += 1E-3*dt*( scalar_gradient_z(air_pressure,i,j,k)/air_density[i,j,k] + gravity )
 
 		u += u_temp
 		v += v_temp
@@ -325,3 +354,5 @@ while True:
 
 	if save:
 		pickle.dump((temperature_atmosp,temperature_planet,u,v,t,air_density,albedo), open("save_file.p","wb"))
+
+	# sys.exit()
