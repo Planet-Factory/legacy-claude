@@ -210,7 +210,7 @@ The equation we will need for that is the mass continuity equation as shown in \
 \end{equation}
 
 Using this equation means that we will no longer assume that the atmosphere is incompressible. Therefore we need to change a few things in the code. First we need to change the $\rho$ in 
-\autoref{alg:stream3}. Since $\rho$ is no longer constant we need to access the right value of $\rho$ by specifying the indices. So $\rho$ will chnage to $\rho[lat, lon]$. Furthermore we need
+\autoref{alg:stream3}. Since $\rho$ is no longer constant we need to access the right value of $\rho$ by specifying the indices. So $\rho$ will change to $\rho[lat, lon]$. Furthermore we need
 to calculate $\rho$ after the movement of air has taken place, so we need to change \autoref{alg:advection} as well to include the calculations for $\rho$. The new version can be found in 
 \autoref{alg:advectionv2}. Again the $\nabla$ represents the call to \autoref{alg:divergence}.
 

@@ -5,9 +5,9 @@ this manual and hence has been left out. The plan was to add vertical momentum a
 \subsection{Discovering That Things Are Broken}
 While trying to add vertical momentum, it appears that some parts of the model are broken in their current state. The horizontal advection is one of the things that is broken. If you recall, 
 we needed to use the Laplacian operator in the advection equations (as shown in \autoref{eq:diffusion}, diffusion is considered a part of advection since diffusion transports energy and matter
-which is what advection does as well). The Laplacian operator (as shown in \autoref{alg:laplacian layer}) does not work. It is currently unknown why that is. If a fix has been found, the original
-algorithm will be fixed accordingly (unless a lot of stuff changes and we need additional functions to be defined, then I will put a reference there to the section where it will be fixed). For 
-now we disabled the Laplacian operator as it has a small effect on the total advection (and because it is broken).
+which is what advection does as well). The Laplacian operator (as shown in \autoref{alg:laplacian layer}) did not work. This is because there was a misplaced bracket causing weird numerical errors.
+This has been fixed in the code (but was never present in the manual, yay for me) and can be safely enabled, though for this stream we disabled the Laplacian operator as it has a small effect on 
+the total advection (and because it was at this time broken). %The Laplacian has been re-enabled in Stream 8 (\autoref{sec:stream8}).
 
 Another thing that we found out was broken is the vertical momentum. We tried to add it, ran into problems and just set it to 0 to fix the other problems that occured. One of those problems was 
 a wrong initialisation of the density. We basically told the model that the density is the same on every layer of the atmosphere, which is obviously not true. Hence we need to adjust that. The 

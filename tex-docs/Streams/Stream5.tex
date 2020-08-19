@@ -68,20 +68,34 @@ the layer part in the gradient.
     \label{alg:gradient y layer}
 \end{algorithm}
 
-With those changes done, let us define the gradient in the $z$ direction. The function can be found in \autoref{alg:gradient z layer}. 
+With those changes done, let us define the gradient in the $z$ direction. The function can be found in \autoref{alg:gradient z layer}. Here $a.dimensions$ is the attribute that tells us how 
+deeply nested the array $a$ is. If the result is $1$ we have just a normal array, if it is $2$ we have a double array (an array at each index of the array) which is also called a matrix and if it 
+is $3$ we have a triple array. We need this because we have a one-dimensional case, for when we do not use multiple layers and a three-dimensional case for when we do use multiple layers. This 
+distinction is needed to avoid errors being thrown when running the model with one or multiple layers.
 
 \begin{algorithm}[hbt]
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
     \Output{Gradient in the $z$ direction}
-    \uIf{$i == 0$}{
-        $grad \leftarrow 2\frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
-    }\uElseIf{$i == nlat - 1$}{
-        $grad \leftarrow 2\frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
-    }\uElse{
-        $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{\delta z[k]}$ \;
+    \uIf{$a.dimensions == 1$}{
+        \uIf{$k == 0$}{
+            $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
+        }\uElseIf{$k == nlevels - 1$}{
+            $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
+        }
+    } \uElse {
+        \uIf{$k == 0$}{
+            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
+        }\uElseIf{$k == nlevels - 1$}{
+            $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
+        }
     }
+    
     \Return $grad$ \;
     \caption{Calculating the gradient in the $z$ direction}
     \label{alg:gradient z layer}
@@ -229,9 +243,9 @@ use gravity ($g$) instead of the coriolis force ($f$) and calculate the pressure
         \For{$lat \in [1, nlat - 1]$}{
             \For{$lon \in [0, nlon]$}{
                 \For{$layer \in [0, nlevels]$}{
-                    $u[lan, lon, layer] \leftarrow u[lan, lon, layer] + \delta t \frac{-u[lan, lon, layer]S_{xu} - v[lan, lon, layer]S_{yu} + f[lan]v[lan, lon, layer] - S_{px}}{\rho}$ \;
-                    $v[lan, lon, layer] \leftarrow v[lan, lon, layer] + \delta t \frac{-u[lan, lon, layer]S_{xv} - v[lan, lon, layer]S_{yv} - f[lan]u[lan, lon, layer] - S_{py}}{\rho}$ \;
-                    $w[lan, lon, layer] \leftarrow w[lan, lon, layer] + \delta t (\frac{S_{pz}}{\rho[lan, lon, layer]} + g)$ \;
+                    $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
+                    $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
+                    $w[lan, lon, layer] \leftarrow w[lat, lon, layer] + \delta t (\frac{S_{pz}}{\rho[lat, lon, layer]} + g)$ \;
                 }
             }
         }
@@ -241,7 +255,7 @@ use gravity ($g$) instead of the coriolis force ($f$) and calculate the pressure
 \end{algorithm}
 
 Lastly, we need to add the correct indices to the advection algorithm \autoref{alg:advectionfix}. Let us add it, with \autoref{alg:advection layer} as a result. Here the ':' means all indices 
-that the 3 dimensional matrix.
+of the 3 dimensional matrix.
 
 \begin{algorithm}
     $\alpha_a \leftarrow 2 \cdot 10^{-5}$ \;
