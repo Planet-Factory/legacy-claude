@@ -1,0 +1,47 @@
+\section{Using Python to Model the Earth's Atmosphere}
+This stream Simon was not feeling that well and it felt like his brain was not working, so be wary of errors! You have been warned. also the resolutin (size of an individual cell on the latitude
+longitude grid) has been decreased to 5 degrees per cell instead of 3 degrees.
+
+\subsection{Interpolating the Air Density}
+In order to interpolate (see \autoref{sec:interpolation}) the air density, we need data. However currently we are just guessing the air density at higher levels, instead of taking real values. 
+So let us change that. For that we are going to use the U.S. Standard Atmosphere, an industry standard measure of the atmosphere on Earth \cite{usatmosp}. This data was provided in a text 
+(\texttt{TXT}) file which of course needs to be read in order for the data to be used in the model. Here we only care for the density and the temperature at a specific height. So the text file 
+only contains those two columns of the data (and the height in km of course as that is the index of the row, the property that uniquely identifies a row).
+
+With that in mind, let's get coding and importing the data. We do this in \autoref{alg:usatmosp}. As one can see we do not specify how to open the file or how to split the read line, as this 
+is language specific and not interesting to describe in detail. I refer you to the internet to search for how to open a text file in the language you are working in. Keep in mind in which 
+magnitude you are working and in which magnitude the data is. If you work with $km$ for height and the data is in $m$, you need to account for that somewhere by either transforming the imported 
+data or work in the other magnitude. 
+
+\begin{algorithm}
+    $data \leftarrow \text{open text file containing the us standard atmosphere data}$ \;
+    \ForEach{$line \in data$}{
+        Split $line$ into three components, $sh, st$ and $sd$, representing the height, temperature and density respectively \;
+        $standardHeight.add(sh)$ \;
+        $standardTemperature.add(st)$ \;
+        $standardDensity.add(sd)$ \;
+    }
+
+    $densityProfile \leftarrow \texttt{interpolate}(heights, standardHeight, standardDensity)$ \;
+    $temperatureProfile \leftarrow \texttt{interpolate}(heights, standardHeight, standardTemperature)$ \;
+
+    \For{$alt \in [0, nlevels]$}{
+        $\rho[:, :, alt] \leftarrow densityProfile[alt]$ \;
+        $T_a[:, :, alt] \leftarrow temperatureProfile[alt]$ \;
+    }
+    \caption{Loading in the U.S. Standard Atmosphere}
+    \label{alg:usatmosp}
+\end{algorithm}
+
+Note that the function \texttt{interpolate} takes three arguments, the first one being the data points that we want to have values for, the second one is the data points that we know and the 
+third one is the values for the data points that we know. This function may or may not exist in your programming language of choice, which might mean that you have to write it yourself. 
+The formula that we use for interpolation can be found in \autoref{eq:interpolation}, though you still need to figure out what value you need for $\lambda$ (see \autoref{sec:interpolation}). 
+This is left as an exercise for the reader.
+
+\subsection{Fixing Vertical Motion}
+Another attempt was made at fixing the vertical motion. The changes are incorporated in \autoref{alg:advection layer}. Do keep in mind that the low air density in the upper layers messes a lot 
+with the vertical motion. In other words, it kinda works but not really. Another idea to help fix it, is to introduce a variable called $top$ which indicates the highest point that the 
+atmosphere may have. This value is initialised as $8 \cdot 10^3$ in meters (so 8 $km$). We then change the definition of $heights$ to: An array of uniform thickness of $\frac{top}{nlevels} m$.
+We also added the $\delta z$ to \autoref{alg:temperature layer} as that was something that was still missing.
+
+The current theory why the vertical velocity is not right is that the vertical thermodynamics may be wrong. This will be investigated further and we will report on this in future sections.

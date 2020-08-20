@@ -1,0 +1,113 @@
+\section{Getting Radiation Right in our Climate Model! 3D Motion Here We Come} \label{sec:stream8}
+The time has come to finally fix 3D motion. For this to work, we need to use a radiation scheme, which Simon \sout{shamelessly stole} got inspired by the Isca project \cite{isca}. So he followed
+the references and found a paper which he is going to use in our model \cite{greyRad}. Great, so let's get into it shall we.
+
+\subsection{Grey Radiation Scheme}
+A radiation scheme is a model for how energy is redistributed using light in a system. Such a model is a Grey radiation scheme if you split it into two parts, short and long wavelength radiation.
+So you have two redistribution systems, one for short wavelength light and one for long wavelength light. Another assumption we make when using the Grey radiation scheme, is that the atmosphere 
+is transparent to short wavelength radiation, meaning it lets through light with short wavelengths. Additionally we use a two stream approximation, which means that we have a stream of radiation
+going up, and another stream of radiation going down. Note that these two streams are both long wavelength radiation, because we said earlier we assume the atmosphere completely ignores short 
+wavelength radiation.
+
+The two long wavelength radiation streams are described in \autoref{eq:upward radiation} and \autoref{eq:downward radiation} \cite{greyRad}. In those equations, the symbols are:
+
+\begin{itemize}
+    \item $U$: Upward flux.
+    \item $D$: Downward flux.
+    \item $B$: The Stefan-Boltzmann equation (see \autoref{eq:stefan-boltzmann}).
+    \item $\tau$: Optical depth.
+\end{itemize}
+
+\begin{subequations}
+    \begin{equation}
+        \frac{dU}{d\tau} = U - B
+        \label{eq:upward radiation}
+    \end{equation}
+    \begin{equation}
+        \frac{dD}{d\tau} = B - D
+        \label{eq:downward radiation}
+    \end{equation}
+\end{subequations}
+
+With \autoref{eq:upward radiation} and \autoref{eq:downward radiation} written down, we can discuss how they work. These equations need a boundary condition to work, a starting point if you like.
+For those equations the boundary conditions are that $U$ is at the surface equal to $B$ and that $D$ at the top of the atmosphere is equal to $0$. Meaning that in the beginning the top of the 
+atmosphere has no downward flux as there is no heat there, and that the bottom of the atmosphere has a lot of upward flux as most if not all of the heat is located there. Then after the spin up 
+time this should stabilise. We are interested in the change of the fluxes, so $dU$ and $dD$, to get those we need to multiply the right hand side by $d\tau$. Then we have the flow of radiation
+that we need. However we cannot solely use these two equations to calculate the heat of a given layer. For that we need a few more components. These are described in \autoref{eq:heat layer}. 
+Here $Q_R$ is the amount of heat in a layer, $c_p$ is the specific heat capacity of dry air (our atmosphere), $\rho$ is the density of the air in that layer and $\delta z$ is the change in height. 
+$\delta U - D$ are the change in net radiation, meaning the amount of radiation that is left over after you transferred the upward and downward flux. See it as incoming and outgoing energy for a 
+given layer, the net change (either cooling down or heating up) is what remains after you have subtracted the incoming energy from the outgoing energy. While this explanation is not entirely true 
+(as flux is not entirely equivalent to energy), it explains the concept the best.
+
+\begin{equation}
+    Q_R = \frac{1}{c_p\rho}\frac{\delta(U - D)}{\delta z}
+    \label{eq:heat layer}
+\end{equation}
+
+Now only one question remains: what is optical depth? Optical depth is the amount of work a photon has had to do to get to a certain point. This might sound really vague, but bear with me. 
+Optical depth describes how much stuff a certain photon has had to go through to get to a point. As you'd expect this is $0$ at the top of the atmosphere as space is a big vacuum so no stuff to 
+move through, so no work. Then the further the photon moves into the atmosphere, the more work the photon has had to do to get there. This is because it now needs to move through gases, like air,
+water vapour and other gases. Hence the closer the photon gets to the surface of the planet, the larger the optical depth is because the photon has had to work more to get there. This phenomenon
+is described in \autoref{eq:optical depth}. The symbols in the equation mean:
+
+\begin{itemize}
+    \item $\tau_0$: Optical depth at the surface.
+    \item $p$: Atmospheric pressure ($Pa$).
+    \item $p_s$: Atmospheric pressure at the surface ($Pa$).
+    \item $f_l$: The linear optical depth parameter, with a value of 0.1.
+\end{itemize}
+
+\begin{equation}
+    \tau = \tau_0[f_l(\frac{p}{p_s}) + (1 - f_l)(\frac{p}{p_s})^4]
+    \label{eq:optical depth}
+\end{equation}
+
+As one can see, \autoref{eq:optical depth} has two parts, a linear part and a quatric part (to the power $4$). The quatric term approximates the structure of water vapour in the atmosphere, which 
+roughly scales with $\frac{1}{4}$ with respect to the height. The linear term is present to fix numerical behaviour because this is an approximation which will not be completely correct (that's
+why it is an approximation) so we add this term to make it roughly right. The same thing holds for $f_l$ which can be manually tuned to fix weird numerical behaviour.
+
+
+\subsection{Getting the equations to code}
+With these equations in our mind, let's get coding. First we add the pressure profile, the pressure of all atmospheric layers at a lat lon point. We need this to accurately represent the optical 
+depth per atmospheric layer. Then we need to use the pressure profile with regards to \autoref{eq:optical depth}. The resulting code can be found in \autoref{alg:optical depth}. This algorithm 
+replaces the temperature calculations we have done in \autoref{alg:temperature layer}, as this is basically a better version of the calculations done in that algorithm. $f_l$ has a value of $0.1$
+and is located near all the other constants in the code, henceforth we will refer to this section in the code as the control panel, since most if not all of the constants can be tweaked here. 
+$\tau_0$ is a function that gives the surface optical depth for a given latitude. The corresponding equation can be found in \autoref{eq:optical depth surface} \cite{simon}. Translating this 
+into code is left as an exercise to the reader. $U[0]$ is the boundary condition discussed before (being the same as \autoref{eq:stefan-boltzmann}), just as $D[nlevels]$ is the boundary condition. 
+$S_z$ represents the call to \autoref{alg:gradient z layer}.
+
+\begin{algorithm}
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlon]$}{
+            $pressureProfile \leftarrow p[i,j,:]$ \;
+            $\tau = \tau_0(lat)f_l\frac{pressureProfile}{pressureProfile[0]} + (1 - f_l)(\frac{pressureProfile}{pressureProfile[0]})^4)$ \;
+            $U[0] \leftarrow \sigma T_p[lat, lon]^4$ \;
+
+            \For{$level \in [1, nlevels]$}{
+                $U[level] \leftarrow U[level - 1] + (\tau[level] - \tau[level - 1])(U[level - 1] - \sigma \cdot (mean(T_a[:, :, level]))^4)$ \;
+            }
+
+            $D[nlevels] \leftarrow 0$ \;
+
+            \For{$level \in [nlevels - 1, 0]$}{
+                $D[level] \leftarrow (\tau[level] - \tau[level - 1])(\sigma \cdot (mean(T_a[:, :, level]))^4) - D[level + 1]$ \;
+            }
+
+            \For{$level \in [0, nlevels]$}{
+                $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
+            }
+
+            $T_a[lat, lon, :] \leftarrow T_a[lat, lon, :] + Q$ \;
+        }
+    }
+    \caption{Adding in radiation}
+    \label{alg:optical depth}
+\end{algorithm}
+
+\begin{equation}
+    \tau_0 = 3.75 + \cos(lat \frac{\pi}{90})\frac{4.5}{2}
+    \label{eq:optical depth surface}
+\end{equation}
+
+Note that in this form, it did not work on stream yet. This may be due to a coding error or to a missing equation, constant or something similar. If it turns out to be a simple fix, then it will
+be fixed in this section. If a lot of other things change in order for the fix to work, then it will probably be a seperate section with a reference to that section here.

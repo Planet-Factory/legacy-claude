@@ -1,0 +1,24 @@
+\section{Making a Dummy THICC Atmospheric Model*}
+* The naming of this section is decided by the stream name, I did not come up with this \cite{twitch}. During this stream, a lot of plotting improvements have been made, which is not the scope of
+this manual and hence has been left out. The plan was to add vertical momentum and advection, though things did not go according to plan\dots
+
+\subsection{Discovering That Things Are Broken}
+While trying to add vertical momentum, it appears that some parts of the model are broken in their current state. The horizontal advection is one of the things that is broken. If you recall, 
+we needed to use the Laplacian operator in the advection equations (as shown in \autoref{eq:diffusion}, diffusion is considered a part of advection since diffusion transports energy and matter
+which is what advection does as well). The Laplacian operator (as shown in \autoref{alg:laplacian layer}) did not work. This is because there was a misplaced bracket causing weird numerical errors.
+This has been fixed in the code (but was never present in the manual, yay for me) and can be safely enabled, though for this stream we disabled the Laplacian operator as it has a small effect on 
+the total advection (and because it was at this time broken). %The Laplacian has been re-enabled in Stream 8 (\autoref{sec:stream8}).
+
+Another thing that we found out was broken is the vertical momentum. We tried to add it, ran into problems and just set it to 0 to fix the other problems that occured. One of those problems was 
+a wrong initialisation of the density. We basically told the model that the density is the same on every layer of the atmosphere, which is obviously not true. Hence we need to adjust that. The 
+new initialisation is described in \autoref{alg:density}. Note that the $\rho[:,: i]$ notation means that for every index in the first and second dimension, only change the value for the index $i$
+in the third dimension.
+
+\begin{algorithm}
+    $\rho[:, :, 0] \leftarrow 1.3$ \;
+    \For{$i \in [1, nlevels-1]$}{
+        $\rho[:, :, i] \leftarrow 0.1\rho[:, :, i - 1]$
+    }
+    \caption{Initialisation of the air density $\rho$}
+    \label{alg:density}
+\end{algorithm}
