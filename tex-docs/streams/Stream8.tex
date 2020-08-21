@@ -74,7 +74,7 @@ replaces the temperature calculations we have done in \autoref{alg:temperature l
 and is located near all the other constants in the code, henceforth we will refer to this section in the code as the control panel, since most if not all of the constants can be tweaked here. 
 $\tau_0$ is a function that gives the surface optical depth for a given latitude. The corresponding equation can be found in \autoref{eq:optical depth surface} \cite{simon}. Translating this 
 into code is left as an exercise to the reader. $U[0]$ is the boundary condition discussed before (being the same as \autoref{eq:stefan-boltzmann}), just as $D[nlevels]$ is the boundary condition. 
-$S_z$ represents the call to \autoref{alg:gradient z layer}.
+$S_z$ represents the call to \autoref{alg:gradient z layer}. \texttt{solar} represents the call to \autoref{alg:solar}.
 
 \begin{algorithm}
     \For{$lat \in [-nlat, nlat]$}{
@@ -87,10 +87,14 @@ $S_z$ represents the call to \autoref{alg:gradient z layer}.
                 $U[level] \leftarrow U[level - 1] + (\tau[level] - \tau[level - 1])(U[level - 1] - \sigma \cdot (mean(T_a[:, :, level]))^4)$ \;
             }
 
-            $D[nlevels] \leftarrow 0$ \;
+            $D[nlevels - 1] \leftarrow 0$ \;
 
             \For{$level \in [nlevels - 1, 0]$}{
-                $D[level] \leftarrow (\tau[level] - \tau[level - 1])(\sigma \cdot (mean(T_a[:, :, level]))^4) - D[level + 1]$ \;
+                \uIf{$level == 0$}{
+                    $D[level] \leftarrow D[level + 1] + (\tau[level + 1] - \tau[level])(\sigma \cdot (T_a[lat, lon, level])^4) - D[level + 1]$ \;
+                }\uElse{
+                    $D[level] \leftarrow D[level + 1] + (\tau[level] - \tau[level - 1])(\sigma \cdot (T_a[lat, lon, level])^4) - D[level + 1]$ \;
+                }
             }
 
             \For{$level \in [0, nlevels]$}{
@@ -98,6 +102,10 @@ $S_z$ represents the call to \autoref{alg:gradient z layer}.
             }
 
             $T_a[lat, lon, :] \leftarrow T_a[lat, lon, :] + Q$ \;
+
+            $S \leftarrow \texttt{solar}(I, lat, lon, t)$ \;
+
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] \frac{\delta t((1 - a[lat, lon]) S + S_z(D, 0, 0, 0) - \sigma T_p[lat, lon]^4)}{C_p[lat ,lon]}$ \;
         }
     }
     \caption{Adding in radiation}
@@ -109,5 +117,5 @@ $S_z$ represents the call to \autoref{alg:gradient z layer}.
     \label{eq:optical depth surface}
 \end{equation}
 
-Note that in this form, it did not work on stream yet. This may be due to a coding error or to a missing equation, constant or something similar. If it turns out to be a simple fix, then it will
-be fixed in this section. If a lot of other things change in order for the fix to work, then it will probably be a seperate section with a reference to that section here.
+%Note that in this form, it did not work on stream yet. This may be due to a coding error or to a missing equation, constant or something similar. If it turns out to be a simple fix, then it will
+%be fixed in this section. If a lot of other things change in order for the fix to work, then it will probably be a seperate section with a reference to that section here.
