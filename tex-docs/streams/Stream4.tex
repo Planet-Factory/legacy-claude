@@ -1,0 +1,83 @@
+\section{Removing Some Assumptions and Mistakes from CLAuDE}
+The first half of this stream was spent looking through the code and fixing some mistakes. To spare you dear reader from making these same mistakes, they have already been incorporated into 
+the previous sections, hooray! This does not only save you some work, but it also spares you from staring at a model that does not function due to wrongly defined constants or using the wrong 
+values.
+
+\subsection{Adding a Spin-Up Time}
+Instead of having a static start (having the planet start from rest, so no rotations allowed) we will have the model start up for some time before we start simulating the climate extensively.
+To accomodate for this, we have to make some changes in the code. First we need to add two booleans (variables that can only take two values, either \texttt{TRUE} or \texttt{FALSE}) that we use
+to indicate to the model whether we want to simulate the wind and whether we want to simulate advection. This means that the main loop will have some changes made to it. After performing the 
+calculations in \autoref{alg:temperature with density} we would calculate the velocities and afterwards we would calculate the advection. Instead let us change it to what is shown in 
+\autoref{alg:stream4v1}.
+
+\begin{algorithm}
+    \While{\texttt{TRUE}}{
+        \autoref{alg:temperature with density} \;
+        \If{$velocity$}{
+            \autoref{alg:stream3} \;
+            \If{$advection$}{
+                \autoref{alg:advectionv2} \;
+            }
+        }
+    }
+    \caption{Main loop that can simulate flow and advection conditionally}
+    \label{alg:stream4v1}
+\end{algorithm}
+
+Now to dynamically enable/disable the simulation of flow and advection we need to add the spin-up calculations to the main loop. So in \autoref{alg:stream4v1}, before 
+\autoref{alg:temperature with density} we add \autoref{alg:spinup}. What it does is it changes the timestep when spinnning up and disables flow simulation, and when a week has passed it reduces 
+the timestep and enables flow simulation. At this point in time, the advection is not dynamically enabled/disabled but it is done by the programmer. Currently it will break the model, so I 
+recommend leaving it on \texttt{FALSE} until it is fixed in \autoref{sec:advectionfix}.
+
+\begin{algorithm}
+    \eIf{$t < 7day$}{
+        $\delta t \leftarrow 60 \cdot 47$ \;
+        $velocity \leftarrow \texttt{FALSE}$ \;
+    }{
+        $\delta t \leftarrow 60 \cdot 9$ \;
+        $velocity \leftarrow \texttt{TRUE}$ \;
+    }
+    \caption{The spin-up block dynamically enabling or disabling flow simulation}
+    \label{alg:spinup}
+\end{algorithm}
+
+\subsection{Varying the Albedo}
+The albdeo (reflectiveness of the planet's surface) is of course not the same over the whole planet. To account for this, we instead vary the albedo slightly for each point in the latitude 
+longitude grid. The algorithm that does this is shown in \autoref{alg:albedo variance}. The uniform distribution basically says that each allowed value in the interval has an equal chance of 
+being picked \cite{uniformdist}.
+
+\begin{algorithm}
+    $V_a \leftarrow 0.02$ \;
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlon]$}{
+            $R \leftarrow \text{ Pick a random number (from the uniform distribution) in the interval } [-V_a, V_a]$ \;
+            $a[lat, lon] \leftarrow a[lat, lon] + V_a \cdot R$\;
+        }
+    }
+    \caption{Varying the albedo of the planet}
+    \label{alg:albedo variance}
+\end{algorithm}
+
+\subsection{Fixing the Advection} \label{sec:advectionfix}
+Currently the advection does not work like it should. This is probably due to boundary issues, where we get too close to the poles and it starts freaking out there \cite{simon}. So to fix this 
+we are going to define boundaries and assume that the advection only works within those boundaries. We only let it change by half of the values. The changes are incorporated in 
+\autoref{alg:advectionfix}. The reason why we mention this seperately, in contrast to the other fixes that we have incorporated throughout the manual already, is the accompanying change with the 
+boundary. 
+
+\begin{algorithm}
+    $\alpha_a \leftarrow 2 \cdot 10^{-5}$ \;
+    $\alpha_p \leftarrow 1.5 \cdot 10^{-6}$ \;
+    $boundary \leftarrow 7$ \;
+    \While{\texttt{TRUE}}{
+        $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
+        $T_a \leftarrow T_a - 0.5T_{add}[boundary:-boundary, :] \text{ //Only subtract } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + boundary, nlat - boundary]$. \;
+        $\rho[boundary: -boundary, :] \leftarrow \rho - 0.5(\delta t \nabla \rho) \text{ //Only change the density for indices in the interval } [-nlat + boundary, nlat - boundary]$ \;
+        $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
+    }
+    \caption{The main loop for calculating the effects of advection}
+    \label{alg:advectionfix}
+\end{algorithm}
+
+\subsection{Adding Friction}
+In order to simulate friction, we multiply the speeds $u$ and $v$ by $0.99$. Of course there are equations for friction but that gets complicated very fast, so instead we just assume that we
+have a constant friction factor. This multiplication is done directly after \autoref{alg:stream3} in \autoref{alg:stream4v1}.

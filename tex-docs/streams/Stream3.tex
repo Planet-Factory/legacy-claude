@@ -1,0 +1,266 @@
+\section{Adding Mass to CLAuDE}
+\subsection{The Momentum Equations}
+The momentum equations are a set of equations that describe the flow of a fluid on the surface of a rotating body. For our model we will use the f-plane approximation. The equations corresponding
+to the f-plane approximation are given in \autoref{eq:x momentum} and \autoref{eq:y momentum} \cite{momentumeqs}. Note that we are ignoring vertical moevement, as this does not have a significant
+effect on the whole flow. All the symbols in \autoref{eq:x momentum} and \autoref{eq:y momentum} mean:
+
+\begin{itemize}
+    \item $u$: The east to west velocity ($ms^{-1}$).
+    \item $t$: The time ($s$).
+    \item $f$: The coriolis parameter as in \autoref{eq:coriolis}.
+    \item $v$: The north to south velocity ($ms^{-1}$).
+    \item $\rho$: The density of the atmosphere ($kgm^{-3}$).
+    \item $p$: The atmospheric pressure ($Pa$).
+    \item $x$: The local longitude coordinate ($m$).
+    \item $y$: The local latitude coordinate ($m$).
+\end{itemize}
+
+If we then define a vector $\bar{u}$ as $(u, v, 0)$, we can rewrite both \autoref{eq:x momentum} as \autoref{eq:x momentum laplace}. Here $\nabla u$ is the gradient of 
+$u$ in both $x$ and $y$ directions. Then if we write out $\nabla u$ we get \autoref{eq:x momentum final}. Similarly, if we want to get $\delta v$ instead of $\delta u$ we rewrite 
+\autoref{eq:y momentum} to get \autoref{eq:y momentum laplace} and \autoref{eq:y momentum final}.
+
+\begin{subequations}
+    \begin{equation}
+        \frac{Du}{Dt} - fv = -\frac{1}{\rho} \frac{\delta p}{\delta x}
+        \label{eq:x momentum}
+    \end{equation}
+    \begin{equation}
+        \frac{Dv}{Dt} - fu = -\frac{1}{\rho} \frac{\delta p}{\delta y}
+        \label{eq:y momentum}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta u}{\delta t} + \bar{u} \cdot \nabla u - fv = -\frac{1}{\rho}\frac{\delta p}{\delta x}
+        \label{eq:x momentum laplace}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta v}{\delta t} + \bar{u} \cdot \nabla v - fu = -\frac{1}{\rho}\frac{\delta p}{\delta y}
+        \label{eq:y momentum laplace}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta u}{\delta t} + u\frac{\delta u}{\delta x} + v\frac{\delta u}{\delta y} - fv = -\frac{1}{\rho}\frac{\delta p}{\delta x}
+        \label{eq:x momentum final}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta v}{\delta t} + u\frac{\delta v}{\delta x} + v\frac{\delta v}{\delta y} - fu = -\frac{1}{\rho}\frac{\delta p}{\delta y}
+        \label{eq:y momentum final}
+    \end{equation}
+\end{subequations}
+
+Now that we have the momentum equations sorted out, we need to define a method to do the gradient calculations for us. Therefore we define two functions \autoref{alg:gradient x} and 
+\autoref{alg:gradient y} that calculate the $x$ and $y$ gradients respectively.
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$}
+    \Output{Gradient in the $x$ direction}
+    $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon] - a[i, (j - 1) \text{ mod } nlon]}{\delta x[i]}$ \;
+    \Return{$grad$} \;
+    \caption{Calculating the gradient in the $x$ direction}
+    \label{alg:gradient x}
+\end{algorithm}
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$}
+    \Output{Gradient in the $y$ direction}
+    \eIf{$i == 0$ or $i == nlat - 1$}{
+        $grad \leftarrow 0$ \;
+    }{
+        $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
+    }
+    \Return $grad$ \;
+    \caption{Calculating the gradient in the $y$ direction}
+    \label{alg:gradient y}
+\end{algorithm}
+
+With the gradient functions defined, we can move on to the main code for the momentum equations. The main loop is shown in \autoref{alg:stream3}. Do note that this loop replaces the one
+in \autoref{alg:stream2v2} as these calculate the same thing, but the new algorithm does it better.
+
+\begin{algorithm}
+    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
+    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lan, lon)$ \;
+    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lan, lon)$ \;
+    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
+    $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    $S_{py} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    \While{\texttt{TRUE}}{
+        \For{$lat \in [1, nlat - 1]$}{
+            \For{$lon \in [0, nlon]$}{
+                $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
+                $v[lan, lon] \leftarrow v[lan, lon] + \delta t\frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
+            }
+        }
+    }
+    \caption{Calculating the flow of the atmosphere (wind)}
+    \label{alg:stream3}
+\end{algorithm}
+
+\subsection{Thermal Diffusion}
+As of this time, what you notice if you run the model is that the winds only get stronger and stronger (and the model is hence blowing up). This is because there is no link yet between the 
+velocities of the atmosphere and the temperature. Currently, any air movement does not affect the temperature in the atmosphere of our model while it does in reality. So we need to change some 
+calculations to account for that. Thermal diffusion helps with spreading out the temperatures and tempering the winds a bit.
+
+The diffusion equation, as written in \autoref{eq:diffusion}, describes how the temperature spreads out over time\cite{diffusion}. The symbols in the equation represent:
+
+\begin{itemize}
+    \item $u$: A vector consisting out of 4 elements: $x, y, z, t$. $x, y, z$ are the local coordinates and $t$ is time.
+    \item $\alpha$: The thermal diffusivity constant.
+    \item $\nabla^2$: The Laplace operator, more information in \autoref{sec:laplace}.
+    \item $\bar{u}$: The time derivative of $u$, or in symbols $\frac{\delta u}{\delta t}$.
+\end{itemize}
+
+\begin{equation}
+    \bar{u} = \alpha \nabla^2 u
+    \label{eq:diffusion}
+\end{equation}
+
+Now to get this into code we need the following algorithms \autoref{alg:laplacian} and \autoref{alg:diffusion}. \autoref{alg:laplacian} implements the laplacian operator, whereas 
+\autoref{alg:diffusion} implements the diffusion calculations. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
+respectively. $\nabla^2$ in \autoref{alg:diffusion} represents the call to \autoref{alg:laplacian}.
+
+\begin{algorithm}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{A matrix (double array) a}
+    \Output{A matrix (double array) with results for the laplacian operator for each element}
+    \For{$lat \in [1, nlat - 1]$}{
+        \For{$lon \in [0, nlon]$}{
+            $output[lat, lon] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon)}{\delta x[lat]} + \frac{\Delta_y(a, lat + 1, lon) - 
+            \Delta_y(a, lat - 1, lon)}{\delta y}$\;
+        }
+    }
+    \Return{$ouput$} \;
+    \caption{Calculate the laplacian operator over a matrix a}
+    \label{alg:laplacian}
+\end{algorithm}
+
+\begin{algorithm}
+    $\alpha_a \leftarrow 2 \cdot 10^{-5}$ \;
+    $\alpha_p \leftarrow 1.5 \cdot 10^{-6}$ \;
+    \While{\texttt{TRUE}}{
+        $T_a \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a)$ \;
+        $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
+    }
+    \caption{The main loop for calculating the effects of diffusion}
+    \label{alg:diffusion}
+\end{algorithm}
+
+\subsection{Advection}
+With thermal diffusion in place, the temperature will spread out a bit, however air is not transported yet. This means that the winds we simulate are not actually moving any air. Advection is
+going to change that. Advection is a fluid flow transporting something with it as it flows. This can be temperature, gas, solids or other fluids. In our case we will be looking at temperature.
+The advection equation is shown in \autoref{eq:advection}. The symbols are:
+
+\begin{itemize}
+    \item $\psi$: What is carried along (in our case temperature, $K$).
+    \item $t$: The time ($s$).
+    \item $u$: The fluid velocity vector ($ms^{-1}$).
+    \item $\nabla$: The divergence operator (as explained in \autoref{sec:laplace}).
+\end{itemize}
+
+\begin{equation}
+    \frac{\delta \psi}{\delta t} + \nabla \cdot (\psi u) = 0
+    \label{eq:advection}
+\end{equation}
+
+As we expect to use the divergence operator more often throughout our model, let us define a seperate function for it in \autoref{alg:divergence}. $\Delta_x$ and $\Delta_y$ in 
+\autoref{alg:divergence} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} respectively. We do the multiplication with the velocity vector here already, as we expect 
+that we might use it in combination with the divergence operator more frequently.
+
+\begin{algorithm}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{A matrix (double array) $a$}
+    \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
+    $dim_1 \leftarrow \text{ Length of } a \text{ in the first dimension}$ \;
+    \For{$i \in [0, dim_1]$}{
+        $dim_2 \leftarrow \text{ Length of } a \text{ in the second dimension (i.e. the length of the array stored at index } i)$ \;
+        \For{$j \in [0, dim_2]$}{
+            $output[i, j] \leftarrow \Delta_x(au, i, j) + \Delta_y(av, i, j)$ \;
+        }
+    }
+    \Return{$output$} \;
+    \caption{Calculate the result of the divergence operator on a vector}
+    \label{alg:divergence}
+\end{algorithm}
+
+With the divergence functon defined, we now need to adjust \autoref{alg:diffusion} to incorporate this effect. The resulting algorithm can be found in \autoref{alg:advection}. Here $\nabla$
+represents the function call to \autoref{alg:divergence}.
+
+\begin{algorithm}
+    $\alpha_a \leftarrow 2 \cdot 10^{-5}$ \;
+    $\alpha_p \leftarrow 1.5 \cdot 10^{-6}$ \;
+    \While{\texttt{TRUE}}{
+        $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
+        $T_a \leftarrow T_a + T_{add}[5:-5, :] \text{ //Only add } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + 5, nlat - 5]$. \;
+        $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
+    }
+    \caption{The main loop for calculating the effects of advection}
+    \label{alg:advection}
+\end{algorithm}
+
+Now that we have the air moving, we also need to account for the moving of the density. This is because moving air to a certain place will change the air density at that place if the air at that 
+place does not move away at the same rate. Say we are moving air to $x$ at $y \ ms^{-1}$. If air at $x$ moves at a rate $z \ ms^{-1}$ and $z \neq y$ then the air density at $x$ will change.
+The equation we will need for that is the mass continuity equation as shown in \autoref{eq:mass continuity} \cite{masscontinue}.
+
+\begin{equation}
+    \frac{\delta \rho}{\delta t} + \nabla \cdot (\rho v) = 0
+    \label{eq:mass continuity}
+\end{equation}
+
+Using this equation means that we will no longer assume that the atmosphere is incompressible. Therefore we need to change a few things in the code. First we need to change the $\rho$ in 
+\autoref{alg:stream3}. Since $\rho$ is no longer constant we need to access the right value of $\rho$ by specifying the indices. So $\rho$ will change to $\rho[lat, lon]$. Furthermore we need
+to calculate $\rho$ after the movement of air has taken place, so we need to change \autoref{alg:advection} as well to include the calculations for $\rho$. The new version can be found in 
+\autoref{alg:advectionv2}. Again the $\nabla$ represents the call to \autoref{alg:divergence}.
+
+
+\begin{algorithm}
+    $\alpha_a \leftarrow 2 \cdot 10^{-5}$ \;
+    $\alpha_p \leftarrow 1.5 \cdot 10^{-6}$ \;
+    \While{\texttt{TRUE}}{
+        $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
+        $T_a \leftarrow T_a + T_{add}[5:-5, :] \text{ //Only add } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + 5, nlat - 5]$. \;
+        $\rho \leftarrow \rho + \delta t \nabla \rho$ \;
+        $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
+    }
+    \caption{The main loop for calculating the effects of advection}
+    \label{alg:advectionv2}
+\end{algorithm}
+
+Now that we have a varying density, we need to account for that in the temperature equations. So let us do that. We need it in the denominator as the density has a direct effect on the 
+heat capacity of the atmosphere. The changes are reflected in \autoref{alg:temperature with density}.
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+
+    \While{\texttt{TRUE}}{
+        \For{$lat \in [-nlat, nlat]$}{
+            \For{$lon \in [0, nlot]$}{
+                $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{\rho[lat, lon]C_p[lat, lon]}$ \;
+                $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{\rho[lat, lon]C_a}$ \;
+                $t \leftarrow t + \delta t$ \;
+            }
+        }
+    }
+    \caption{The main loop of the temperature calculations}
+    \label{alg:temperature with density}
+\end{algorithm}
+
+\subsection{Improving the Coriolis Parameter}
+Another change introduced is in the coriolis parameter. Up until now it has been a constant, however we know that it varies along the latitude. So let's make it vary over the latitude. Recall 
+\autoref{eq:coriolis}, where $\Theta$ is the latitude. Coriolis ($f$) is currently defined in \autoref{alg:gradient}, so let's incorporate the changes which are shown in \autoref{alg:coriolis}.
+
+\begin{algorithm}
+    \SetAlgoLined
+    $C \leftarrow 2\pi R$ \;
+    $\delta y \leftarrow \frac{C}{nlat}$ \;
+    $\Omega \leftarrow 7.2921 \cdot 10^{-5}$ \;
+
+    \For{$lat \in [-nlat, nlat]$}{
+        $\delta x[lat] \leftarrow \delta y \cos(lat \cdot \frac{\pi}{180})$ \;
+        $f[lat] \leftarrow 2\Omega \sin(lat \frac{\pi}{180})$ \;
+    }
+    \caption{Calculating the gradient $\delta x$}
+    \label{alg:coriolis}
+\end{algorithm}
