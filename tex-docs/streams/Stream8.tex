@@ -84,17 +84,13 @@ $S_z$ represents the call to \autoref{alg:gradient z layer}. \texttt{solar} repr
             $U[0] \leftarrow \sigma T_p[lat, lon]^4$ \;
 
             \For{$level \in [1, nlevels]$}{
-                $U[level] \leftarrow U[level - 1] + (\tau[level] - \tau[level - 1])(U[level - 1] - \sigma \cdot (mean(T_a[:, :, level]))^4)$ \;
+                $U[level] \leftarrow U[level - 1] - \frac{(\tau[level] - \tau[level - 1])(\sigma \cdot (mean(T_a[:, :, level]))^4)}{1 + (\tau[level - 1] - \tau[level])}$ \;
             }
 
             $D[nlevels - 1] \leftarrow 0$ \;
 
             \For{$level \in [nlevels - 1, 0]$}{
-                \uIf{$level == 0$}{
-                    $D[level] \leftarrow D[level + 1] + (\tau[level + 1] - \tau[level])(\sigma \cdot (T_a[lat, lon, level])^4) - D[level + 1]$ \;
-                }\uElse{
-                    $D[level] \leftarrow D[level + 1] + (\tau[level] - \tau[level - 1])(\sigma \cdot (T_a[lat, lon, level])^4) - D[level + 1]$ \;
-                }
+                $D[level] \leftarrow D[level + 1] - \frac{(\tau[level + 1] - \tau[level])(\sigma \cdot (mean(T_a[:, :, level]))^4)}{1 + (\tau[level] - \tau[level + 1])}$ \;
             }
 
             \For{$level \in [0, nlevels]$}{
