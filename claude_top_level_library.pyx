@@ -70,7 +70,7 @@ def radiation_calculation(np.ndarray temperature_world, np.ndarray temperature_a
 			
 			# gradient of difference provides heating at each level
 			for k in np.arange(nlevels):
-				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,0,0,k)/(1E3*density_profile[k])
+				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,k)/(1E3*density_profile[k])
 				# make sure model does not have a higher top than 50km!!
 				# approximate SW heating of ozone
 				if heights[k] > 20E3:

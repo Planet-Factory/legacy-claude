@@ -3638,7 +3638,7 @@ static PyObject *__pyx_pf_24claude_top_level_library_2radiation_calculation(CYTH
  * 
  * 			# gradient of difference provides heating at each level
  * 			for k in np.arange(nlevels):             # <<<<<<<<<<<<<<
- * 				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,0,0,k)/(1E3*density_profile[k])
+ * 				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,k)/(1E3*density_profile[k])
  * 				# make sure model does not have a higher top than 50km!!
  */
       __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 72, __pyx_L1_error)
@@ -3710,7 +3710,7 @@ static PyObject *__pyx_pf_24claude_top_level_library_2radiation_calculation(CYTH
         /* "claude_top_level_library.pyx":73
  * 			# gradient of difference provides heating at each level
  * 			for k in np.arange(nlevels):
- * 				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,0,0,k)/(1E3*density_profile[k])             # <<<<<<<<<<<<<<
+ * 				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,k)/(1E3*density_profile[k])             # <<<<<<<<<<<<<<
  * 				# make sure model does not have a higher top than 50km!!
  * 				# approximate SW heating of ozone
  */
@@ -3735,8 +3735,8 @@ static PyObject *__pyx_pf_24claude_top_level_library_2radiation_calculation(CYTH
         }
         #if CYTHON_FAST_PYCALL
         if (PyFunction_Check(__pyx_t_17)) {
-          PyObject *__pyx_temp[6] = {__pyx_t_15, __pyx_t_3, ((PyObject *)__pyx_v_dz), __pyx_int_0, __pyx_int_0, __pyx_v_k};
-          __pyx_t_1 = __Pyx_PyFunction_FastCall(__pyx_t_17, __pyx_temp+1-__pyx_t_12, 5+__pyx_t_12); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 73, __pyx_L1_error)
+          PyObject *__pyx_temp[4] = {__pyx_t_15, __pyx_t_3, ((PyObject *)__pyx_v_dz), __pyx_v_k};
+          __pyx_t_1 = __Pyx_PyFunction_FastCall(__pyx_t_17, __pyx_temp+1-__pyx_t_12, 3+__pyx_t_12); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 73, __pyx_L1_error)
           __Pyx_XDECREF(__pyx_t_15); __pyx_t_15 = 0;
           __Pyx_GOTREF(__pyx_t_1);
           __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -3744,15 +3744,15 @@ static PyObject *__pyx_pf_24claude_top_level_library_2radiation_calculation(CYTH
         #endif
         #if CYTHON_FAST_PYCCALL
         if (__Pyx_PyFastCFunction_Check(__pyx_t_17)) {
-          PyObject *__pyx_temp[6] = {__pyx_t_15, __pyx_t_3, ((PyObject *)__pyx_v_dz), __pyx_int_0, __pyx_int_0, __pyx_v_k};
-          __pyx_t_1 = __Pyx_PyCFunction_FastCall(__pyx_t_17, __pyx_temp+1-__pyx_t_12, 5+__pyx_t_12); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 73, __pyx_L1_error)
+          PyObject *__pyx_temp[4] = {__pyx_t_15, __pyx_t_3, ((PyObject *)__pyx_v_dz), __pyx_v_k};
+          __pyx_t_1 = __Pyx_PyCFunction_FastCall(__pyx_t_17, __pyx_temp+1-__pyx_t_12, 3+__pyx_t_12); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 73, __pyx_L1_error)
           __Pyx_XDECREF(__pyx_t_15); __pyx_t_15 = 0;
           __Pyx_GOTREF(__pyx_t_1);
           __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
         } else
         #endif
         {
-          __pyx_t_16 = PyTuple_New(5+__pyx_t_12); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 73, __pyx_L1_error)
+          __pyx_t_16 = PyTuple_New(3+__pyx_t_12); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 73, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_16);
           if (__pyx_t_15) {
             __Pyx_GIVEREF(__pyx_t_15); PyTuple_SET_ITEM(__pyx_t_16, 0, __pyx_t_15); __pyx_t_15 = NULL;
@@ -3762,15 +3762,9 @@ static PyObject *__pyx_pf_24claude_top_level_library_2radiation_calculation(CYTH
           __Pyx_INCREF(((PyObject *)__pyx_v_dz));
           __Pyx_GIVEREF(((PyObject *)__pyx_v_dz));
           PyTuple_SET_ITEM(__pyx_t_16, 1+__pyx_t_12, ((PyObject *)__pyx_v_dz));
-          __Pyx_INCREF(__pyx_int_0);
-          __Pyx_GIVEREF(__pyx_int_0);
-          PyTuple_SET_ITEM(__pyx_t_16, 2+__pyx_t_12, __pyx_int_0);
-          __Pyx_INCREF(__pyx_int_0);
-          __Pyx_GIVEREF(__pyx_int_0);
-          PyTuple_SET_ITEM(__pyx_t_16, 3+__pyx_t_12, __pyx_int_0);
           __Pyx_INCREF(__pyx_v_k);
           __Pyx_GIVEREF(__pyx_v_k);
-          PyTuple_SET_ITEM(__pyx_t_16, 4+__pyx_t_12, __pyx_v_k);
+          PyTuple_SET_ITEM(__pyx_t_16, 2+__pyx_t_12, __pyx_v_k);
           __pyx_t_3 = 0;
           __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_17, __pyx_t_16, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 73, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_1);
@@ -3949,7 +3943,7 @@ static PyObject *__pyx_pf_24claude_top_level_library_2radiation_calculation(CYTH
  * 
  * 			# gradient of difference provides heating at each level
  * 			for k in np.arange(nlevels):             # <<<<<<<<<<<<<<
- * 				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,0,0,k)/(1E3*density_profile[k])
+ * 				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,k)/(1E3*density_profile[k])
  * 				# make sure model does not have a higher top than 50km!!
  */
       }

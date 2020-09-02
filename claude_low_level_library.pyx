@@ -34,7 +34,6 @@ def scalar_gradient_y_2d(a,dy,nlat,i,j):
 		return (a[i+1,j]-a[i-1,j])/dy
 
 def scalar_gradient_z(a,dz,i,j,k):
-	cdef np.ndarray output = np.zeros_like(a)
 	cdef np.int_t nlevels = len(dz)
 	if k == 0:
 		return (a[i,j,k+1]-a[i,j,k])/dz[k]
@@ -43,8 +42,7 @@ def scalar_gradient_z(a,dz,i,j,k):
 	else:
 		return (a[i,j,k+1]-a[i,j,k-1])/(2*dz[k])
 
-def scalar_gradient_z_1D(np.ndarray a,np.ndarray dz,np.int_t i,np.int_t j,np.int_t k):
-	cdef np.ndarray output = np.zeros_like(a)
+def scalar_gradient_z_1D(np.ndarray a,np.ndarray dz,np.int_t k):
 	cdef np.int_t nlevels = len(dz)
 	if k == 0:
 		return (a[k+1]-a[k])/dz[k]
