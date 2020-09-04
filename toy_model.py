@@ -23,17 +23,17 @@ year = 365*day					# length of year (s)
 
 dt_spinup = 60*137
 dt_main = 60*9
-spinup_length = 0*day
+spinup_length = 5*day
 
 ###
 
 advection = True 				# if you want to include advection set this to be True
 advection_boundary = 8			# how many gridpoints away from poles to apply advection
 
-save = False 					# save current state to file?
-load = False  					# load initial state from file?
+save = True 					# save current state to file?
+load = True  					# load initial state from file?
 
-plot = True 					# display plots of output?
+plot = False 					# display plots of output?
 level_plots = True 				# display plots of output on vertical levels?
 nplots = 5						# how many levels you want to see plots of (evenly distributed through column)
 
@@ -215,6 +215,18 @@ while True:
 	
 	before_plot = time.time()
 	if plot:
+
+		tropopause_height = np.zeros(nlat)
+		for i in range(nlat):
+			k = 2
+			if low_level.scalar_gradient_z_1D(np.mean(temperature_atmos[i,:,:],axis=0),dz,k) > 0: 
+				k += 1
+				while low_level.scalar_gradient_z_1D(np.mean(temperature_atmos[i,:,:],axis=0),dz,k) < 0: 
+				 	k += 1
+			else:
+				while low_level.scalar_gradient_z_1D(np.mean(temperature_atmos[i,:,:],axis=0),dz,k) < 0: 
+					k += 1
+
 		# update plot
 		test = ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic')
 		ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=1)
@@ -226,6 +238,7 @@ while True:
 		ax[0].set_xlabel('Longitude')
 
 		ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmos,axis=1)), cmap='seismic')
+		ax[1].plot(lat_plot,tropopause_height,color='black',linestyle='--',linewidth=3,alpha=0.5)
 		ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1)), colors='white',levels=20,linewidths=1,alpha=0.8)
 		ax[1].streamplot(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1)),np.transpose(np.mean(10*w,axis=1)),color='black',density=0.75)
 		ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
@@ -270,4 +283,5 @@ while True:
 	if save:
 		pickle.dump((temperature_atmos,temperature_world,u,v,w,t,air_density,albedo), open("save_file.p","wb"))
 
-	# sys.exit()
+	if np.isnan(u.max()):
+		sys.exit()
