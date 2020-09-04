@@ -46,35 +46,6 @@ $u$ in both $x$ and $y$ directions. Then if we write out $\nabla u$ we get \auto
     \end{equation}
 \end{subequations}
 
-Now that we have the momentum equations sorted out, we need to define a method to do the gradient calculations for us. Therefore we define two functions \autoref{alg:gradient x} and 
-\autoref{alg:gradient y} that calculate the $x$ and $y$ gradients respectively.
-
-\begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$}
-    \Output{Gradient in the $x$ direction}
-    $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon] - a[i, (j - 1) \text{ mod } nlon]}{\delta x[i]}$ \;
-    \Return{$grad$} \;
-    \caption{Calculating the gradient in the $x$ direction}
-    \label{alg:gradient x}
-\end{algorithm}
-
-\begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$}
-    \Output{Gradient in the $y$ direction}
-    \eIf{$i == 0$ or $i == nlat - 1$}{
-        $grad \leftarrow 0$ \;
-    }{
-        $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
-    }
-    \Return $grad$ \;
-    \caption{Calculating the gradient in the $y$ direction}
-    \label{alg:gradient y}
-\end{algorithm}
-
 With the gradient functions defined, we can move on to the main code for the momentum equations. The main loop is shown in \autoref{alg:stream3}. Do note that this loop replaces the one
 in \autoref{alg:stream2v2} as these calculate the same thing, but the new algorithm does it better.
 
@@ -117,8 +88,7 @@ The diffusion equation, as written in \autoref{eq:diffusion}, describes how the 
 \end{equation}
 
 Now to get this into code we need the following algorithms \autoref{alg:laplacian} and \autoref{alg:diffusion}. \autoref{alg:laplacian} implements the laplacian operator, whereas 
-\autoref{alg:diffusion} implements the diffusion calculations. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
-respectively. $\nabla^2$ in \autoref{alg:diffusion} represents the call to \autoref{alg:laplacian}.
+\autoref{alg:diffusion} implements the diffusion calculations.  $\nabla^2$ in \autoref{alg:diffusion} represents the call to \autoref{alg:laplacian}.
 
 \begin{algorithm}
     \SetKwInOut{Input}{Input}
@@ -163,10 +133,6 @@ The advection equation is shown in \autoref{eq:advection}. The symbols are:
     \frac{\delta \psi}{\delta t} + \nabla \cdot (\psi u) = 0
     \label{eq:advection}
 \end{equation}
-
-As we expect to use the divergence operator more often throughout our model, let us define a seperate function for it in \autoref{alg:divergence}. $\Delta_x$ and $\Delta_y$ in 
-\autoref{alg:divergence} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} respectively. We do the multiplication with the velocity vector here already, as we expect 
-that we might use it in combination with the divergence operator more frequently.
 
 \begin{algorithm}
     \SetKwInOut{Input}{Input}

@@ -16,90 +16,7 @@ are no longer indexed by $lat, lon$ but are indexed by $lat, lon, layer$.
     \label{alg:more layers}
 \end{algorithm}
 
-We also need to change all the gradient functions (\autoref{alg:gradient x} and \autoref{alg:gradient y}) to incorporate the atmospheric layers. Additionally we need a new gradient function that 
-calculates the gradient in the $z$ direction (vertical). Let us first change the existing gradient functions to take the atmospheric layer in effect. The changes can be found in 
-\autoref{alg:gradient x layer} and \autoref{alg:gradient y layer}. Let us improve the gradient in the $y$ direction as well. Since we are using the central difference method (calculating the
-gradient by taking the difference of the next grid cell and the previous grid cell) there is no gradient at the poles. What we can do instead of returning $0$ for those cases is forward 
-differencing (calculating the gradient by taking the difference of the cell and the next/previous cell, multiplied by $2$ to keep it fair). A special change in both functions is checking whether
-$k$ is equal to \texttt{NULL}. We do this as sometimes we want to use this function for matrices that does not have the layer dimension. Hence we define a default value for $k$ which is 
-\texttt{NULL}. \texttt{NULL} is a special value in computer science. It represents nothing. This can be useful sometimes if you declare a variable to be something but it is referring to something
-that has been deleted or it is returned when some function fails. It usually indicates that something special is going on. So here we use it in the special case where we do not want to consider
-the layer part in the gradient.
 
-\begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
-    \Output{Gradient in the $x$ direction}
-    \eIf{$k == \texttt{NULL}$}{
-        $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon] - a[i, (j - 1) \text{ mod } nlon]}{\delta x[i]}$ \;
-    }{
-        $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon, k] - a[i, (j - 1) \text{ mod } nlon, k]}{\delta x[i]}$ \;
-    }
-    \Return{$grad$} \;
-    \caption{Calculating the gradient in the $x$ direction}
-    \label{alg:gradient x layer}
-\end{algorithm}
-
-\begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
-    \Output{Gradient in the $y$ direction}
-    \eIf{$k == \texttt{NULL}$}{
-        \uIf{$i == 0$}{
-            $grad \leftarrow 2 \frac{a[i + 1, j] - a[i, j]}{\delta y}$ \;
-        }\uElseIf{$i == nlat - 1$}{
-            $grad \leftarrow 2 \frac{a[i, j] - a[i - 1, j]}{\delta y}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
-        }
-    }{
-        \uIf{$i == 0$}{
-            $grad \leftarrow 2 \frac{a[i + 1, j, k] - a[i, j, k]}{\delta y}$ \;
-        }\uElseIf{$i == nlat - 1$}{
-            $grad \leftarrow 2 \frac{a[i, j, k] - a[i - 1, j, k]}{\delta y}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
-        }
-    }
-    \Return $grad$ \;
-    \caption{Calculating the gradient in the $y$ direction}
-    \label{alg:gradient y layer}
-\end{algorithm}
-
-With those changes done, let us define the gradient in the $z$ direction. The function can be found in \autoref{alg:gradient z layer}. Here $a.dimensions$ is the attribute that tells us how 
-deeply nested the array $a$ is. If the result is $1$ we have just a normal array, if it is $2$ we have a double array (an array at each index of the array) which is also called a matrix and if it 
-is $3$ we have a triple array. We need this because we have a one-dimensional case, for when we do not use multiple layers and a three-dimensional case for when we do use multiple layers. This 
-distinction is needed to avoid errors being thrown when running the model with one or multiple layers.
-
-\begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
-    \Output{Gradient in the $z$ direction}
-    \uIf{$a.dimensions == 1$}{
-        \uIf{$k == 0$}{
-            $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
-        }\uElseIf{$k == nlevels - 1$}{
-            $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
-        }
-    } \uElse {
-        \uIf{$k == 0$}{
-            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
-        }\uElseIf{$k == nlevels - 1$}{
-            $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
-        }
-    }
-    
-    \Return $grad$ \;
-    \caption{Calculating the gradient in the $z$ direction}
-    \label{alg:gradient z layer}
-\end{algorithm}
 
 As you can see, we have used $\delta z$ however, we have not defined it yet. Let us do that in \autoref{alg:gradient z}.
 
@@ -112,58 +29,10 @@ As you can see, we have used $\delta z$ however, we have not defined it yet. Let
     \label{alg:gradient z}
 \end{algorithm}
 
-Let's incorporate the changes for the Laplacian operator (\autoref{alg:laplacian}) as well. The new code can be found in \autoref{alg:laplacian layer}.
-
-\begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{A matrix (double array) a}
-    \Output{A matrix (double array) with results for the laplacian operator for each element}
-    \eIf{$a.dimensions == 2$}{
-        \For{$lat \in [1, nlat - 1]$}{
-            \For{$lon \in [0, nlon]$}{
-                $output[lat, lon] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon)}{\delta x[lat]} + \frac{\Delta_y(a, lat + 1, lon) - 
-                \Delta_y(a, lat - 1, lon)}{\delta y}$\;
-            }
-        }
-    }{
-        \For{$lat \in [1, nlat - 1]$}{
-            \For{$lon \in [0, nlon]$}{
-                \For{$k \in [0, nlevels - 1]$}{
-                    $output[lat, lon, k] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon, k) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon, k)}{\delta x[lat]} + \frac{\Delta_y(a, 
-                    lat + 1, lon, k) - \Delta_y(a, lat - 1, lon, k)}{\delta y} + \frac{\Delta_z(a, lat, lon, k + 1) - \Delta_z(a, lat, lon, k + 1)}{2\delta z[k]}$\;
-                }
-            }
-        }
-    }
-    
-    \Return{$ouput$} \;
-    \caption{Calculate the laplacian operator over a matrix a}
-    \label{alg:laplacian layer}
-\end{algorithm}
-
 Of course we also need to incorporate the new layers in the divergence operator (\autoref{alg:divergence}). The new changes can be found in \autoref{alg:divergence layer}. Here we use $w$, the 
 vertical wind velocity. We define $w$ in the same way as $u$ and $v$, it is all zeroes (in the beginning) and has the same dimensions as $u$ and $v$.
 
-\begin{algorithm}[!hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{A matrix (double array) $a$}
-    \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
-    $dim_1 \leftarrow \text{ Length of } a \text{ in the first dimension}$ \;
-    \For{$i \in [0, dim_1]$}{
-        $dim_2 \leftarrow \text{ Length of } a \text{ in the second dimension (i.e. the length of the array stored at index } i)$ \;
-        \For{$j \in [0, dim_2]$}{
-            $dim_3 \leftarrow \text{ Length of } a \text{ in the third dimension}$ \;
-            \For{$k \in [0, dim_3]$}{
-                $output[i, j] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw, i, j, k)$ \;
-            }
-        }
-    }
-    \Return{$output$} \;
-    \caption{Calculate the result of the divergence operator on a vector}
-    \label{alg:divergence layer}
-\end{algorithm}
+
 
 With all those changes in the functions done, let us incorporate the changes into the model itself. We now need to account for the temperature change throughout the layers. Let us look at the 
 atmospheric temperature equation again (\autoref{eq:atmos change}). We need to account for one more thing, the absorbtion of energy from another layer. The new equation is shown in 
