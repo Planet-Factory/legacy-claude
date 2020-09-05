@@ -1,0 +1,43 @@
+\section{The Master File}
+The master file is the file that controls the model calculation. This file decides what calculations are used and  what is done with the calculations (which is not the scope of this manual).
+In other words, the master file combines all the calculations and theory from the previous sections and puts it all together to form a model. As mentioned earlier, this structure enables the 
+user to create their own version of the model. If one has their own calculations, or wants to use an older version of the calculations in this manual, then the user can define it themselves
+and call it instead of the calls that we use. The model is meant to be customisable, which this structure enables.
+
+\subsection{Adding a Spin-Up Time}
+Instead of having a static start (having the planet start from rest, so no rotations allowed) we will have the model start up for some time before we start simulating the climate extensively.
+To accomodate for this, we have to make some changes in the code. First we need to add two booleans (variables that can only take two values, either \texttt{TRUE} or \texttt{FALSE}) that we use
+to indicate to the model whether we want to simulate the wind and whether we want to simulate advection. This means that the main loop will have some changes made to it. After performing the 
+calculations in \autoref{alg:temperature with density} we would calculate the velocities and afterwards we would calculate the advection. Instead let us change it to what is shown in 
+\autoref{alg:stream4v1}.
+
+\begin{algorithm}
+    \While{\texttt{TRUE}}{
+        \autoref{alg:temperature with density} \;
+        \If{$velocity$}{
+            \autoref{alg:stream3} \;
+            \If{$advection$}{
+                \autoref{alg:advectionfix} \;
+            }
+        }
+    }
+    \caption{Main loop that can simulate flow and advection conditionally}
+    \label{alg:stream4v1}
+\end{algorithm}
+
+Now to dynamically enable/disable the simulation of flow and advection we need to add the spin-up calculations to the main loop. So in \autoref{alg:stream4v1}, before 
+\autoref{alg:temperature with density} we add \autoref{alg:spinup}. What it does is it changes the timestep when spinnning up and disables flow simulation, and when a week has passed it reduces 
+the timestep and enables flow simulation. At this point in time, the advection is not dynamically enabled/disabled but it is done by the programmer. Currently it will break the model, so I 
+recommend leaving it on \texttt{FALSE} until it is fixed in \autoref{sec:advectionfix}.
+
+\begin{algorithm}
+    \eIf{$t < 7day$}{
+        $\delta t \leftarrow 60 \cdot 47$ \;
+        $velocity \leftarrow \texttt{FALSE}$ \;
+    }{
+        $\delta t \leftarrow 60 \cdot 9$ \;
+        $velocity \leftarrow \texttt{TRUE}$ \;
+    }
+    \caption{The spin-up block dynamically enabling or disabling flow simulation}
+    \label{alg:spinup}
+\end{algorithm}

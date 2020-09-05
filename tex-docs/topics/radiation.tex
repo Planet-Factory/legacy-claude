@@ -1,9 +1,13 @@
 \section{Radiation}
-\subsection{The First Law of Thermodynamics and the Stefan-Boltzmann Equation}
-The beginning of CLAuDE is based upon one of the most important laws of physics: "Energy is neither created nor destroyed, only changed from one form to another." In otherwords, if energy goes 
-into an object it must equal the outflowing energy plus the change of internal energy. This is captured in Stefan-Boltzmann's law (\autoref{eq:stefan-boltzmann}) \cite{stefan-boltzmann}. 
+Radiation is energy waves, some waves are visible like light, others are invisible like radio signals. As is the basis for physics, energy cannot be created nor destroyed, only changed from one
+form to another.
 
-Here we assume that the planet is a black body, i.e. it absorbs all radiation (energy waves, some waves are visible like light, others are invisible like radio signals) on all wavelengths. 
+\subsection{The First Law of Thermodynamics and the Stefan-Boltzmann Equation}
+If energy goes into an object it must equal the outflowing energy plus the change of internal energy. Which is exactly what happens with the atmosphere. Radiation from the sun comes in, and 
+radiation from the atmosphere goes out. And along the way we heat the atmosphere and the planet which causes less radiation to be emitted than received. At least, that is the idea for Earth which
+may not apply to all planets. Let one thing be clear, more radiation cannot be emitted than is inserted, unless the planet and atmosphere are cooling. Anyway, we assume that the planet is a black 
+body, i.e. it absorbs all radiation on all wavelengths. This is captured in Stefan-Boltzmann's law (\autoref{eq:stefan-boltzmann}) \cite{stefan-boltzmann}. 
+
 In \autoref{eq:stefan-boltzmann} the symbols are:
 
 \begin{itemize}
@@ -201,4 +205,71 @@ that $S$ is defined as the call to \autoref{alg:solar}.
     }
     \caption{The main function of the temperature calculations}
     \label{alg:stream1v2}
+\end{algorithm}
+
+\subsection{Albedo}
+Albedo is basically the reflectiveness of a material (in our case the planet's surface) \cite{albedo}. The average albedo of the Earth is about 0.2. Do note that we change $C_p$ from a constant 
+to an array. We do this to allow adding in oceans or other terrain in the future. Same thing for the albedo, different terrain has different reflectiveness.
+
+\begin{algorithm}[hbt]
+    $a \leftarrow 0.2$ \;
+
+    $C_p \leftarrow 10^7$ \;
+    \caption{Defining the oceans}
+    \label{alg:albedo}
+\end{algorithm}
+
+Now that we have that defined, we need to adjust the main loop of the program (\autoref{alg:stream1v2}). For clarity, all the defined constants have been left out. We need to add albedo into the
+equation and change $C_p$ from a constant to an array. The algorithm after these changes can be found in \autoref{alg:stream2v3}. We multiply by $1 - a$ since albedo represents how much energy is 
+reflected instead of absorbed, where we need the amount that is absorbed which is exactly equal to $1$ minus the amount that is reflected.
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{time $t$, amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlot]$}{
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p[lat, lon]}$ \;
+            $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
+        }
+    }
+    \caption{The main loop of the temperature calculations}
+    \label{alg:stream2v3}
+\end{algorithm}
+
+\subsection{Temperature with Varying Density}
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{time $t$, amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlot]$}{
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{\rho[lat, lon]C_p[lat, lon]}$ \;
+            $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{\rho[lat, lon]C_a}$ \;
+            $t \leftarrow t + \delta t$ \;
+        }
+    }
+    \caption{The main loop of the temperature calculations}
+    \label{alg:temperature with density}
+\end{algorithm}
+
+\subsection{Varying the Albedo}
+The albdeo (reflectiveness of the planet's surface) is of course not the same over the whole planet. To account for this, we instead vary the albedo slightly for each point in the latitude 
+longitude grid. The algorithm that does this is shown in \autoref{alg:albedo variance}. The uniform distribution basically says that each allowed value in the interval has an equal chance of 
+being picked \cite{uniformdist}.
+
+\begin{algorithm}
+    $V_a \leftarrow 0.02$ \;
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlon]$}{
+            $R \leftarrow \text{ Pick a random number (from the uniform distribution) in the interval } [-V_a, V_a]$ \;
+            $a[lat, lon] \leftarrow a[lat, lon] + V_a \cdot R$\;
+        }
+    }
+    \caption{Varying the albedo of the planet}
+    \label{alg:albedo variance}
 \end{algorithm}

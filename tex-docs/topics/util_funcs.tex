@@ -123,7 +123,7 @@ the basis vector.
     \label{eq:laplacian vector}
 \end{equation}
 
-The new code can be found in \autoref{alg:laplacian}. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
+The code can be found in \autoref{alg:laplacian}. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
 respectively.
 
 \begin{algorithm}[hbt]
@@ -157,7 +157,7 @@ respectively.
 \subsection{Divergence}
 As we expect to use the divergence operator more often throughout our model, let us define a seperate function for it in \autoref{alg:divergence}. $\Delta_x$ and $\Delta_y$ in 
 \autoref{alg:divergence} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} respectively. We do the multiplication with the velocity vectors $u, v$ and $w$ here already, 
-as we expect that we might use it in combination with the divergence operator more frequently. What those vectors are and represent we will discuss in %insert velocity reference here
+as we expect that we might use it in combination with the divergence operator more frequently. What those vectors are and represent we will discuss in \autoref{sec:momentum}.
 
 \begin{algorithm}[!hbt]
     \SetKwInOut{Input}{Input}
