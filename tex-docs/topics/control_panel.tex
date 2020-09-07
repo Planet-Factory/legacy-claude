@@ -43,7 +43,7 @@ mass units ($u$)\cite{mole}. This is not a physical constant perse, but more lik
 way more intuitive and are assumed to be known.
 
 \subsubsection{The Stefan-Boltzmann Constant}
-The Stefan-Boltzmann constant, $\sigma = 5.670373 \cdot 10^-8 \ (Wm^{-2}K^{-4})$ \cite{stefan-boltzmann} is used in the Stefan-Boltzmann law (more on that in %insert reference here). 
+The Stefan-Boltzmann constant, $\sigma = 5.670373 \cdot 10^-8 \ (Wm^{-2}K^{-4})$ \cite{stefan-boltzmann} is used in the Stefan-Boltzmann law (more on that in \autoref{sec:first thermolaw}). 
 
 \subsection{Planet Specific Variables}
 The following set of variables vary per planet, that's why we call them variables since they vary. Makes sense right? We add them here as we will use them throughout the manual. The advantage
@@ -80,7 +80,7 @@ all the relevant variables that are unique to a planet, or well not necessarily 
     $top \leftarrow 50*10^3$ \Comment*[l]{How high the top of the atmosphere is with respect to the planet surface in meters ($m$)}
     $ins \leftarrow 1370$ \Comment*[l]{Amount of energy from the star that reaches the planet per unit area ($Jm^{-2}$)}
     $\epsilon \leftarrow 0.75$ \Comment*[l]{Absorbtivity of the atmosphere, fraction of how much of the total energy is absorbed (unitless)}
-    %$R \leftarrow 6.4*10^6$ \Comment*[l]{The radius of the planet in meters ($m$)}
+    $r \leftarrow 6.4*10^6$ \Comment*[l]{The radius of the planet in meters ($m$)}
 \end{algorithm}
 
 \subsubsection{Model Specific Parameters}
@@ -101,4 +101,21 @@ definitions can be found in \autoref{alg:model constants}. What the $adv$ boolea
     $t_s \leftarrow 5*day$ \Comment*[l]{How long we let the planet spin up in seconds ($s$)}
     $adv \leftarrow \texttt{FALSE}$ \Comment*[l]{Whether we want to enable advection or not}
     $adv\_boun \leftarrow 8$ \Comment*[l]{How many cells away from the poles where we want to stop calculating the effects of advection}
+    $C_a \leftarrow 287$ \Comment*[l]{Heat capacity of the atmosphere in $JKg^{-1}K^{-1}$}
+    $C_p \leftarrow 1 \cdot 10^6$ \Comment*[l]{Heat capacity of the planet in $JKg^{-1}K^{-1}$}
+    $\delta y \leftarrow \frac{2\pi r}{nlat}$ \Comment*[l]{How far apart the gridpoints in the y direction are (degrees latitude)}
+
+    $count \leftarrow 0$ \;
+    \For{$j \in [0, top]$}{
+        $heights[j] \leftarrow count$ \Comment*[l]{The height of a layer}
+        $count \leftarrow count + \frac{top}{nlevels}$ \;
+    }
+
+    \For{$i \in [0, nlat]$}{
+        $\delta x[i] \leftarrow \delta y\cos(lat[i]\frac{\pi}{180})$ \Comment*[l]{How far apart the gridpoints in the x direction are (degrees longitude)}
+    }
+
+    \For{$k \in [0, nlevels - 1]$}{
+        $\delta z[k] \leftarrow heights[k + 1] - heights$ \Comment*[l]{How far apart the gridpoints in the z direction are ($m$)}
+    }
 \end{algorithm}

@@ -41,145 +41,6 @@ important enough to account for yet, especially considering the current complexi
 The code that corresponds to this is quite simple, the only change that we need to make in \autoref{eq:state gas} is that we need to replace $T$ by $T_a$, the temperature of the atmosphere. As
 $T_a$ is a matrix (known to programmers as a double array), $p$ will be a matrix as well. Now we only need to fill in some values. $\rho = 1.2$\cite{densityAir}, $R_s = 287$\cite{specificGasConstantAir}.
 
-\subsection{The Primitive Equations and Geostrophy}
-\textbf{NOTE:} This whole subsection is obsolete. We have replaced these calculations with \autoref{sec:momentum}. The folloing subsection is left in for historical value, and maybe for a simpler
-calculation if you want your own model to do less heavy calculations. This is where the previously mentioned master file strucutre comes in. You can create a new file with the following 
-calculations and replace the call that you would make to \autoref{sec:momentum} with a call to the algorithm listed in this subsection. Your choice, though the model Simon has made opted to use 
-the more complicated calculations. So here are the original calculations and if you want an up to date overview of the calculations please have a look at \autoref{sec:momentum}.
-
-The primitive equations (also known as the momentum equations) is what makes the air move. It is actually kind of an injoke between physicists as they are called the primitive equations but 
-actually look quite complicated (and it says $fu$ at the end! \cite{simon}). The primitive equations are a set of equations dictating the direction in the $u$ and $v$ directions as shown in 
-\autoref{eq:primitive u} and \autoref{eq:primitive v}. We can make the equations simpler by using and approximation called geostrophy which means that we have no vertical motion, such that the
-terms with $\omega$ in \autoref{eq:primitive u} and \autoref{eq:primitive v} become 0. We also assume that we are in a steady state, i.e. there is no acceleration which in turn means that the 
-whole middle part of the equations are $0$. Hence we are left with \autoref{eq:primitive u final} and \autoref{eq:primitive v final}.
-
-\begin{subequations}
-    \begin{equation}
-        \frac{du}{dt} = \frac{\delta u}{\delta t} + u\frac{\delta u}{ \delta x} + v\frac{\delta u}{\delta v} + \omega\frac{\delta u}{\delta p} = -\frac{\delta \Phi}{\delta x} + fv
-        \label{eq:primitive u}
-    \end{equation}
-    \begin{equation}
-        \frac{dv}{dt} = \frac{\delta v}{\delta t} + u\frac{\delta v}{ \delta x} + v\frac{\delta v}{\delta v} + \omega\frac{\delta v}{\delta p} = -\frac{\delta \Phi}{\delta y} - fu
-        \label{eq:primitive v}
-    \end{equation}
-
-    \begin{equation}
-        0 = -\frac{\delta \Phi}{\delta x} + fv
-        \label{eq:primitive u final}
-    \end{equation}
-    \begin{equation}
-        0 = -\frac{\delta \Phi}{\delta y} - fu
-        \label{eq:primitive v final}
-    \end{equation}
-\end{subequations}
-
-\autoref{eq:primitive u final} can be split up into to parts, the $\frac{\delta \Phi}{\delta x}$ part (the gradient force) and the $fv$ part (the coriolis force). The same applies to 
-\autoref{eq:primitive v final}. Effectively we have a balance between the gradient and the coriolis force as shown in \autoref{eq:pu simple} and \autoref{eq:pv simple}. The symbols in both of 
-these equations are:
-
-\begin{itemize}
-    \item $\Phi$: The geopotential, potential (more explanation in \autoref{sec:potential}) of the planet's gravity field ($Jkg^{-1}$).
-    \item $x$: The change in the East direction along the planet surface ($m$).
-    \item $y$: The change in the North direction along the planet surface ($m$).
-    \item $f$: The coriolis parameter as described by \autoref{eq:coriolis}, where $\Omega$ is the rotation rate of the planet (for Earth $7.2921 \cdot 10^{-5}$) ($rad \ s^{-1}$) and $\theta$ is the 
-    latitude \cite{coriolis}.
-    \item $u$: The velocity in the latitude ($ms^{-1}$).
-    \item $v$: The velocity in the longitude ($ms^{-1}$).
-\end{itemize}
-
-\begin{subequations}
-    \begin{equation}
-        f = 2\Omega\sin(\theta)
-        \label{eq:coriolis}
-    \end{equation}
-    \begin{equation}
-        \frac{\delta \Phi}{\delta x} = fv
-        \label{eq:pu simple}
-    \end{equation}
-    \begin{equation}
-        \frac{\delta \Phi}{\delta y} = -fu
-        \label{eq:pv simple}
-    \end{equation}
-    \begin{equation}
-        \frac{\delta p}{\rho \delta x} = fv
-        \label{eq:pu simple final}
-    \end{equation}
-    \begin{equation}
-        \frac{\delta p}{\rho \delta y} = -fu
-        \label{eq:pv simple final}
-    \end{equation}
-\end{subequations}
-
-Since we want to know how the atmosphere moves, we want to get the v and u components of the velocity vector (since $v$ and $u$ are the veolicites in longitude and latitude, if we combine them 
-in a vector we get the direction of the overall velocity). So it is time to start coding and calculating! If we look back at \autoref{alg:stream1v2}, we can see that we already have a double 
-for loop. In computer science, having multiple loops is generally considered a bad coding practice as you usually can just reuse the indices of the already existing loop, so you do not need to 
-create a new one. However this is a special case, since we are calculating new temperatures in the double for loop. If we then also would start to calculate the velocities then we would use new 
-information and old information at the same time. Since at index $i - 1$ the new temperature has already been calculated, but at the index $i + 1$ the old one is still there. So in order to fix 
-that we need a second double for loop to ensure that we always use the new temperatures. We display this specific loop in \autoref{alg:stream2}. Do note that everything in \autoref{alg:stream1v2} 
-is still defined and can still be used, but since we want to focus on the new code, we leave out the old code to keep it concise and to prevent clutter. 
-
-\begin{algorithm}[hbt]
-    \SetAlgoLined
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlon]$}{
-            $u[lat, lon] \leftarrow -\frac{p[lat + 1, lon] - p[lat - 1, lon]}{\delta y} \cdot \frac{1}{f[lat]\rho}$ \;
-            $v[lat, lon] \leftarrow \frac{p[lat, lon + 1] - p[lat, lon - 1]}{\delta x[lat]} \cdot \frac{1}{f[lat]\rho}$ \;
-        }
-    }
-    \caption{The main loop of the velocity of the atmosphere calculations}
-    \label{alg:stream2}
-\end{algorithm}
-
-The gradient calculation is done in \autoref{alg:gradient}. For this to work, we need the circumference of the planet. Herefore we need to assume that the planet is a sphere. While that is not 
-technically true, it makes little difference in practice and is good enough for our model. The equation for the circumference can be found in \autoref{eq:circumference} \cite{circumference}, 
-where $r$ is the radius of the planet. Here we also use the f-plane approximation, where the coriolis paramter has one value for the northern hemisphere and one value for the southern hemisphere 
-\cite{fplane}.
-
-\begin{equation}
-    2 \pi r
-    \label{eq:circumference}
-\end{equation}
-
-\begin{algorithm}
-    \SetAlgoLined
-    $C \leftarrow 2\pi R$ \;
-    $\delta y \leftarrow \frac{C}{nlat}$ \;
-
-    \For{$lat \in [-nlat, nlat]$}{
-        $\delta x[lat] \leftarrow \delta y \cos(lat \cdot \frac{\pi}{180})$ \;
-
-        \eIf{$lat < 0$}{
-            $f[lat] \leftarrow -10^{-4}$ \;
-        }{
-            $f[lat] \leftarrow 10^{-4}$ \;
-        }
-    }
-    \caption{Calculating the gradient $\delta x$ (note that this algorithm is obsolete)}
-    \label{alg:gradient}
-\end{algorithm}
-
-Because of the geometry of the planet and the construction of the longitude latitude grid, we run into some problems when calculating the gradient. Since the planet is not flat ("controversial 
-I know"\cite{simon}) whenever we reach the end of the longitude we need to loop around to get to the right spot to calculate the gradients (as the planet does not stop at the end of the 
-longitude line but loops around). So to fix that we use the modulus (mod) function which does the looping for us if we exceed the grid's boundaries. We do haveanother problem though, the poles. 
-As the latitude grows closer to the poles, they are converging on the center point of the pole. Looping around there is much more difficult so to fix it, we just do not consider that center 
-point in the main loop. The changed algorithm can be found in \autoref{alg:stream2v2}
-
-\begin{algorithm}[hbt]
-    \SetAlgoLined
-    \For{$lat \in [-nlat + 1, nlat - 1]$}{
-        \For{$lon \in [0, nlon]$}{
-            $u[lat, lon] \leftarrow -\frac{p[(lat + 1) \text{ mod } nlat, lon] - p[(lat -1) \text{ mod } nlat, lon]}{\delta y} \cdot \frac{1}{f[lat]\rho}$ \;
-            $v[lat, lon] \leftarrow \frac{p[lat, (lon + 1) \text{ mod } nlon] - p[lat, (lon -1) \text{ mod } nlon]}{\delta x[lat]} \cdot \frac{1}{f[lat]\rho}$ \;
-        }
-    }
-    \caption{The main loop of the velocity of the atmosphere calculations}
-    \label{alg:stream2v2}
-\end{algorithm}
-
-Do note that the pressure calculation is done between the temperature calculation in \autoref{alg:stream1v2} and the $u, v$ calculations in \autoref{alg:stream2v2}. At this point our model shows
-a symmetric vortex around the sun that moves with the sun. This is not very realistic as you usually have convection and air flowing from warm to cold, but we do not have that complexity yet 
-(due to our single layer atmosphere).
-
 \subsection{The Momentum Equations} \label{sec:momentum}
 The momentum equations are a set of equations that describe the flow of a fluid on the surface of a rotating body. For our model we will use the f-plane approximation. The equations corresponding
 to the f-plane approximation are given in \autoref{eq:x momentum} and \autoref{eq:y momentum} \cite{momentumeqs}. Note that we are ignoring vertical movement, as this does not have a significant
@@ -267,3 +128,34 @@ Another change introduced is in the coriolis parameter. Up until now it has been
 \subsection{Adding Friction}
 In order to simulate friction, we multiply the speeds $u$ and $v$ by $0.99$. Of course there are equations for friction but that gets complicated very fast, so instead we just assume that we
 have a constant friction factor. This multiplication is done directly after \autoref{alg:stream3} in \autoref{alg:stream4v1}.
+
+\subsection{Adding in Layers}
+With adding in atmospheric layers we need to add vertical winds, or in other words add the $w$ component of the velocity vectors. We do that by editing \autoref{alg:stream3}. We change it to 
+\autoref{alg:velocity}. Here we use gravity ($g$) instead of the coriolis force ($f$) and calculate the change in pressure. Therefore we need to store a copy of the pressure before we do any 
+calculations. This needs to be a copy due to aliasing \footnote{Aliasing is assigning a different name to a variable, while it remains the same variable. Take for instance that we declare a 
+variable $x$ and set it to be $4$. Then we say $y \leftarrow x$, which you might think is the same as saying they $y \leftarrow 4$ but behind the screen it is pointing to $x$. So if $x$ changes, 
+then so does $y$.}
+
+\begin{algorithm}
+    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
+    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lan, lon)$ \;
+    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lan, lon)$ \;
+    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
+    $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
+    \While{\texttt{TRUE}}{
+        \For{$lat \in [1, nlat - 1]$}{
+            \For{$lon \in [0, nlon]$}{
+                \For{$layer \in [0, nlevels]$}{
+                    $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
+                    $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
+                    $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
+                }
+            }
+        }
+
+        $p_o \leftarrow copy(p)$ \;
+    }
+    \caption{Calculating the flow of the atmosphere (wind)}
+    \label{alg:velocity}
+\end{algorithm}

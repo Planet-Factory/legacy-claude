@@ -27,8 +27,7 @@ calculations in \autoref{alg:temperature with density} we would calculate the ve
 
 Now to dynamically enable/disable the simulation of flow and advection we need to add the spin-up calculations to the main loop. So in \autoref{alg:stream4v1}, before 
 \autoref{alg:temperature with density} we add \autoref{alg:spinup}. What it does is it changes the timestep when spinnning up and disables flow simulation, and when a week has passed it reduces 
-the timestep and enables flow simulation. At this point in time, the advection is not dynamically enabled/disabled but it is done by the programmer. Currently it will break the model, so I 
-recommend leaving it on \texttt{FALSE} until it is fixed in \autoref{sec:advectionfix}.
+the timestep and enables flow simulation. At this point in time, the advection is not dynamically enabled/disabled but it is done by the programmer.
 
 \begin{algorithm}
     \eIf{$t < 7day$}{
@@ -41,3 +40,56 @@ recommend leaving it on \texttt{FALSE} until it is fixed in \autoref{sec:advecti
     \caption{The spin-up block dynamically enabling or disabling flow simulation}
     \label{alg:spinup}
 \end{algorithm}
+
+\subsection{Non-uniform air density}
+While air density on the surface is in general consistent, this does not hold if you move up through the atmosphere. The planet will pull air down due to gravity, which means that more air is at 
+the planet surface than at the top of the atmosphere. Hence the air density changes throughout the atmosphere and we need to account for that. This is done in \autoref{alg:density}. Because this 
+is used in radiation, velocity and advection, we initialise this in the master file. Though one could argue it could be part of the control panel, we opt not to include any code other than 
+variable declarations in the control panel for greater clarity. This also means that we give the user the option to have only one layer (by skipping implementing this algorithm). Note that the 
+$\rho[:,: i]$ notation means that for every index in the first and second dimension, only change the value for the index $i$ in the third dimension.
+
+\begin{algorithm}
+    $\rho[:, :, 0] \leftarrow 1.3$ \;
+    \For{$i \in [1, nlevels-1]$}{
+        $\rho[:, :, i] \leftarrow 0.1\rho[:, :, i - 1]$
+    }
+    \caption{Initialisation of the air density $\rho$}
+    \label{alg:density}
+\end{algorithm}
+
+\subsection{Interpolating the Air Density}
+In order to interpolate (see \autoref{sec:interpolation}) the air density, to have a better estimation at each grid cell, we need data. However currently we are just guessing the air density at 
+higher levels, instead of taking real values. So let us change that. For that we are going to use the U.S. Standard Atmosphere, an industry standard measure of the atmosphere on Earth 
+\cite{usatmosp}. This data was provided in a text (\texttt{TXT}) file which of course needs to be read in order for the data to be used in the model. Here we only care for the density and the 
+temperature at a specific height. So the text file only contains those two columns of the data (and the height in km of course as that is the index of the row, the property that uniquely 
+identifies a row).
+
+With that in mind, let's get coding and importing the data. We do this in \autoref{alg:usatmosp}. As one can see we do not specify how to open the file or how to split the read line, as this 
+is language specific and not interesting to describe in detail. I refer you to the internet to search for how to open a text file in the language you are working in. Keep in mind in which 
+magnitude you are working and in which magnitude the data is. If you work with $km$ for height and the data is in $m$, you need to account for that somewhere by either transforming the imported 
+data or work in the other magnitude. 
+
+\begin{algorithm}
+    $data \leftarrow \text{open text file containing the us standard atmosphere data}$ \;
+    \ForEach{$line \in data$}{
+        Split $line$ into three components, $sh, st$ and $sd$, representing the height, temperature and density respectively \;
+        $standardHeight.add(sh)$ \;
+        $standardTemperature.add(st)$ \;
+        $standardDensity.add(sd)$ \;
+    }
+
+    $densityProfile \leftarrow \texttt{interpolate}(heights, standardHeight, standardDensity)$ \;
+    $temperatureProfile \leftarrow \texttt{interpolate}(heights, standardHeight, standardTemperature)$ \;
+
+    \For{$alt \in [0, nlevels]$}{
+        $\rho[:, :, alt] \leftarrow densityProfile[alt]$ \;
+        $T_a[:, :, alt] \leftarrow temperatureProfile[alt]$ \;
+    }
+    \caption{Loading in the U.S. Standard Atmosphere}
+    \label{alg:usatmosp}
+\end{algorithm}
+
+Note that the function \texttt{interpolate} takes three arguments, the first one being the data points that we want to have values for, the second one is the data points that we know and the 
+third one is the values for the data points that we know. This function may or may not exist in your programming language of choice, which might mean that you have to write it yourself. 
+The formula that we use for interpolation can be found in \autoref{eq:interpolation}, though you still need to figure out what value you need for $\lambda$ (see \autoref{sec:interpolation}). 
+This is left as an exercise for the reader.
