@@ -104,6 +104,8 @@ definitions can be found in \autoref{alg:model constants}. What the $adv$ boolea
     $C_a \leftarrow 287$ \Comment*[l]{Heat capacity of the atmosphere in $JKg^{-1}K^{-1}$}
     $C_p \leftarrow 1 \cdot 10^6$ \Comment*[l]{Heat capacity of the planet in $JKg^{-1}K^{-1}$}
     $\delta y \leftarrow \frac{2\pi r}{nlat}$ \Comment*[l]{How far apart the gridpoints in the y direction are (degrees latitude)}
+    $\alpha_a \leftarrow 2 \cdot 10^{-5}$ \Comment*[l]{The diffusivity constant for the atmosphere}
+    $\alpha_p \leftarrow 1.5 \cdot 10^{-6}$ \Comment*[l]{The diffusivity constant for the planet surface}
 
     $count \leftarrow 0$ \;
     \For{$j \in [0, top]$}{

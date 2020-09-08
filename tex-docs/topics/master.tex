@@ -41,6 +41,23 @@ the timestep and enables flow simulation. At this point in time, the advection i
     \label{alg:spinup}
 \end{algorithm}
 
+\subsection{Varying the Albedo}
+The albdeo (reflectiveness of the planet's surface) is of course not the same over the whole planet. To account for this, we instead vary the albedo slightly for each point in the latitude 
+longitude grid. The algorithm that does this is shown in \autoref{alg:albedo variance}. The uniform distribution basically says that each allowed value in the interval has an equal chance of 
+being picked \cite{uniformdist}.
+
+\begin{algorithm}
+    $V_a \leftarrow 0.02$ \;
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlon]$}{
+            $R \leftarrow \text{ Pick a random number (from the uniform distribution) in the interval } [-V_a, V_a]$ \;
+            $a[lat, lon] \leftarrow a[lat, lon] + V_a \cdot R$\;
+        }
+    }
+    \caption{Varying the albedo of the planet}
+    \label{alg:albedo variance}
+\end{algorithm}
+
 \subsection{Non-uniform air density}
 While air density on the surface is in general consistent, this does not hold if you move up through the atmosphere. The planet will pull air down due to gravity, which means that more air is at 
 the planet surface than at the top of the atmosphere. Hence the air density changes throughout the atmosphere and we need to account for that. This is done in \autoref{alg:density}. Because this 

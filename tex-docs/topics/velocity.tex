@@ -98,12 +98,10 @@ With the gradient functions defined in \autoref{alg:gradient x} and \autoref{alg
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
-    \While{\texttt{TRUE}}{
-        \For{$lat \in [1, nlat - 1]$}{
-            \For{$lon \in [0, nlon]$}{
-                $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
-                $v[lan, lon] \leftarrow v[lan, lon] + \delta t\frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
-            }
+    \For{$lat \in [1, nlat - 1]$}{
+        \For{$lon \in [0, nlon]$}{
+            $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
+            $v[lan, lon] \leftarrow v[lan, lon] + \delta t \frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
         }
     }
     \caption{Calculating the flow of the atmosphere (wind)}
@@ -143,18 +141,16 @@ then so does $y$.}
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
-    \While{\texttt{TRUE}}{
-        \For{$lat \in [1, nlat - 1]$}{
-            \For{$lon \in [0, nlon]$}{
-                \For{$layer \in [0, nlevels]$}{
-                    $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
-                    $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
-                    $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
-                }
+    \For{$lat \in [1, nlat - 1]$}{
+        \For{$lon \in [0, nlon]$}{
+            \For{$layer \in [0, nlevels]$}{
+                $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
+                $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
+                $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
             }
         }
 
-        $p_o \leftarrow copy(p)$ \;
+    $p_o \leftarrow copy(p)$ \;
     }
     \caption{Calculating the flow of the atmosphere (wind)}
     \label{alg:velocity}

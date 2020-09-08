@@ -194,7 +194,7 @@ that $S$ is defined as the call to \autoref{alg:solar}.
     \SetAlgoLined
     \SetKwInput{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{time $t$, amount of energy that hits the planet $S$}
+    \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
 
     \For{$lat \in [-nlat, nlat]$}{
@@ -227,7 +227,7 @@ reflected instead of absorbed, where we need the amount that is absorbed which i
     \SetAlgoLined
     \SetKwInput{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{time $t$, amount of energy that hits the planet $S$}
+    \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
     \For{$lat \in [-nlat, nlat]$}{
         \For{$lon \in [0, nlot]$}{
@@ -247,34 +247,16 @@ The air density is not at all points exactly the same. This may be due to the wi
     \SetAlgoLined
     \SetKwInput{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{time $t$, amount of energy that hits the planet $S$}
+    \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
     \For{$lat \in [-nlat, nlat]$}{
         \For{$lon \in [0, nlot]$}{
             $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{\rho[lat, lon]C_p[lat, lon]}$ \;
             $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{\rho[lat, lon]C_a}$ \;
-            $t \leftarrow t + \delta t$ \;
         }
     }
     \caption{The main loop of the temperature calculations}
     \label{alg:temperature with density}
-\end{algorithm}
-
-\subsection{Varying the Albedo}
-The albdeo (reflectiveness of the planet's surface) is of course not the same over the whole planet. To account for this, we instead vary the albedo slightly for each point in the latitude 
-longitude grid. The algorithm that does this is shown in \autoref{alg:albedo variance}. The uniform distribution basically says that each allowed value in the interval has an equal chance of 
-being picked \cite{uniformdist}.
-
-\begin{algorithm}
-    $V_a \leftarrow 0.02$ \;
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlon]$}{
-            $R \leftarrow \text{ Pick a random number (from the uniform distribution) in the interval } [-V_a, V_a]$ \;
-            $a[lat, lon] \leftarrow a[lat, lon] + V_a \cdot R$\;
-        }
-    }
-    \caption{Varying the albedo of the planet}
-    \label{alg:albedo variance}
 \end{algorithm}
 
 \subsection{Adding Layers}
@@ -308,6 +290,10 @@ regards to the storage of the values) by the addition of multiple atmospheric la
 
 \begin{algorithm}[hbt]
     \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
     \For{$lat \in [-nlat, nlat]$}{
         \For{$lon \in [0, nlot]$}{
             \For{$layer \in [0, nlevels]$}{
@@ -323,7 +309,6 @@ regards to the storage of the values) by the addition of multiple atmospheric la
                     $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 + \epsilon[layer + 1]T_a[lat, lon, layer + 1] 
                     - 2\epsilon[layer](T_a[lat, lon, layer])^4)}{\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
                 }
-                $t \leftarrow t + \delta t$ \;
             }
         }
     }
@@ -417,6 +402,10 @@ into code is left as an exercise to the reader. $U[0]$ is the boundary condition
 $S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents the call to \autoref{alg:solar}.
 
 \begin{algorithm}
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
     \For{$lat \in [-nlat, nlat]$}{
         \For{$lon \in [0, nlon]$}{
             $pressureProfile \leftarrow p[lat, lon, :]$ \;
