@@ -1,0 +1,192 @@
+\section{Utility Functions}
+With the control panel defined and explained, let us move over to some utility functions. Functions that can be used in all kinds of calculations, which we might need more often. In general it 
+concerns functions like calculating the gradient, the lacplacian or interpolation. 
+
+\subsection{Gradients}
+Let us define the gradient in the $x, y$ and $z$ directions. The functions can be found in \autoref{alg:gradient x}, \autoref{alg:gradient y} and \autoref{alg:gradient z}. We use these functions 
+in various other algorithms as the gradient (also known as derivative) is often used in physics. It denotes the rate of change, how much something changes over time. Velocity for instance denotes
+how far you move in a given time. Which is a rate of change, how much your distance to a given point changes over time. 
+
+In \autoref{alg:gradient z} $a.dimensions$ is the attribute that tells us how deeply nested the array $a$ is. If the result is $1$ we have just a normal array, if it is $2$ we have a double array 
+(an array at each index of the array) which is also called a matrix and if it is $3$ we have a triple array. We need this because we have a one-dimensional case, for when we do not use multiple 
+layers and a three-dimensional case for when we do use multiple layers. This distinction is needed to avoid errors being thrown when running the model with one or multiple layers. 
+
+This same concept can be seen in \autoref{alg:gradient x} and \autoref{alg:gradient y}, though here we check if $k$ is defined or \texttt{NULL}. We do this as sometimes we want to use this 
+function for matrices that does not have the third dimension. Hence we define a default value for $k$ which is \texttt{NULL}. \texttt{NULL} is a special value in computer science. It represents 
+nothing. This can be useful sometimes if you declare a variable to be something but it is referring to something that has been deleted or it is returned when some function fails. It usually 
+indicates that something special is going on. So here we use it in the special case where we do not want to consider the third dimension in the gradient. We also use forward differencing 
+(calculating the gradient by taking the difference of the cell and the next/previous cell, multiplied by $2$ to keep it fair) in \autoref{alg:gradient y} as that gives better results for the 
+calculations we will do later on.
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
+    \Output{Gradient in the $x$ direction}
+    \eIf{$k == \texttt{NULL}$}{
+        $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon] - a[i, (j - 1) \text{ mod } nlon]}{\delta x[i]}$ \;
+    }{
+        $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon, k] - a[i, (j - 1) \text{ mod } nlon, k]}{\delta x[i]}$ \;
+    }
+    \Return{$grad$} \;
+    \caption{Calculating the gradient in the $x$ direction}
+    \label{alg:gradient x}
+\end{algorithm}
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
+    \Output{Gradient in the $y$ direction}
+    \eIf{$k == \texttt{NULL}$}{
+        \uIf{$i == 0$}{
+            $grad \leftarrow 2 \frac{a[i + 1, j] - a[i, j]}{\delta y}$ \;
+        }\uElseIf{$i == nlat - 1$}{
+            $grad \leftarrow 2 \frac{a[i, j] - a[i - 1, j]}{\delta y}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
+        }
+    }{
+        \uIf{$i == 0$}{
+            $grad \leftarrow 2 \frac{a[i + 1, j, k] - a[i, j, k]}{\delta y}$ \;
+        }\uElseIf{$i == nlat - 1$}{
+            $grad \leftarrow 2 \frac{a[i, j, k] - a[i - 1, j, k]}{\delta y}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
+        }
+    }
+    \Return $grad$ \;
+    \caption{Calculating the gradient in the $y$ direction}
+    \label{alg:gradient y}
+\end{algorithm}
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
+    \Output{Gradient in the $z$ direction}
+    \uIf{$a.dimensions == 1$}{
+        \uIf{$k == 0$}{
+            $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
+        }\uElseIf{$k == nlevels - 1$}{
+            $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
+        }
+    } \uElse {
+        \uIf{$k == 0$}{
+            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
+        }\uElseIf{$k == nlevels - 1$}{
+            $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
+        }
+    }
+    
+    \Return $grad$ \;
+    \caption{Calculating the gradient in the $z$ direction}
+    \label{alg:gradient z}
+\end{algorithm}
+
+\subsection{Laplacian Operator} \label{sec:laplace}
+The Laplacian operator ($\nabla^2$, sometimes also seen as $\Delta$) has two definitions, one for a vector field and one for a scalar field. The two concepts are not indpendent, a vector field 
+is composed of scalar fields \cite{vectorscalarfields}. Let us define a vector field first. A vector field is a function whose domain and range are a subset of the Eucledian $\mathbb{R}^3$ space. 
+A scalar field is then a function consisting out of several real variables (meaning that the variables can only take real numbers as valid values). So for instance the circle equation 
+$x^2 + y^2 = r^2$ is a scalar field as $x, y$ and $r$ are only allowed to take real numbers as their values. 
+
+With the vector and scalar fields defined, let us take a look at the Laplacian operator. For a scalar field $\phi$ the laplacian operator is defined as the divergence of the gradient of $\phi$
+\cite{laplacian}. But what are the divergence and gradient? The gradient is defined in \autoref{eq:gradient} and the divergence is defined in \autoref{eq:divergence}. Here $\phi$ is a vector 
+with components $x, y, z$ and $\Phi$ is a vector field with components $x, y, z$. $\Phi_1, \Phi_2$ and $\Phi_3$ refer to the functions that result in the corresponding $x, y$ and $z$ values 
+\cite{vectorscalarfields}. Also, $i, j$ and $k$ are the basis vectors of $\mathbb{R^3}$, and the multiplication of each term with their basis vector results in $\Phi_1, \Phi_2$ and $\Phi_3$
+respectively. If we then combine the two we get the Laplacian operator, as in \autoref{eq:laplacian scalar}.
+
+\begin{subequations}
+    \begin{equation}
+        \text{grad } \phi = \nabla \phi = \frac{\delta \phi}{\delta x}i + \frac{\delta \phi}{\delta y}j + \frac{\delta \phi}{\delta z}k
+        \label{eq:gradient}
+    \end{equation}
+    \begin{equation}
+        \text{div} \Phi = \nabla \cdot \Phi = \frac{\delta \Phi_1}{\delta x} + \frac{\delta \Phi_2}{\delta y} + \frac{\delta \Phi_3}{\delta z}
+        \label{eq:divergence}
+    \end{equation}
+    \begin{equation}
+        \nabla^2 \phi = \nabla \cdot \nabla \phi = \frac{\delta^2 \phi}{\delta x^2} + \frac{\delta^2 \phi}{\delta y^2} + \frac{\delta^2 \phi}{\delta z^2}
+        \label{eq:laplacian scalar}
+    \end{equation}
+\end{subequations}
+
+For a vector field $\Phi$ the Laplacian operator is defined as in \autoref{eq:laplacian vector}. Which essential boils down to taking the Laplacian operator of each function and multiply it by
+the basis vector.
+
+\begin{equation}
+    \nabla^2 \Phi = (\nabla^2 \Phi_1)i + (\nabla^2 \Phi_2)j + (\nabla^2 \Phi_3)k
+    \label{eq:laplacian vector}
+\end{equation}
+
+The code can be found in \autoref{alg:laplacian}. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
+respectively.
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{A matrix (double array) a}
+    \Output{A matrix (double array) with results for the laplacian operator for each element}
+    \eIf{$a.dimensions == 2$}{
+        \For{$lat \in [1, nlat - 1]$}{
+            \For{$lon \in [0, nlon]$}{
+                $output[lat, lon] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon)}{\delta x[lat]} + \frac{\Delta_y(a, lat + 1, lon) - 
+                \Delta_y(a, lat - 1, lon)}{\delta y}$\;
+            }
+        }
+    }{
+        \For{$lat \in [1, nlat - 1]$}{
+            \For{$lon \in [0, nlon]$}{
+                \For{$k \in [0, nlevels - 1]$}{
+                    $output[lat, lon, k] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon, k) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon, k)}{\delta x[lat]} + \frac{\Delta_y(a, 
+                    lat + 1, lon, k) - \Delta_y(a, lat - 1, lon, k)}{\delta y} + \frac{\Delta_z(a, lat, lon, k + 1) - \Delta_z(a, lat, lon, k + 1)}{2\delta z[k]}$\;
+                }
+            }
+        }
+    }
+    
+    \Return{$ouput$} \;
+    \caption{Calculate the laplacian operator over a matrix a}
+    \label{alg:laplacian}
+\end{algorithm}
+
+\subsection{Divergence}
+As we expect to use the divergence operator more often throughout our model, let us define a seperate function for it in \autoref{alg:divergence}. $\Delta_x$ and $\Delta_y$ in 
+\autoref{alg:divergence} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} respectively. We do the multiplication with the velocity vectors $u, v$ and $w$ here already, 
+as we expect that we might use it in combination with the divergence operator more frequently. What those vectors are and represent we will discuss in \autoref{sec:momentum}.
+
+\begin{algorithm}[!hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{A matrix (double array) $a$}
+    \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
+    $dim_1 \leftarrow \text{ Length of } a \text{ in the first dimension}$ \;
+    \For{$i \in [0, dim_1]$}{
+        $dim_2 \leftarrow \text{ Length of } a \text{ in the second dimension (i.e. the length of the array stored at index } i)$ \;
+        \For{$j \in [0, dim_2]$}{
+            $dim_3 \leftarrow \text{ Length of } a \text{ in the third dimension}$ \;
+            \For{$k \in [0, dim_3]$}{
+                $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw, i, j, k)$ \;
+            }
+        }
+    }
+    \Return{$output$} \;
+    \caption{Calculate the result of the divergence operator on a vector}
+    \label{alg:divergence}
+\end{algorithm}
+
+\subsection{Interpolation} \label{sec:interpolation}
+Interpolation is a form of estimation, where one has a set of data points and desires to know the values of other data points that are not in the original set of data points\cite{interpolation}. 
+Based on the original data points, it is estimated what the values of the new data points will be. There are various forms of interpolation like linear interpolation, polynomial interpolation 
+and spline interpolation. The CLAuDE model uses linear interpolation which is specified in \autoref{eq:interpolation}. Here $z$ is the point inbetween the known data points $x$ and $y$. 
+$\lambda$ is the factor that tells us how close $z$ is to $y$ in the interval $[0, 1]$. If $z$ is very close to $y$, $\lambda$ will have the value on the larger end of the interval, like 0.9.
+Whereas if $z$ is close to $x$ then $\lambda$ will have a value on the lower end of the interval, like 0.1.
+
+\begin{equation}
+    z = (1 - \lambda)x + \lambda y
+    \label{eq:interpolation}
+\end{equation}
