@@ -12,7 +12,8 @@ the total advection (and because it was at this time broken). %The Laplacian has
 Another thing that we found out was broken is the vertical momentum. We tried to add it, ran into problems and just set it to 0 to fix the other problems that occured. One of those problems was 
 a wrong initialisation of the density. We basically told the model that the density is the same on every layer of the atmosphere, which is obviously not true. Hence we need to adjust that. The 
 new initialisation is described in \autoref{alg:density}. Note that the $\rho[:,: i]$ notation means that for every index in the first and second dimension, only change the value for the index $i$
-in the third dimension.
+in the third dimension. As soon as the vertical momentum has been fixed it will be fixed in the correct spot. If a lot of the code changes then it will probably be in another section and I will 
+insert a reference to that section.
 
 \begin{algorithm}
     $\rho[:, :, 0] \leftarrow 1.3$ \;

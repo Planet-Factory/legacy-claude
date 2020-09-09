@@ -229,7 +229,9 @@ We also need to initialise the $\epsilon$ value for each layer. We do that in \a
 \end{algorithm}
 
 Now we need to add vertical winds, or in other words add the $w$ component of the velocity vectors. We do that by editing \autoref{alg:stream3}. We change it to \autoref{alg:velocity}. Here we 
-use gravity ($g$) instead of the coriolis force ($f$) and calculate the pressure gradient in the $z$ direction.
+use gravity ($g$) instead of the coriolis force ($f$) and calculate the change in pressure. Therefore we need to store a copy of the pressure before we do any calculations. This needs to be a
+copy due to aliasing \footnote{Aliasing is assigning a different name to a variable, while it remains the same variable. Take for instance that we declare a variable $x$ and set it to be $4$. 
+Then we say $y \leftarrow x$, which you might think is the same as saying they $y \leftarrow 4$ but behind the screen it is pointing to $x$. So if $x$ changes, then so does $y$.}
 
 \begin{algorithm}
     $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
@@ -238,17 +240,18 @@ use gravity ($g$) instead of the coriolis force ($f$) and calculate the pressure
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
-    $S_{pz} \leftarrow \texttt{gradient\_z}(p, lan, lon)$ \;
     \While{\texttt{TRUE}}{
         \For{$lat \in [1, nlat - 1]$}{
             \For{$lon \in [0, nlon]$}{
                 \For{$layer \in [0, nlevels]$}{
                     $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
                     $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
-                    $w[lan, lon, layer] \leftarrow w[lat, lon, layer] + \delta t (\frac{S_{pz}}{\rho[lat, lon, layer]} + g)$ \;
+                    $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
                 }
             }
         }
+
+        $p_o \leftarrow copy(p)$ \;
     }
     \caption{Calculating the flow of the atmosphere (wind)}
     \label{alg:velocity}
