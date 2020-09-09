@@ -13,7 +13,7 @@ cdef float inv_90 = np.pi/90
 def scalar_gradient_x(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j,np.int_t k):
 	return (a[i,(j+1)%nlon,k]-a[i,(j-1)%nlon,k])/dx[i]
 
-def scalar_gradient_x_2D(a,dx,nlon,i,j):
+def scalar_gradient_x_2D(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j):
 	return (a[i,(j+1)%nlon]-a[i,(j-1)%nlon])/dx[i]
 
 # gradient of scalar field a in the local y direction at point i,j
@@ -25,7 +25,7 @@ def scalar_gradient_y(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t 
 	else:
 		return (a[i+1,j,k]-a[i-1,j,k])/dy
 
-def scalar_gradient_y_2d(a,dy,nlat,i,j):
+def scalar_gradient_y_2D(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t j):
 	if i == 0:
 		return 2*(a[i+1,j]-a[i,j])/dy
 	elif i == nlat-1:
@@ -33,7 +33,7 @@ def scalar_gradient_y_2d(a,dy,nlat,i,j):
 	else:
 		return (a[i+1,j]-a[i-1,j])/dy
 
-def scalar_gradient_z(a,dz,i,j,k):
+def scalar_gradient_z(np.ndarray a,np.ndarray dz,np.int_t i,np.int_t j,np.int_t k):
 	cdef np.int_t nlevels = len(dz)
 	if k == 0:
 		return (a[i,j,k+1]-a[i,j,k])/dz[k]
@@ -52,7 +52,8 @@ def scalar_gradient_z_1D(np.ndarray a,np.ndarray dz,np.int_t k):
 		return (a[k+1]-a[k-1])/(2*dz[k])
 
 def surface_optical_depth(DTYPE_f lat):
-	return 4 + np.cos(lat*inv_90)*2.5
+	cdef DTYPE_f inv_90
+	return 4 + np.cos(lat*inv_90)*2
 
 def thermal_radiation(DTYPE_f a):
 	cdef DTYPE_f sigma = 5.67E-8
@@ -83,5 +84,5 @@ def solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,DT
 		else:
 			return value
 
-def profile(a):
+def profile(np.ndarray a):
 	return np.mean(np.mean(a,axis=0),axis=0)
