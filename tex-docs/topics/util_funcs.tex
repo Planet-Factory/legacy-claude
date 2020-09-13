@@ -190,3 +190,110 @@ Whereas if $z$ is close to $x$ then $\lambda$ will have a value on the lower end
     z = (1 - \lambda)x + \lambda y
     \label{eq:interpolation}
 \end{equation}
+
+\subsection{3D smoothing} \label{sec:3dsmooth}
+As you can imagine the temperature, pressure and the like vary quite a lot over the whole planet. Which is something that we kind of want but not really. What we really want is to limit how 
+much variety we allow to exist. For this we are going to use Fast Fourier Transforms, also known as FFTs. A Fourier Transform decomposes a wave into its frequences. The fast bit comes from the 
+algorithm we use to calculate it. This is because doing it via the obvious way is very slow, in the order of $O(n^2)$ (for what that means, please visit \autoref{sec:runtime}). Whereas if we use 
+the FFT, we reduce the running time to $O(n\log(n))$. There are various ways to calculate the FFT, but we use the Cooley–Tukey algorithm \cite{fft}. To explain it, let us first dive into a normal 
+Fourier Transform.
+
+The best way to explain what a Fourier Transform does is to apply it to a sound. Sound is vibrations travelling through the air that reach your air and make the inner part of your air vibrate.
+If you plot the air pressure reaching your air versus the time, the result will have the form of a sinoidal wave. However, it is only a straight forward sinoidal wave (as if you plotted the 
+$\cos$ function) if the tone is pure. That is often not the case, and sounds are combinations of tones. This gives waves that are sinoidal but not very alike to the $\cos$ function. The FT will
+transform this "unpure" wave and splits them up into a set of waves that are all of pure tone. To do that we need complex numbers which are explained here \autoref{sec:complex}. 
+
+With that explanation out of the way, we now know that with Euler's formula (\autoref{eq:euler}) we can rotate on the complex plane. If we rotate one full circle per second, the formula changes 
+to \autoref{eq:euler rotate}, as the circumference of the unit circle is $2\pi$ and $t$ is in seconds. This rotates in the clock-wise direction, but we want to rotate in the clockwise direction, 
+so we need to add a $-$ to the exponent. If we also want to control how fast the rotation happens (which is called the frequency) then we change the equation to \autoref{eq:euler freq}. Note that
+the frequency unit is $Hz$ which is defined as $s^{-1}$, which means that a frequency of $10 Hz$ means 10 revolutions per second. Now we get our wave which we call $g(t)$ and plonk it in front 
+of the equation up until now. Which results in \autoref{eq:euler wave}. Visually, this means that we take the sound wave and wrap it around the origin. This might sound strange at first but bear 
+with me. If you track the center of mass (the average of all the points that form the graph) you will notice that it hovers around the origin. If you now change the frequency of the rotation ($f$)
+you will see that the center of mass moves a bit, usually around the origin. However, if the frequency of the rotation matches a frequency of the wave, then the center of mass is suddenly a 
+relatively long distance away from the origin. This indicates that we have found a frequency that composes the sound wave. Now how do we track the center of mass? That is done using integration,
+as in \autoref{eq:euler int}. Now to get to the final form, we forget about the fraction part. This means that the center of mass will still hover around the origin for the main part of the 
+rotation, but has a huge value for when the rotation is at the same frequency as one of the waves in the sound wave. The larger the difference between $t_2$ and $t_1$, the larger the value of the
+Fourier Transform. The final equation is given in \autoref{eq:ft}.
+
+\begin{subequations}
+    \begin{equation}
+        e^{ix} = \cos(x) + i\sin(x)
+        \label{eq:euler}
+    \end{equation}
+    \begin{equation}
+        e^{2\pi it}
+        \label{eq:euler rotate}
+    \end{equation}
+    \begin{equation}
+        e^{-2\pi ift}
+        \label{eq:euler freq}
+    \end{equation}
+    \begin{equation}
+        g(t)e^{-2\pi ift}
+        \label{eq:euler wave}
+    \end{equation}
+    \begin{equation}
+        \frac{1}{t_2 - t_1}\int^{t_2}_{t_1}g(t)e^{-2\pi ift}
+        \label{eq:euler int}
+    \end{equation}
+    \begin{equation}
+        \hat{g}(f) = \int^{t_2}_{t_1}g(t)e^{-2\pi ift}
+        \label{eq:ft}
+    \end{equation}
+\end{subequations}
+
+These Fourier Transforms have the great property that if you add them together you still have the relatively large distances of the center of mass to the origin at the original frequencies. It 
+is this property that enables us to find the frequencies that compose a sound wave. 
+
+Now that we know what a Fourier Transform is, we need to make it a Fast Fourier Transform, as you can imagine that calculating such a thing is quite difficult. Some smart people have thought
+about this and they came up with quite a fast algorithm, the Cooley-Tukey algorithm \cite{fft}, named after the people that thought of it. They use something we know as a Discrete Fourier 
+Transform which is described by \autoref{eq:dft}. Here $N$ is the total amount of samples from the continuous sound wave. This means that $0 \leq k \leq N - 1$ and $0 \leq n \leq N - 1$.
+
+Now with the DFT out of the way we can discuss the algorithm. It makes use of a clever property of the DFT. If you replace $k$ by $(N + k)$, as in \autoref{eq:dftex}, you can split up the 
+exponent which will transform one of the two parts into $1$ due to $e^{-i2\pi n} = 1$ for any integer $n$. This means that $X_{N + k} = X_k \Rightarrow X_{k + iN} = X_k$ for any integer $i$. 
+This symmetry as it is called can be exploited to produce a divide and conquer algorithm, which will recursivley calculate the FT which gives a running time of $N\log(n)$ as shown in 
+\autoref{alg:FFT}.
+
+\begin{subequations}
+    \begin{equation}
+        X_k = \sum_{n = 0}^{N - 1} x_ne^{-\frac{i2\pi}{N}kn}
+        \label{eq:dft}
+    \end{equation}
+    \begin{equation}
+        X_{N + k} = \sum_{n = 0}^{N - 1} x_ne^{-\frac{i2\pi(N + k)}{N}n} = \sum_{n = 0}^{N - 1} x_ne^{-i2\pi n}x_ne^{-\frac{i2\pi}{N}kn} = \sum_{n = 0}^{N - 1} x_ne^{-\frac{i2\pi}{N}kn}
+        \label{eq:dftex}
+    \end{equation}
+\end{subequations}
+
+\begin{algorithm}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{array $A$, integer $i$, integer $N$, integer $s$}
+    \Output{array $B$ with length $A.length - 1$ containing the DFT}
+    \uIf{$N = 1$}{
+        $B[0] \leftarrow A[0]$ \;
+    } \uElse{
+        $B[0], \dots, B[\frac{N}{2} - 1] \leftarrow \texttt{FFT}(A, i, \frac{N}{2}, 2s)$ \;
+        $B[\frac{N}{2}], \dots, B[N - 1] \leftarrow \texttt{FFT}(A, i + s, \frac{N}{2}, 2s)$ \;
+        \For{$k = 0$ to $\frac{N}{2} - 1$}{
+            $t \leftarrow B[k]$ \;
+            $B[k] \leftarrow t + e^{-2i\pi \frac{k}{N}} B[k + \frac{N}{2}]$ \;
+            $B[k + \frac{N}{2}] \leftarrow t - e^{-2i\pi \frac{k}{N}} B[k + \frac{N}{2}]$ \;
+        }
+    }
+    \Return{B}
+    \label{alg:FFT}
+\end{algorithm}
+
+There is just this one problem we have, the algorithm in \autoref{alg:FFT} can only handle one dimension, and we need to support multidimensional arrays. So let us define a multidimensional FFT 
+first in \autoref{eq:NFFT}. Here $N$ and $M$ are the amount of indices for the dimensions, where $M$ are the amount of indices for the first dimension and $N$ are the amount of indices for the 
+second dimension. This can of course be extended in the same way for a $p$-dimensional array.
+
+\begin{equation}
+    X_{k,l} = \sum_{m = 0}^{M - 1}\sum_{n = 0}^{N - 1} x_{m, n}e^{-2i\pi(\frac{mk}{M} + \frac{nl}{N})}
+    \label{eq:NFFT}
+\end{equation}
+
+It is at this point that the algorithm becomes very complicated. Therefore I would like to invite you to use a library for these kinds of calculations, like Numpy \cite{numpy} for Python. If you
+really want to use your own made version, you need to wait for a bit as I try to decode the literature on the algorithm for it. It is one heck of a thing to decode, so I decided to treat that at 
+a later point in the future. It will then be found here, so you will have to stay tuned. Sorry about that, it's quite complex...

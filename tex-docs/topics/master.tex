@@ -110,3 +110,27 @@ Note that the function \texttt{interpolate} takes three arguments, the first one
 third one is the values for the data points that we know. This function may or may not exist in your programming language of choice, which might mean that you have to write it yourself. 
 The formula that we use for interpolation can be found in \autoref{eq:interpolation}, though you still need to figure out what value you need for $\lambda$ (see \autoref{sec:interpolation}). 
 This is left as an exercise for the reader.
+
+\subsection{Clamping the Velocities}
+Due to the boundaries in the advection calculations (see \autoref{sec:adv}) we get weird instabilities as the velocity calculations are executed on more cells. Which means that air is trying to 
+displace temperature (advect it) by flowing faster to those cells, but actually don't carry any temperature because we turned it off for those cells. This is something that we need to fix to get 
+rid of weirdness around the edges. This is done in \autoref{alg:velocity clamped}. Here the $bla:$ means from $bla$ to the last valid index, if the $:$ is in front of $bla$ then it means from 
+the first valid index to $bla$.
+
+\begin{algorithm}
+    \autoref{alg:velocity}
+    $u[(adv\_boun, -adv\_boun - 1), :, :] \leftarrow 0.5u[(adv\_boun, -adv\_boun - 1), :, :]$ \;
+    $v[(adv\_boun, -adv\_boun - 1), :, :] \leftarrow 0.5v[(adv\_boun, -adv\_boun - 1), :, :]$ \;
+    $w[(adv\_boun, -adv\_boun - 1), :, :] \leftarrow 0.5w[(adv\_boun, -adv\_boun - 1), :, :]$ \;
+
+    $u[:adv\_boun, :, :] \leftarrow 0 $\;
+    $v[:adv\_boun, :, :] \leftarrow 0 $\;
+    $w[:adv\_boun, :, :] \leftarrow 0 $\;
+
+    $u[-adv\_boun:, :, :] \leftarrow 0$ \;
+    $v[-adv\_boun:, :, :] \leftarrow 0$ \;
+    $w[-adv\_boun:, :, :] \leftarrow 0$ \;
+    \caption{Clamping the Velocities}
+    \label{alg:velocity clamped}
+\end{algorithm}
+
