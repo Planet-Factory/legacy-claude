@@ -134,3 +134,23 @@ the first valid index to $bla$.
     \label{alg:velocity clamped}
 \end{algorithm}
 
+\subsection{Smoothing all the things}
+On a planet wide scale, you have a lot of variety in the data. To counteract that we filter out the high frequency data. Which means that we filter out the data that occurs sporadically. So we 
+do not consider the data that occurs so infrequently that it means nothing. We do this for the radiation (temperature) and the velocity which is shown in \autoref{alg:smootht} and 
+\autoref{alg:smoothv} respectively. It is worth mentioning that \autoref{alg:smootht} is executed after we do the calculations for $T_a$ (shown in \autoref{alg:optical depth}). 
+\autoref{alg:smoothv} is done after \autoref{alg:velocity} but before \autoref{alg:velocity clamped}. 
+
+
+\begin{algorithm}
+    $T_a \leftarrow \texttt{Smooth}(T_a, smooth_t)$ \;
+    \caption{Smoothing the atmospheric temperature}
+    \label{alg:smootht}
+\end{algorithm}
+
+\begin{algorithm}
+    $u \leftarrow \texttt{Smooth}(u, smooth_u)$ \;
+    $v \leftarrow \texttt{Smooth}(v, smooth_v)$ \;
+    $w \leftarrow \texttt{Smooth}(w, smooth_w)$ \;
+    \caption{Smoothing the velocity}
+    \label{alg:smoothv}
+\end{algorithm}
