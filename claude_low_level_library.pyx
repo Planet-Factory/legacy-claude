@@ -52,7 +52,7 @@ def scalar_gradient_z_1D(np.ndarray a,np.ndarray dz,np.int_t k):
 		return (a[k+1]-a[k-1])/(2*dz[k])
 
 def surface_optical_depth(DTYPE_f lat):
-	cdef DTYPE_f inv_90
+	# cdef DTYPE_f inv_90
 	return 4 + np.cos(lat*inv_90)*2
 
 def thermal_radiation(DTYPE_f a):
@@ -86,3 +86,25 @@ def solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,DT
 
 def profile(np.ndarray a):
 	return np.mean(np.mean(a,axis=0),axis=0)
+
+def t_to_theta(np.ndarray temperature_atmos, np.ndarray air_pressure):
+	cdef np.ndarray output = np.zeros_like(temperature_atmos)
+	cdef np.int_t i,j,k
+	cdef DTYPE_f inv_p0
+	for i in range(output.shape[0]):
+		for j in range(output.shape[1]):
+			inv_p0 = 1/air_pressure[i,j,0]
+			for k in range(output.shape[2]):
+				output[i,j,k] = temperature_atmos[i,j,k]*(air_pressure[i,j,k]*inv_p0)**0.286
+	return output
+
+def theta_to_t(np.ndarray theta, np.ndarray air_pressure):
+	cdef np.ndarray output = np.zeros_like(theta)
+	cdef np.int_t i,j,k
+	cdef DTYPE_f inv_p0
+	for i in range(output.shape[0]):
+		for j in range(output.shape[1]):
+			inv_p0 = 1/air_pressure[i,j,0]
+			for k in range(output.shape[2]):
+				output[i,j,k] = theta[i,j,k]*(air_pressure[i,j,k]*inv_p0)**-0.286
+	return output

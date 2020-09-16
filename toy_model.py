@@ -18,28 +18,28 @@ top = 40E3						# top of atmosphere (m)
 planet_radius = 6.4E6			# define the planet's radius (m)
 insolation = 1370				# TOA radiation from star (W m^-2)
 gravity = 9.81 					# define surface gravity for planet (m s^-2)
-axial_tilt = -23.5/2				# tilt of rotational axis w.r.t. solar plane
+axial_tilt = -23.5/2			# tilt of rotational axis w.r.t. solar plane
 year = 365*day					# length of year (s)
 
 dt_spinup = 60*137
 dt_main = 60*7
-spinup_length = 3*day
+spinup_length = 7*day
 
 ###
 
 advection = True 				# if you want to include advection set this to be True
 advection_boundary = 3			# how many gridpoints away from poles to apply advection
-smoothing_parameter_t = 0.9
-smoothing_parameter_u = 0.8
-smoothing_parameter_v = 0.8
+smoothing_parameter_t = 0.6
+smoothing_parameter_u = 0.6
+smoothing_parameter_v = 0.6
 smoothing_parameter_w = 0.3
 
-save = True 					# save current state to file?
+save = False 					# save current state to file?
 load = True  					# load initial state from file?
 
-plot = False 					# display plots of output?
-level_plots = False 			# display plots of output on vertical levels?
-nplots = 3						# how many levels you want to see plots of (evenly distributed through column)
+plot = True 					# display plots of output?
+level_plots = True 			# display plots of output on vertical levels?
+nplots = 4						# how many levels you want to see plots of (evenly distributed through column)
 
 ###########################
 
@@ -203,8 +203,8 @@ while True:
 		before_velocity = time.time()
 		u,v,w = top_level.velocity_calculation(u,v,air_pressure,old_pressure,air_density,coriolis,gravity,dx,dy,dt)
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
-		# v = top_level.smoothing_3D(v,smoothing_parameter_v)
-		# w = top_level.smoothing_3D(w,smoothing_parameter_w)
+		v = top_level.smoothing_3D(v,smoothing_parameter_v)
+		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.3)
 		
 		u[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
 		v[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
@@ -221,12 +221,12 @@ while True:
 		# time_taken = float(round(time.time() - before_velocity,3))
 		# print('Velocity: ',str(time_taken),'s')
 
-		# before_advection = time.time()
 		if advection:
-			# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
-			# atmosp_addition = dt*(thermal_diffusivity_air*laplacian(temperature_atmos))
+			# before_advection = time.time()
 
-			atmosp_addition = dt*top_level.divergence_with_scalar(temperature_atmos,u,v,w,dx,dy,dz)
+			# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
+
+			atmosp_addition = dt*top_level.thermal_advection(temperature_atmos,air_pressure,u,v,w,dx,dy,dz)
 			temperature_atmos[advection_boundary:-advection_boundary,:,:] -= atmosp_addition[advection_boundary:-advection_boundary,:,:]
 			temperature_atmos[advection_boundary-1,:,:] -= 0.5*atmosp_addition[advection_boundary-1,:,:]
 			temperature_atmos[-advection_boundary,:,:] -= 0.5*atmosp_addition[-advection_boundary,:,:]
@@ -239,7 +239,6 @@ while True:
 
 			# temperature_world -= dt*(thermal_diffusivity_roc*top_level.laplacian_2D(temperature_world,dx,dy))
 
-			
 			# time_taken = float(round(time.time() - before_advection,3))
 			# print('Advection: ',str(time_taken),'s')
 
@@ -270,6 +269,7 @@ while True:
 		ax[0].set_xlabel('Longitude')
 
 		ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmos,axis=1)), cmap='seismic',levels=15)
+		# ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1)), cmap='seismic',levels=15)
 		ax[1].plot(lat_plot,tropopause_height,color='black',linestyle='--',linewidth=3,alpha=0.5)
 		if velocity:
 			ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1)), colors='white',levels=20,linewidths=1,alpha=0.8)
@@ -282,7 +282,7 @@ while True:
 
 		f.colorbar(test, cax=cbar_ax)
 		cbar_ax.set_title('Temperature (K)')
-		f.suptitle( 'Time ' + str(round(24*t/day,2)) + ' hours' )
+		f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
 		
 		if level_plots:
 			quiver_padding = int(50/resolution)

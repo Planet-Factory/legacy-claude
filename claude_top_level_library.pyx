@@ -53,7 +53,31 @@ def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,n
 	for i in range(nlat):
 		for j in range(nlon):
 			for k in range(nlevels):
-				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + 0.05*low_level.scalar_gradient_z(aw,dz,i,j,k)
+				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + 1*low_level.scalar_gradient_z(aw,dz,i,j,k)
+	return output
+
+# specifically thermal advection, converts temperature field to potential temperature field, then advects (adiabatically), then converts back to temperature
+def thermal_advection(np.ndarray temperature_atmos,np.ndarray air_pressure,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
+	cdef np.ndarray output = np.zeros_like(temperature_atmos)
+	cdef np.ndarray au, av, aw
+	cdef np.int_t nlat, nlon, nlevels, i, j, k 
+	cdef np.ndarray theta = low_level.t_to_theta(temperature_atmos,air_pressure)
+
+	nlat = output.shape[0]
+	nlon = output.shape[1]
+	nlevels = output.shape[2]
+
+	au = theta*u
+	av = theta*v
+	aw = theta*w
+
+	for i in range(nlat):
+		for j in range(nlon):
+			for k in range(nlevels):
+				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + 1*low_level.scalar_gradient_z(aw,dz,i,j,k)
+	
+	output = low_level.theta_to_t(output,air_pressure)
+
 	return output
 
 def radiation_calculation(np.ndarray temperature_world, np.ndarray temperature_atmos, np.ndarray air_pressure, np.ndarray air_density, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.ndarray heights, np.ndarray dz, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
@@ -141,13 +165,13 @@ def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray air_pressure,np.nd
 
 	return u,v,w
 
-def smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter):
-	nlat = a.shape[0]
-	nlon = a.shape[1]
-	nlevels = a.shape[2]
+def smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter, DTYPE_f vert_smooth_parameter=0.5):
+	cdef np.int_t nlat = a.shape[0]
+	cdef np.int_t nlon = a.shape[1]
+	cdef np.int_t nlevels = a.shape[2]
 	smooth_parameter *= 0.5
-	test = np.fft.fftn(a)
+	cdef np.ndarray test = np.fft.fftn(a)
 	test[int(nlat*smooth_parameter):int(nlat*(1-smooth_parameter)),:,:] = 0
 	test[:,int(nlon*smooth_parameter):int(nlon*(1-smooth_parameter)),:] = 0
-	# test[:,:int(nlevels*smooth_parameter):int(nlevels*(1-smooth_parameter))] = 0
+	test[:,:,int(nlevels*vert_smooth_parameter):int(nlevels*(1-vert_smooth_parameter))] = 0
 	return np.fft.ifftn(test).real
