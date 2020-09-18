@@ -16,6 +16,9 @@ simplistic model of atmospheric dynamics.
 Beyond these goals, we hope that it can become a useful resource for teachers and students discussing climate 
 and atmospheric dynamics.
 
+### Building
+See the documentation on building in [BUILDING.md](https://github.com/Planet-Factory/claude/blob/master/BUILDING.md).
+
 ### Community
 
 **Discord**
