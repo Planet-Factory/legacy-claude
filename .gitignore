@@ -427,3 +427,8 @@ TSWLatexianTemp*
 *.glstex
 
 # End of https://www.toptal.com/developers/gitignore/api/python,tex
+
+# Platform specific - compiled python (through cython)
+claude_*_level_library*.pyd
+# and the code it's generated from
+claude_*_level_library.c
