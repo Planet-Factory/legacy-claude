@@ -1,0 +1,58 @@
+\section{List of Variables}
+Are you ever confused about what something is? Do you ever forget what a variable represents? Then I got the solution for you. The following overview will explain what each variable is and 
+represents. I will try to not use one variable for the same thing, though that is sometimes very difficult to do. I'll do my best. In the meantime, enjoy this exstensive list. Note that this 
+only applies to variables in code, every symbol in equations are explained at the equations themselves.
+
+\begin{itemize}
+    \item $R$: The Gas Constant with value $8.3144621$ ($J(mol)^{-1}K$).
+    \item $day$: Length of one day in seconds ($s$).
+    \item $year$: Length of one year in seconds ($s$).
+    \item $\delta t$: How much time is between each calculation run in seconds ($s$).
+    \item $g:$ Magnitude of gravity on the planet in $ms^{-2}$.
+    \item $\alpha$: By how many degrees the planet is tilted with respect to the star's plane, also called axial tilt.
+    \item $top$: How high the top of the atmosphere is with respect to the planet surface in meters ($m$).
+    \item $ins$: Amount of energy from the star that reaches the planet per unit area ($Jm^{-2}$).
+    \item $\epsilon$: Absorbtivity of the atmosphere, fraction of how much of the total energy is absorbed (unitless).
+    \item $resolution$: The amount of degrees on the latitude longitude grid that each cell has, with this setting each cell is 3 degrees latitude high and 3 degrees longitude wide.
+    \item $nlevels \leftarrow 10$: The amount of layers in the atmosphere.
+    \item $\delta t_s$: The time between calculation rounds during the spin up period in seconds ($s$).
+    \item $t_s$: How long we let the planet spin up in seconds ($s$).
+    \item $adv$: Whether we want to enable advection or not.
+    \item $velocity$: Whether we want to calculate the air velocity or not.
+    \item $adv\_boun$: How many cells away from the poles where we want to stop calculating the effects of advection.
+    \item $nlon$: The amount of longitude gridpoints that we use, which depends on the resolution.
+    \item $nlat$: The amount of latitude gridpoints that we use, which depends on the resolution.
+    \item $T_p$: The temperature of the planet, a 2D array representing a latitude, longitude grid cell.
+    \item $T_a$: The temperature of the atmosphere, a 3D array representing a grid cell on the latitude, longitude, atmospheric layer grid.
+    \item $\sigma$: The Stefan-Boltzmann constant equal to $5.670373 \cdot 10^{-8} \ (Wm^{-2}K^{-4})$. 
+    \item $C_a$: Specific heat capacity of the air, equal to $1.0035 Jg^{-1}K^{-1}$.
+    \item $C_p$: Specific heat capacity of the planet, equal to $1.0 \cdot 10^{6} Jg^{-1}K^{-1}$.
+    \item $a$: Albedo, the reflectiveness of a substance. Note that $a$ is used in general functions as an array that is supplied as input. If that is the case it can be read at the top of the
+                algorithm.
+    \item $\rho$: The density of the atmosphere, a 3D array representing a grid cell on the latitude, longitude, atmospheric layer grid.
+    \item $\delta x$: How far apart the gridpoints are in the $x$ direction in degrees longitude.
+    \item $\delta y$: How far apart the gridpoints are in the $y$ direction in degrees latitude.
+    \item $\delta z$: How far apart the gridpoints are in the $z$ direction in $m$.
+    \item $heights$: How high an atmospheric layer is in $m$.
+    \item $\tau$: The optical depth for an atmospheric layer.
+    \item $\tau_0$: The optical depth at the planet surface.
+    \item $f_l$: The optical depth parameter.
+    \item $pressureProfile$: The average pressure taken over all atmospheric layers in a latitude, longitude gridcell.
+    \item $densityProfile$:The average density taken over all atmospheric layers in a latitude, longitude gridcell.
+    \item $temperatureProfile$: The average temperature taken over all atmospheric layers in a latitude, longitude gridcell.
+    \item $U$: Upward flux of radiation, 1D array representing an atmospheric layer.
+    \item $D$: Downward flux of radiation, 1D array representing an atmospheric layer.
+    \item $u$: The east to west air velocity in $ms^{-1}$.
+    \item $v$: The north to south air velocity in $ms^{-1}$.
+    \item $w$: The bottom to top air velocity in $ms^{-1}$.
+    \item $f$: The coriolis parameter.
+    \item $\Omega$: The rotation rate of the planet in $rads^{-1}$.
+    \item $p$: The pressure of a latitude, longitude, atmospheric layer gridcell.
+    \item $p_0$: The pressure of a latitude, longitude, atmospheric layer gridcell from the previous calculation round.
+    \item $\alpha_a$: The thermal diffusivity constant for air.
+    \item $\alpha_p$: The thermal diffusivity constant for the planet surface.
+    \item $smooth_t$: The smoothing parameter for the temperature.
+    \item $smooth_u$: The smoothing parameter for the $u$ component of the velocity.
+    \item $smooth_v$: The smoothing parameter for the $v$ component of the velocity.
+    \item $smooth_w$: The smoothing parameter for the $w$ component of the velocity.
+\end{itemize}
