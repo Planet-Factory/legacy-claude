@@ -36,9 +36,9 @@ With thermal diffusion in place, the temperature will spread out a bit, however 
 going to change that. The advection equation is shown in \autoref{eq:advection}. The symbols are:
 
 \begin{itemize}
-    \item $\psi$: What is carried along (in our case temperature, $K$).
-    \item $t$: The time ($s$).
-    \item $u$: The fluid velocity vector ($ms^{-1}$).
+    \item $\psi$: What is carried along (in our case temperature, \si{K}).
+    \item $t$: The time (\si{s}).
+    \item $u$: The fluid velocity vector (\si{ms^{-1}}).
     \item $\nabla$: The divergence operator (as explained in \autoref{sec:laplace}).
 \end{itemize}
 
@@ -113,4 +113,111 @@ First thing to mention is that vertical advection is still broken. Why? Because 
 we calculate the difference from one layer to the other is by differencing them (subtracting) which is always finite. Therefore we always get some inaccuracies. Usually that is fine, but with an 
 exponential function the differences, you guessed it, become exponentially wrong. As such, the function would eventually be so far off that the model would blow up. So we need to fix it. To 
 prevent a blow up, we have disabled the call to the gradient $z$ function in \autoref{alg:divergence}. This ensures that the horizontal bits still work, but the vertical stuff does not.
-As always, we will try to fix this in a future stream. 
+As always, we will try to fix this in the future. 
+
+\subsection{Adiabatic Motion}
+Up until now, we have been moving air and the density of the atmosphere. However we have not transported any temperature yet. What this means is that if we have a packet of air (see it as a box
+filled with air, but the box is invisible) $P$ which is at the planet surface. There $P$ has temperature $T_1$. If we then move $P$ to a layer higher up in the atmosphere, $P$ will still have 
+the same temperature, which is wrong because the density differs. Due to this difference, there is either more or less pressure applied to the box of air which means that $P$ will contract or 
+expand. This obviously changes it's temperature as the air molecules are closer together/further away from each other. Therefore the energy spread is different which affects the temperature. 
+For a visual representation, please consult \autoref{fig:thermal potential}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/potential_temperature.jpg}
+    \caption{Visual representation of why we need Thermal Potential \cite{simon}.}
+    \label{fig:thermal potential}
+\end{figure}
+
+As seen in \autoref{fig:thermal potential}, the packet of air (next to $T_1$) moves up into a higher layer of the atmosphere and ends up at the top (next to $T_2$). The packet has grown bigger, 
+as the density in that atmospheric layer is lower and hence the air expands. Because the same energy is in that packet, but it has expanded, the temperature of that packet drops which gives us 
+$T_2 < T_1$. The light blue graph in the background shows how the density behaves the higher you go, meaning at the far right (when we are at the highest point) the density is quite low and at 
+the far left (when we are at the planet surface) the density is quite high. The yellow graph shows the temperature of the air at that height, which behaves similarly to the density graph.
+
+Thermal potential or potential temperature, is the temperature that the packet of air would be if it is at the planet surface. So take the packet at $T_2$ in \autoref{fig:thermal potential}. If we move that down to the 
+surface, then it would be temperature $T$ which is then equal to the thermal potential. The equation corresponding to thermal potential is shown in \autoref{eq:thermal potential} 
+\cite{thermalPotential}. The symbols in \autoref{eq:thermal potential} mean:
+
+\begin{itemize}
+    \item $T$: The temperature of the packet of air (\si{K}).
+    \item $p_0$: Reference pressure, usually the pressure at the planet surface (\si{Pa}).
+    \item $p$: Pressure of the packet of air (\si{Pa}).
+    \item $R$: Gas constant as defined in \autoref{sec:gas constant} (\si{JK^{-1}mol^{-1}}).
+    \item $C_a$: Specific heat capacity of air at a constant pressure (\si{Jkg^{-1}K^{-1}}).
+\end{itemize}
+
+\begin{subequations}
+    \begin{equation}
+        \theta = T(\frac{p_0}{p})^{\frac{R}{C_a}}
+        \label{eq:thermal potential}
+    \end{equation}
+    \begin{equation}
+        T = \theta(\frac{p}{p_0})^{\frac{R}{C_a}}
+        \label{eq:potential temp}
+    \end{equation}
+\end{subequations}
+
+If we now re-arrange \autoref{eq:thermal potential} so that we have $T$ on one side and the rest on the other side, we get \autoref{eq:potential temp}. With this we can convert temperature into 
+potential temperature and vice versa. The whole process of moving temperature around is called adiabatic motion. Now it is time to get this into code. For this to work we need to translate both 
+\autoref{eq:thermal potential} and \autoref{eq:potential temp} into code and create an overarching function that calls the previously mentioned equations. Let us start with 
+\autoref{eq:thermal potential} which is described in \autoref{alg:temp to pot}. Note that $\frac{R}{C_a}$ does not change as they are constants, therefore we can precompute them which saves quite 
+a bit of time (namely $O(n^3)$ divisions, where $n$ is the length of each dimension of $T_a$). Also note that we can inverse the process by inserting a minus in the exponent and swapping $T_a$ 
+and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}.
+
+\begin{algorithm}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{temperature of the atmosphere $T_a$, air pressure $p$, boolean $back$}
+    \Output{potential temperature $\theta$}
+    \uIf{$back$}{
+        $\kappa \leftarrow -\frac{R}{C_a}$ \;
+    }\uElse{
+        $\kappa \leftarrow \frac{R}{C_a}$ \;
+    }
+    \For{$i \leftarrow 0$ \KwTo $T_a.length$}{
+        \For{$j \leftarrow 0$ \KwTo $T_a[i].length$}{
+            $p_0 \leftarrow p[i, j 0]$ \;
+            \For{$k \leftarrow 0$ \KwTo $T_a[i, j].length$}{
+                $\theta[i, j, k] \leftarrow T_a[i, j, k] (\frac{p[i, j, k]}{p_0})^{\kappa}$
+            }
+        }
+    }
+    \Return{$\theta$}
+    \caption{Converting temperature into potential temperature}
+    \label{alg:temp to pot}
+\end{algorithm}
+
+With that done we now only need to create the overarching function that will call \autoref{alg:temp to pot}. This function will be based on \autoref{alg:divergence} as it is quite similar for 
+what we need to do, however we need to replace a call so we do need to make it a seperate function. Let us do that in \autoref{alg:thermal pot}. Here \texttt{TToTheta} represents the call to 
+\autoref{alg:temp to pot}.
+
+\begin{algorithm}[!hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{temperature of the atmosphere $T_a$, pressure $p$}
+    \Output{temperature of the atmosphere after advection $output$}
+    $\theta \leftarrow $ \texttt{TToTheta}($T_a, p,$ \texttt{FALSE}) \;
+    \For{$i \leftarrow 0$ \KwTo $a.length$}{
+        \For{$j \leftarrow 0$ \KwTo $a[i].length$}{
+            \For{$k \leftarrow 0$ \KwTo $a[i, j].length$}{
+                $output[i, j, k] \leftarrow \Delta_x(\theta u, i, j, k) + \Delta_y(\theta v, i, j, k) + \Delta_z(\theta w, i, j, k)$ \;
+            }
+        }
+    }
+    $output \leftarrow $ \texttt{TToTheta}($output, p,$ \texttt{TRUE}) \;
+    \Return{$output$} \;
+    \caption{Calculate the result of the thermal advection}
+    \label{alg:thermal pot}
+\end{algorithm}
+
+Now we only need to do one more thing, replace the algorithm that calculates $T_a$ as a result of advection. Let us do that in \autoref{alg:advection pot}, where \texttt{ThermalAdv} is the call 
+to \autoref{alg:thermal pot}.
+
+\begin{algorithm}
+    $T_{add} \leftarrow T_a + $ \texttt{ThermalAdv}$(T_a, p)$\;
+    $T_a \leftarrow T_a - 0.5T_{add}[adv\_boun:-adv\_boun, :, :] \text{ //Only subtract } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$. \;
+    $\rho[adv\_boun: -adv\_boun, :, :] \leftarrow \rho - 0.5(\delta t \nabla \rho) \text{ //Only change the density for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$ \;
+    $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
+    \caption{The main calculations for calculating the effects of advection}
+    \label{alg:advection pot}
+\end{algorithm}
