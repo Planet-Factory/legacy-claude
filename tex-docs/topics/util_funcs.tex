@@ -302,19 +302,20 @@ a later point in the future. It will then be found here, so you will have to sta
 With that out of the way (or rather on the TODO list), we need to create a smoothing operation out of it. We do this in \autoref{alg:smooth}. Keep in mind that \texttt{FFT} the call is to the 
 multidimensional Fast Fourier Transform algorithm, \texttt{IFFT} the call to the inverse of the multidimensional Fast Fourier Transform algorithm (also on the TODO list) and that the $int()$ 
 function ensures that the number in brackets is an integer. Also note that the inverse of the FFT might give complex answers, and we only want real answers which the $.real$ ensures. We only 
-take the real part and return that.
+take the real part and return that. $v$ is an optional parameter with default value $0.5$ which does absolutely nothing in this algorithm.
 
 \begin{algorithm}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{Array $a$, smoothing factor $s$}
+    \Input{Array $a$, smoothing factor $s$, vertical smoothing factor $v \leftarrow 0.5$}
     \Output{Array $A$ with less variation}
     $nlat \leftarrow a.length$ \;
     $nlon \leftarrow a[0].length$ \;
     $nlevels \leftarrow a[0][0].length$ \;
     $temp \leftarrow \texttt{FFT}(a)$ \;
     $temp[int(nlat s):int(nlat(1 - s)),:,:] \leftarrow 0$ \;
-	$temp[:,int(nlon s):int(nlon(1 - s)),:] \leftarrow 0$ \;
+    $temp[:,int(nlon s):int(nlon(1 - s)),:] \leftarrow 0$ \;
+    $temp[:,:,int(nlevels v):int(nlevels(1 - v))] \leftarrow 0$ \;
     \Return $\texttt{IFFT}(temp).real$ \;
     \caption{Smoothing function}
     \label{alg:smooth}

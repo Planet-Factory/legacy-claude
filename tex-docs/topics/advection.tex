@@ -162,7 +162,8 @@ potential temperature and vice versa. The whole process of moving temperature ar
 \autoref{eq:thermal potential} and \autoref{eq:potential temp} into code and create an overarching function that calls the previously mentioned equations. Let us start with 
 \autoref{eq:thermal potential} which is described in \autoref{alg:temp to pot}. Note that $\frac{R}{C_a}$ does not change as they are constants, therefore we can precompute them which saves quite 
 a bit of time (namely $O(n^3)$ divisions, where $n$ is the length of each dimension of $T_a$). Also note that we can inverse the process by inserting a minus in the exponent and swapping $T_a$ 
-and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}.
+and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}. To avoid confusion we rename $p_0$ to $p_r$ as we talk about a reference pressure, instead of the already defined
+pressure from a previous calculation round.
 
 \begin{algorithm}
     \SetKwInOut{Input}{Input}
@@ -176,9 +177,9 @@ and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}.
     }
     \For{$i \leftarrow 0$ \KwTo $T_a.length$}{
         \For{$j \leftarrow 0$ \KwTo $T_a[i].length$}{
-            $p_0 \leftarrow p[i, j 0]$ \;
+            $p_r \leftarrow p[i, j 0]$ \;
             \For{$k \leftarrow 0$ \KwTo $T_a[i, j].length$}{
-                $\theta[i, j, k] \leftarrow T_a[i, j, k] (\frac{p[i, j, k]}{p_0})^{\kappa}$
+                $\theta[i, j, k] \leftarrow T_a[i, j, k] (\frac{p[i, j, k]}{p_r})^{\kappa}$
             }
         }
     }
