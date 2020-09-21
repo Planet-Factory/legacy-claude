@@ -146,13 +146,13 @@ we change that) amd the current time is obviously not constant. All constants ca
     \SetKwInOut{Output}{Output}
     \Input{time $t$, amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
-    \For{$lat \in [-90, 90]$}{
-        \For{$lon \in [0, 360]$}{
+    \For{$lat \leftarrow -90$ \KwTo $90$}{
+        \For{$lon \leftarrow 0$ \KwTo $360$}{
             $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t (S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p}$ \;
             $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
         }
     }
-    \caption{The main function of the temperature calculations}
+    \caption{The main function for the temperature calculations}
     \label{alg:stream1v1}
 \end{algorithm}
 
@@ -197,13 +197,13 @@ that $S$ is defined as the call to \autoref{alg:solar}.
     \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
 
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlot]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
             $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t (S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p}$ \;
             $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
         }
     }
-    \caption{The main function of the temperature calculations}
+    \caption{The main function for the temperature calculations}
     \label{alg:stream1v2}
 \end{algorithm}
 
@@ -229,13 +229,13 @@ reflected instead of absorbed, where we need the amount that is absorbed which i
     \SetKwInOut{Output}{Output}
     \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlot]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
             $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p[lat, lon]}$ \;
             $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
         }
     }
-    \caption{The main loop of the temperature calculations}
+    \caption{The main function for the temperature calculations}
     \label{alg:stream2v3}
 \end{algorithm}
 
@@ -249,13 +249,13 @@ The air density is not at all points exactly the same. This may be due to the wi
     \SetKwInOut{Output}{Output}
     \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlot]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
             $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{\rho[lat, lon]C_p[lat, lon]}$ \;
             $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{\rho[lat, lon]C_a}$ \;
         }
     }
-    \caption{The main loop of the temperature calculations}
+    \caption{The main function for the temperature calculations}
     \label{alg:temperature with density}
 \end{algorithm}
 
@@ -294,15 +294,15 @@ regards to the storage of the values) by the addition of multiple atmospheric la
     \SetKwInOut{Output}{Output}
     \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlot]$}{
-            \For{$layer \in [0, nlevels]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
                 $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + \sigma(4\epsilon[0](T_a[lat, lon, 0])^4 - 4(T_p[lat, lon])^4))}
                 {4C_p[lat, lon]}$ \;
-                \uIf{$layer == 0$}{
+                \uIf{$layer = 0$}{
                     $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma((T_p[lat, lon])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
                     {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
-                }\uElseIf{$layer == nlevels - 1$}{
+                }\uElseIf{$layer = nlevels - 1$}{
                     $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
                     {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
                 }\uElse{
@@ -312,7 +312,7 @@ regards to the storage of the values) by the addition of multiple atmospheric la
             }
         }
     }
-    \caption{The main loop of the temperature calculations}
+    \caption{The main function for the temperature calculations}
     \label{alg:temperature layer}
 \end{algorithm}
 
@@ -320,7 +320,7 @@ We also need to initialise the $\epsilon$ value for each layer. We do that in \a
 
 \begin{algorithm}
     $\epsilon[0] \leftarrow 0.75$ \;
-    \For{$i \in [1, nlevels]$}{
+    \For{$i \leftarrow 1$ \KwTo $nlevels$}{
         $\epsilon[i] \leftarrow 0.5\epsilon[i - 1]$
     }
     \caption{Intialisation of the insulation of each layer (also known as $\epsilon$)}
@@ -406,23 +406,23 @@ $S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents
     \SetKwInOut{Output}{Output}
     \Input{amount of energy that hits the planet $S$}
     \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
-    \For{$lat \in [-nlat, nlat]$}{
-        \For{$lon \in [0, nlon]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
             $pressureProfile \leftarrow p[lat, lon, :]$ \;
             $\tau = \tau_0(lat)f_l\frac{pressureProfile}{pressureProfile[0]} + (1 - f_l)(\frac{pressureProfile}{pressureProfile[0]})^4)$ \;
             $U[0] \leftarrow \sigma T_p[lat, lon]^4$ \;
 
-            \For{$level \in [1, nlevels]$}{
+            \For{$level \leftarrow 1$ \KwTo $nlevels$}{
                 $U[level] \leftarrow U[level - 1] - \frac{(\tau[level] - \tau[level - 1])(\sigma \cdot (mean(T_a[:, :, level]))^4)}{1 + (\tau[level - 1] - \tau[level])}$ \;
             }
 
             $D[nlevels - 1] \leftarrow 0$ \;
 
-            \For{$level \in [nlevels - 1, 0]$}{
+            \For{$level \leftarrow nleves - 1$ \KwTo $0$}{
                 $D[level] \leftarrow D[level + 1] - \frac{(\tau[level + 1] - \tau[level])(\sigma \cdot (mean(T_a[:, :, level]))^4)}{1 + (\tau[level] - \tau[level + 1])}$ \;
             }
 
-            \For{$level \in [0, nlevels]$}{
+            \For{$level \leftarrow 0$ \KwTo $nlevels$}{
                 $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
             }
 
@@ -433,7 +433,7 @@ $S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents
             $T_p[lat, lon] \leftarrow T_p[lat, lon] \frac{\delta t((1 - a[lat, lon]) S + S_z(D, 0, 0, 0) - \sigma T_p[lat, lon]^4)}{C_p[lat ,lon]}$ \;
         }
     }
-    \caption{Adding in radiation}
+    \caption{Main function for calculating the temperature using radiation}
     \label{alg:optical depth}
 \end{algorithm}
 
@@ -450,7 +450,7 @@ $Q$. We add in a check to see if we are currently calculating the radiation in t
 height. 
 
 \begin{algorithm}
-    \For{$level \in [0, nlevels]$}{
+    \For{$level \leftarrow 0$ \KwTo $nlevels$}{
         $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
         \uIf{$heights[level] > 20 \cdot 10^3$}{
             $Q[level] \leftarrow Q[level] + \texttt{solar}(5, lat, lon, t) \frac{24 \cdot 60 \cdot 60(\frac{heights[level] - 20 \cdot 10^3}{10^3})^2}{30^2}$ \;

@@ -23,7 +23,7 @@ calculations we will do later on.
     \SetKwInOut{Output}{Output}
     \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
     \Output{Gradient in the $x$ direction}
-    \eIf{$k == \texttt{NULL}$}{
+    \eIf{$k = \texttt{NULL}$}{
         $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon] - a[i, (j - 1) \text{ mod } nlon]}{\delta x[i]}$ \;
     }{
         $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon, k] - a[i, (j - 1) \text{ mod } nlon, k]}{\delta x[i]}$ \;
@@ -38,18 +38,18 @@ calculations we will do later on.
     \SetKwInOut{Output}{Output}
     \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
     \Output{Gradient in the $y$ direction}
-    \eIf{$k == \texttt{NULL}$}{
+    \eIf{$k = \texttt{NULL}$}{
         \uIf{$i == 0$}{
             $grad \leftarrow 2 \frac{a[i + 1, j] - a[i, j]}{\delta y}$ \;
-        }\uElseIf{$i == nlat - 1$}{
+        }\uElseIf{$i = nlat - 1$}{
             $grad \leftarrow 2 \frac{a[i, j] - a[i - 1, j]}{\delta y}$ \;
         }\uElse{
             $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
         }
     }{
-        \uIf{$i == 0$}{
+        \uIf{$i = 0$}{
             $grad \leftarrow 2 \frac{a[i + 1, j, k] - a[i, j, k]}{\delta y}$ \;
-        }\uElseIf{$i == nlat - 1$}{
+        }\uElseIf{$i = nlat - 1$}{
             $grad \leftarrow 2 \frac{a[i, j, k] - a[i - 1, j, k]}{\delta y}$ \;
         }\uElse{
             $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
@@ -65,18 +65,18 @@ calculations we will do later on.
     \SetKwInOut{Output}{Output}
     \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
     \Output{Gradient in the $z$ direction}
-    \uIf{$a.dimensions == 1$}{
-        \uIf{$k == 0$}{
+    \uIf{$a.dimensions = 1$}{
+        \uIf{$k = 0$}{
             $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
-        }\uElseIf{$k == nlevels - 1$}{
+        }\uElseIf{$k = nlevels - 1$}{
             $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
         }\uElse{
             $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
         }
     } \uElse {
-        \uIf{$k == 0$}{
+        \uIf{$k = 0$}{
             $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
-        }\uElseIf{$k == nlevels - 1$}{
+        }\uElseIf{$k = nlevels - 1$}{
             $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
         }\uElse{
             $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
@@ -131,17 +131,17 @@ respectively.
     \SetKwInOut{Output}{Output}
     \Input{A matrix (double array) a}
     \Output{A matrix (double array) with results for the laplacian operator for each element}
-    \eIf{$a.dimensions == 2$}{
-        \For{$lat \in [1, nlat - 1]$}{
-            \For{$lon \in [0, nlon]$}{
+    \eIf{$a.dimensions = 2$}{
+        \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+            \For{$lon \leftarrow 0$ \KwTo $nlon$}{
                 $output[lat, lon] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon)}{\delta x[lat]} + \frac{\Delta_y(a, lat + 1, lon) - 
                 \Delta_y(a, lat - 1, lon)}{\delta y}$\;
             }
         }
     }{
-        \For{$lat \in [1, nlat - 1]$}{
-            \For{$lon \in [0, nlon]$}{
-                \For{$k \in [0, nlevels - 1]$}{
+        \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+            \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+                \For{$k \leftarrow 0$ \KwTo $nlevels - 1$}{
                     $output[lat, lon, k] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon, k) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon, k)}{\delta x[lat]} + \frac{\Delta_y(a, 
                     lat + 1, lon, k) - \Delta_y(a, lat - 1, lon, k)}{\delta y} + \frac{\Delta_z(a, lat, lon, k + 1) - \Delta_z(a, lat, lon, k + 1)}{2\delta z[k]}$\;
                 }
@@ -164,12 +164,9 @@ as we expect that we might use it in combination with the divergence operator mo
     \SetKwInOut{Output}{Output}
     \Input{A matrix (double array) $a$}
     \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
-    $dim_1 \leftarrow \text{ Length of } a \text{ in the first dimension}$ \;
-    \For{$i \in [0, dim_1]$}{
-        $dim_2 \leftarrow \text{ Length of } a \text{ in the second dimension (i.e. the length of the array stored at index } i)$ \;
-        \For{$j \in [0, dim_2]$}{
-            $dim_3 \leftarrow \text{ Length of } a \text{ in the third dimension}$ \;
-            \For{$k \in [0, dim_3]$}{
+    \For{$i \leftarrow 0$ \KwTo $a.length$}{
+        \For{$j \leftarrow 0$ \KwTo $a[i].length$}{
+            \For{$k \leftarrow 0$ \KwTo $a[i, j].length$}{
                 $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw, i, j, k)$ \;
             }
         }
@@ -275,7 +272,7 @@ This symmetry as it is called can be exploited to produce a divide and conquer a
     } \uElse{
         $B[0], \dots, B[\frac{N}{2} - 1] \leftarrow \texttt{FFT}(A, i, \frac{N}{2}, 2s)$ \;
         $B[\frac{N}{2}], \dots, B[N - 1] \leftarrow \texttt{FFT}(A, i + s, \frac{N}{2}, 2s)$ \;
-        \For{$k = 0$ to $\frac{N}{2} - 1$}{
+        \For{$k \leftarrow 0$ \KwTo $\frac{N}{2} - 1$}{
             $t \leftarrow B[k]$ \;
             $B[k] \leftarrow t + e^{-2i\pi \frac{k}{N}} B[k + \frac{N}{2}]$ \;
             $B[k + \frac{N}{2}] \leftarrow t - e^{-2i\pi \frac{k}{N}} B[k + \frac{N}{2}]$ \;

@@ -98,8 +98,8 @@ With the gradient functions defined in \autoref{alg:gradient x} and \autoref{alg
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
-    \For{$lat \in [1, nlat - 1]$}{
-        \For{$lon \in [0, nlon]$}{
+    \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
             $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
             $v[lan, lon] \leftarrow v[lan, lon] + \delta t \frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
         }
@@ -116,7 +116,7 @@ Another change introduced is in the coriolis parameter. Up until now it has been
     \SetAlgoLined
     $\Omega \leftarrow 7.2921 \cdot 10^{-5}$ \;
 
-    \For{$lat \in [-nlat, nlat]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
         $f[lat] \leftarrow 2\Omega \sin(lat \frac{\pi}{180})$ \;
     }
     \caption{Calculating the coriolis force}
@@ -141,9 +141,9 @@ then so does $y$.}
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
-    \For{$lat \in [1, nlat - 1]$}{
-        \For{$lon \in [0, nlon]$}{
-            \For{$layer \in [0, nlevels]$}{
+    \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
                 $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
                 $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
                 $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
