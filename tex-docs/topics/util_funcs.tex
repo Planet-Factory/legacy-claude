@@ -242,41 +242,47 @@ Fourier Transform. The final equation is given in \autoref{eq:ft}.
 These Fourier Transforms have the great property that if you add them together you still have the relatively large distances of the center of mass to the origin at the original frequencies. It 
 is this property that enables us to find the frequencies that compose a sound wave. 
 
+Before moving on we first need to discuss some important properties of FTs. Actually, these properties only apply to complex roots of unity (the $e^{2\pi ift}$ part is a complex root of unity). 
+Due to the FT only being a coefficient $g(t)$ in front of a complex root of unity all these properties apply to FTs as well. Let us first start with the cancellation lemma as described in
+\autoref{lemma:cancellation} \cite{cancellation}. Note that $\omega^k_n = e^{\frac{2\pi k}{n}}$ which is very similar to the form we discussed previously if you realise that $f = \frac{1}{T}$. 
+So replace $k$ by $t$ and $n$ by $T = \frac{1}{f}$ and you get the form we have discussed earlier.
+
+\begin{lemma}[Cancellation Lemma] \label{lemma:cancellation}
+    $\omega^{dk}_{dn} = \omega^k_n$, for all $k \geq 0, n \geq 0$ and $d > 0$.
+\end{lemma}
+
+With that we also need to talk about the halving lemma (\autoref{lemma:halving}). This means that $(\omega^{k + \frac{n}{2}}_n)^2 = (\omega^k_n)^2$. 
+
+\begin{lemma}[Halving Lemma] \label{lemma:halving}
+    If $n > 0$ is even, then the squares of the $n$-complex $n^{\text{th}}$ roots of unity are the $\frac{n}{2}$-complex $\frac{n}{2}^{\text{th}}$ roots of unity.
+\end{lemma}
+
 Now that we know what a Fourier Transform is, we need to make it a Fast Fourier Transform, as you can imagine that calculating such a thing is quite difficult. Some smart people have thought
 about this and they came up with quite a fast algorithm, the Cooley-Tukey algorithm \cite{fft}, named after the people that thought of it. They use something we know as a Discrete Fourier 
 Transform which is described by \autoref{eq:dft}. Here $N$ is the total amount of samples from the continuous sound wave. This means that $0 \leq k \leq N - 1$ and $0 \leq n \leq N - 1$.
 
-Now with the DFT out of the way we can discuss the algorithm. It makes use of a clever property of the DFT. If you replace $k$ by $(N + k)$, as in \autoref{eq:dftex}, you can split up the 
-exponent which will transform one of the two parts into $1$ due to $e^{-i2\pi n} = 1$ for any integer $n$. This means that $X_{N + k} = X_k \Rightarrow X_{k + iN} = X_k$ for any integer $i$. 
-This symmetry as it is called can be exploited to produce a divide and conquer algorithm, which will recursivley calculate the FT which gives a running time of $N\log(n)$ as shown in 
-\autoref{alg:FFT}.
-
-\begin{subequations}
-    \begin{equation}
-        X_k = \sum_{n = 0}^{N - 1} x_ne^{-\frac{i2\pi}{N}kn}
-        \label{eq:dft}
-    \end{equation}
-    \begin{equation}
-        X_{N + k} = \sum_{n = 0}^{N - 1} x_ne^{-\frac{i2\pi(N + k)}{N}n} = \sum_{n = 0}^{N - 1} x_ne^{-i2\pi n}x_ne^{-\frac{i2\pi}{N}kn} = \sum_{n = 0}^{N - 1} x_ne^{-\frac{i2\pi}{N}kn}
-        \label{eq:dftex}
-    \end{equation}
-\end{subequations}
+Now with the DFT out of the way we can discuss the algorithm. Before we do, we assume that we have an input of $n$ elements, where $n$ is an exact power of $2$. Meaning $n = 2^k$ for some 
+integer $k$.
 
 \begin{algorithm}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{array $A$, integer $i$, integer $N$, integer $s$}
+    \Input{array $A$}
     \Output{array $B$ with length $A.length - 1$ containing the DFT}
-    \uIf{$N = 1$}{
-        $B[0] \leftarrow A[0]$ \;
-    } \uElse{
-        $B[0], \dots, B[\frac{N}{2} - 1] \leftarrow \texttt{FFT}(A, i, \frac{N}{2}, 2s)$ \;
-        $B[\frac{N}{2}], \dots, B[N - 1] \leftarrow \texttt{FFT}(A, i + s, \frac{N}{2}, 2s)$ \;
-        \For{$k \leftarrow 0$ \KwTo $\frac{N}{2} - 1$}{
-            $t \leftarrow B[k]$ \;
-            $B[k] \leftarrow t + e^{-2i\pi \frac{k}{N}} B[k + \frac{N}{2}]$ \;
-            $B[k + \frac{N}{2}] \leftarrow t - e^{-2i\pi \frac{k}{N}} B[k + \frac{N}{2}]$ \;
-        }
+    $n \leftarrow A.length$ \;
+    \uIf{$n = 1$}{
+        \Return{$A$} \;
+    }
+    $\omega_n \leftarrow e^{\frac{2\pi i}{n}}$ \;
+    $\omega \leftarrow 1$ \;
+    $a^0 \leftarrow (A[0], A[2], \dots, A[n - 2])$ \;
+    $a^1 \leftarrow (A[1], A[3], \dots, A[n - 1])$ \;
+    $y^0 \leftarrow $ \texttt{FFT}($a^0$) \;
+    $y^1 \leftarrow $ \texttt{FFT}($a^1$) \;
+    \For{$k \leftarrow 0$ \KwTo $\frac{n}{2} - 1$}{
+        $B[k] \leftarrow y^0[k] + \omega y^1[k]$ \;
+        $B[k + \frac{n}{2}] \leftarrow y^0[k] - \omega y^1[k]$ \;
+        $\omega \leftarrow \omega \omega_n$ \;
     }
     \Return{B}
     \caption{One dimensional Fast Fourier Transformation}
@@ -293,10 +299,15 @@ second dimension. This can of course be extended in the same way for a $p$-dimen
 \end{equation}
 
 It is at this point that the algorithm becomes very complicated. Therefore I would like to invite you to use a library for these kinds of calculations, like Numpy \cite{numpy} for Python. If you
-really want to use your own made version, you need to wait for a bit as I try to decode the literature on the algorithm for it. It is one heck of a thing to decode, so I decided to treat that at 
-a later point in the future. It will then be found here, so you will have to stay tuned. Sorry about that, it's quite complex...
+really want to use your own made version, or if you want to understand how the libraries sort of do it, then you may continue. I still advise you to use a library, as other people have made the 
+code for you. 
 
-With that out of the way (or rather on the TODO list), we need to create a smoothing operation out of it. We do this in \autoref{alg:smooth}. Keep in mind that \texttt{FFT} the call is to the 
+We can calculate the result of such a multidimensional FFT by computing one-dimensional FFTs along each dimension in turn. Meaning we first calculate the result of the FFT along one dimension, 
+then we do that for the second dimension and so forth. Now the order of calculating the FFTs along each dimension does not matter. So you can calculate the third dimension first, and the first 
+dimension after that if you wish. This has the advantage that we can program a generic function without keeping track of the order of the dimensions. Now, the code is quite complicated but it 
+boils down to this: calculate the FFT along one dimension, then repeat it for the second dimension and multiply the two together and keep repeating that for all dimensions.
+
+With that out of the way, we need to create a smoothing operation out of it. We do this in \autoref{alg:smooth}. Keep in mind that \texttt{FFT} the call is to the 
 multidimensional Fast Fourier Transform algorithm, \texttt{IFFT} the call to the inverse of the multidimensional Fast Fourier Transform algorithm (also on the TODO list) and that the $int()$ 
 function ensures that the number in brackets is an integer. Also note that the inverse of the FFT might give complex answers, and we only want real answers which the $.real$ ensures. We only 
 take the real part and return that. $v$ is an optional parameter with default value $0.5$ which does absolutely nothing in this algorithm.
