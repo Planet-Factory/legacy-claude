@@ -53,7 +53,7 @@ def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,n
 	for i in range(nlat):
 		for j in range(nlon):
 			for k in range(nlevels):
-				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + 1*low_level.scalar_gradient_z(aw,dz,i,j,k)
+				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + low_level.scalar_gradient_z(aw,dz,i,j,k)
 	return output
 
 # specifically thermal advection, converts temperature field to potential temperature field, then advects (adiabatically), then converts back to temperature
@@ -74,7 +74,7 @@ def thermal_advection(np.ndarray temperature_atmos,np.ndarray air_pressure,np.nd
 	for i in range(nlat):
 		for j in range(nlon):
 			for k in range(nlevels):
-				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + 1*low_level.scalar_gradient_z(aw,dz,i,j,k)
+				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + low_level.scalar_gradient_z(aw,dz,i,j,k)
 	
 	output = low_level.theta_to_t(output,air_pressure)
 
@@ -129,7 +129,7 @@ def radiation_calculation(np.ndarray temperature_world, np.ndarray temperature_a
 	
 	return temperature_world, temperature_atmos
 
-def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray air_pressure,np.ndarray old_pressure,np.ndarray air_density,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
+def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray air_pressure,np.ndarray ref_pressure_profile,np.ndarray air_density,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,np.ndarray dz,DTYPE_f dt):
 	# introduce temporary arrays to update velocity in the atmosphere
 	cdef np.ndarray u_temp = np.zeros_like(u)
 	cdef np.ndarray v_temp = np.zeros_like(v)
@@ -144,22 +144,20 @@ def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray air_pressure,np.nd
 	inv_dt_grav = 1/(dt*gravity)
 
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
-	for i in np.arange(3,nlat-3).tolist():
+	for i in np.arange(2,nlat-2).tolist():
 		for j in range(nlon):
 			for k in range(nlevels):
 				inv_density = 1/air_density[i,j,k]
-				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(air_pressure,dx,nlon,i,j,k)*inv_density )
-				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(air_pressure,dy,nlat,i,j,k)*inv_density )
-				w_temp[i,j,k] += -(air_pressure[i,j,k]-old_pressure[i,j,k])*inv_density*inv_dt_grav
+				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z(u,dz,i,j,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(air_pressure,dx,nlon,i,j,k)*inv_density - 1E-6*u[i,j,k])
+				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z(v,dz,i,j,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(air_pressure,dy,nlat,i,j,k)*inv_density - 1E-6*v[i,j,k])
+				# w_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(w,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(w,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z(w,dz,i,j,k) - inv_density*low_level.scalar_gradient_z(air_pressure,dz,i,j,k) - gravity - 1E-6*w[i,j,k])
+				w_temp[i,j,k] += dt*( - inv_density*low_level.scalar_gradient_z_1D((air_pressure[i,j,:]-ref_pressure_profile),dz,k) - gravity - 1E-6*w[i,j,k])
 
 	u += u_temp
 	v += v_temp
-	w = w_temp
+	w += w_temp
 
-	# approximate friction
-	u *= 0.95
-	v *= 0.95
-
+	# approximate surface friction
 	u[:,:,0] *= 0.8
 	v[:,:,0] *= 0.8
 

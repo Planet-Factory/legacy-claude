@@ -22,8 +22,8 @@ axial_tilt = -23.5/2			# tilt of rotational axis w.r.t. solar plane
 year = 365*day					# length of year (s)
 
 dt_spinup = 60*137
-dt_main = 60*7
-spinup_length = 7*day
+dt_main = 60*0.1
+spinup_length = 10*day
 
 ###
 
@@ -32,7 +32,7 @@ advection_boundary = 3			# how many gridpoints away from poles to apply advectio
 smoothing_parameter_t = 0.6
 smoothing_parameter_u = 0.6
 smoothing_parameter_v = 0.6
-smoothing_parameter_w = 0.3
+smoothing_parameter_w = 0.2
 
 save = False 					# save current state to file?
 load = True  					# load initial state from file?
@@ -103,6 +103,7 @@ for i in range(nlat):
 specific_gas = 287
 thermal_diffusivity_roc = 1.5E-6
 
+ref_pressure_profile = density_profile*specific_gas*temp_profile
 air_pressure = air_density*specific_gas*temperature_atmos
 
 # define planet size and various geometric constants
@@ -201,10 +202,10 @@ while True:
 	if velocity:
 
 		before_velocity = time.time()
-		u,v,w = top_level.velocity_calculation(u,v,air_pressure,old_pressure,air_density,coriolis,gravity,dx,dy,dt)
+		u,v,w = top_level.velocity_calculation(u,v,w,air_pressure,ref_pressure_profile,air_density,coriolis,gravity,dx,dy,dz,dt)
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
-		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.3)
+		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.1)
 		
 		u[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
 		v[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
@@ -241,7 +242,6 @@ while True:
 
 			# time_taken = float(round(time.time() - before_advection,3))
 			# print('Advection: ',str(time_taken),'s')
-
 	
 	# before_plot = time.time()
 	if plot:
@@ -268,8 +268,8 @@ while True:
 		ax[0].axhline(y=0,color='black',alpha=0.3)
 		ax[0].set_xlabel('Longitude')
 
-		ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmos,axis=1)), cmap='seismic',levels=15)
-		# ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1)), cmap='seismic',levels=15)
+		# ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmos,axis=1)), cmap='seismic',levels=15)
+		ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1)), cmap='seismic',levels=15)
 		ax[1].plot(lat_plot,tropopause_height,color='black',linestyle='--',linewidth=3,alpha=0.5)
 		if velocity:
 			ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1)), colors='white',levels=20,linewidths=1,alpha=0.8)
