@@ -6,17 +6,17 @@ The equation of state relates one or more variables in a dynamical system (like 
 described by \autoref{eq:ideal gas} \cite{idealGas}. The symbols in that equation represent:
 
 \begin{itemize}
-    \item $p$: The gas pressure ($Pa$).
-    \item $V$: The volume of the gas ($m^3$).
-    \item $n$: The amount of moles\footnote{Mole is the amount of particles ($6.02214076 \cdot 10^{23}$) in a substance, where the average weight of one mole of particles in grams is about the 
-    same as the weight of one particle in atomic mass units ($u$)\cite{mole}} in the gas.
-    \item $R$: The Gas constant, $8.3144621$ ($J(mol)^{-1}K$) \cite{idealGas}.
+    \item $p$: The gas pressure (\si{Pa}).
+    \item $V$: The volume of the gas (\si{m^3}).
+    \item $n$: The amount of moles in the gas (\si{mol}).
+    \item $R$: The Gas constant as defined in \autoref{sec:gas constant} (\si{JK^{-1}mol^{-1}}) \cite{idealGas}.
     \item $T$: The temperature opf the gas ($K$).
 \end{itemize}
 
-If we divide everything in \autoref{eq:ideal gas} by $V$ and set it to be unit (in this case, set it to be exactly $1 m^3$) we can add in the molar mass in both the top and bottom parts of the 
-division as show in \autoref{eq:gas unit}. We can then replace $\frac{nm}{V}$ by $\rho$ the density of the gas ($kgm^{-3}$) and $\frac{R}{m}$ by $R_s$ the specific gas constant (gas constant that varies per 
-gas in $J(mol)^{-1}K$) as shown in \autoref{eq:state gas}. the resulting equation is the equation of state that you get that most atmospheric physicists use when talking about the atmosphere \cite{simon}.
+If we divide everything in \autoref{eq:ideal gas} by $V$ and set it to be unit (in this case, set it to be exactly $1$ \si{m^3}) we can add in the molar mass in both the top and bottom parts of 
+the division as show in \autoref{eq:gas unit}. We can then replace $\frac{nm}{V}$ by $\rho$ the density of the gas (\si{kgm^{-3}}) and $\frac{R}{m}$ by $R_s$ the specific gas constant (gas 
+constant that varies per gas in \si{JK^{-1}mol^{-1}}) as shown in \autoref{eq:state gas}. The resulting equation is the equation of state that you get that most atmospheric physicists use when 
+talking about the atmosphere \cite{simon}.
 
 \begin{subequations}
     \begin{equation}
@@ -47,19 +47,19 @@ to the f-plane approximation are given in \autoref{eq:x momentum} and \autoref{e
 effect on the whole flow. All the symbols in \autoref{eq:x momentum} and \autoref{eq:y momentum} mean:
 
 \begin{itemize}
-    \item $u$: The east to west velocity ($ms^{-1}$).
-    \item $t$: The time ($s$).
+    \item $u$: The east to west velocity (\si{ms^{-1}}).
+    \item $t$: The time (\si{s}).
     \item $f$: The coriolis parameter as in \autoref{eq:coriolis}.
-    \item $v$: The north to south velocity ($ms^{-1}$).
-    \item $\rho$: The density of the atmosphere ($kgm^{-3}$).
-    \item $p$: The atmospheric pressure ($Pa$).
-    \item $x$: The local longitude coordinate ($m$).
-    \item $y$: The local latitude coordinate ($m$).
+    \item $v$: The north to south velocity (\si{ms^{-1}}).
+    \item $\rho$: The density of the atmosphere (\si{kgm^{-3}}).
+    \item $p$: The atmospheric pressure (\si{Pa}).
+    \item $x$: The local longitude coordinate (\si{m}).
+    \item $y$: The local latitude coordinate (\si{m}).
 \end{itemize}
 
-If we then define a vector $\bar{u}$ as $(u, v, 0)$, we can rewrite both \autoref{eq:x momentum} as \autoref{eq:x momentum laplace}. Here $\nabla u$ is the gradient of 
-$u$ in both $x$ and $y$ directions. Then if we write out $\nabla u$ we get \autoref{eq:x momentum final}. Similarly, if we want to get $\delta v$ instead of $\delta u$ we rewrite 
-\autoref{eq:y momentum} to get \autoref{eq:y momentum laplace} and \autoref{eq:y momentum final}.
+If we then define a vector $\bar{u}$ as $(u, v, 0)$, we can rewrite both \autoref{eq:x momentum} as \autoref{eq:x momentum laplace}. Here $\nabla u$ is the gradient of $u$ in both $x$ and $y$ 
+directions. Then if we write out $\nabla u$ we get \autoref{eq:x momentum final}. Similarly, if we want to get $\delta v$ instead of $\delta u$ we rewrite \autoref{eq:y momentum} to get 
+\autoref{eq:y momentum laplace} and \autoref{eq:y momentum final}.
 
 \begin{subequations}
     \begin{equation}
@@ -98,8 +98,8 @@ With the gradient functions defined in \autoref{alg:gradient x} and \autoref{alg
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
-    \For{$lat \in [1, nlat - 1]$}{
-        \For{$lon \in [0, nlon]$}{
+    \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
             $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
             $v[lan, lon] \leftarrow v[lan, lon] + \delta t \frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
         }
@@ -116,7 +116,7 @@ Another change introduced is in the coriolis parameter. Up until now it has been
     \SetAlgoLined
     $\Omega \leftarrow 7.2921 \cdot 10^{-5}$ \;
 
-    \For{$lat \in [-nlat, nlat]$}{
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
         $f[lat] \leftarrow 2\Omega \sin(lat \frac{\pi}{180})$ \;
     }
     \caption{Calculating the coriolis force}
@@ -141,9 +141,9 @@ then so does $y$.}
     $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
     $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
     $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
-    \For{$lat \in [1, nlat - 1]$}{
-        \For{$lon \in [0, nlon]$}{
-            \For{$layer \in [0, nlevels]$}{
+    \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
                 $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
                 $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
                 $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
