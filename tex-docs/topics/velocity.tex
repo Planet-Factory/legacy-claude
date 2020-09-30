@@ -1,0 +1,157 @@
+\section{Air Velocity}
+Did you ever feel the wind blow? Most probably. That's what we will be calculating here. How hard the wind will blow. This is noted as velocity, how fast something moves. 
+
+\subsection{Equation of State and the Incompressible Atmosphere}
+The equation of state relates one or more variables in a dynamical system (like the atmosphere) to another. The most common equation of state in the atmosphere is the ideal gas equation as 
+described by \autoref{eq:ideal gas} \cite{idealGas}. The symbols in that equation represent:
+
+\begin{itemize}
+    \item $p$: The gas pressure (\si{Pa}).
+    \item $V$: The volume of the gas (\si{m^3}).
+    \item $n$: The amount of moles in the gas (\si{mol}).
+    \item $R$: The Gas constant as defined in \autoref{sec:gas constant} (\si{JK^{-1}mol^{-1}}) \cite{idealGas}.
+    \item $T$: The temperature opf the gas ($K$).
+\end{itemize}
+
+If we divide everything in \autoref{eq:ideal gas} by $V$ and set it to be unit (in this case, set it to be exactly $1$ \si{m^3}) we can add in the molar mass in both the top and bottom parts of 
+the division as show in \autoref{eq:gas unit}. We can then replace $\frac{nm}{V}$ by $\rho$ the density of the gas (\si{kgm^{-3}}) and $\frac{R}{m}$ by $R_s$ the specific gas constant (gas 
+constant that varies per gas in \si{JK^{-1}mol^{-1}}) as shown in \autoref{eq:state gas}. The resulting equation is the equation of state that you get that most atmospheric physicists use when 
+talking about the atmosphere \cite{simon}.
+
+\begin{subequations}
+    \begin{equation}
+        pV = nRT
+        \label{eq:ideal gas}
+    \end{equation}
+    \begin{equation}
+        p = \frac{nR}{V}T = \frac{nmR}{Vm}T
+        \label{eq:gas unit}
+    \end{equation}
+    \begin{equation}
+        p = \rho R_sT
+        \label{eq:state gas}
+    \end{equation}
+\end{subequations}
+
+The pressure is quite important, as air moves from a high pressure point to a low pressure point. So if we know the density and the temperature, then we know the pressure and we can work out 
+where the air will be moving to (i.e. how the wind will blow). In our current model, we know the atmospheric temperature but we do not know the density. For simplicities sake, we will now assume
+that the atmosphere is Incompressible, meaning that we have a constant density. Obviously we know that air can be compressed and hence our atmosphere can be compressed too but that is not 
+important enough to account for yet, especially considering the current complexity of our model.
+
+The code that corresponds to this is quite simple, the only change that we need to make in \autoref{eq:state gas} is that we need to replace $T$ by $T_a$, the temperature of the atmosphere. As
+$T_a$ is a matrix (known to programmers as a double array), $p$ will be a matrix as well. Now we only need to fill in some values. $\rho = 1.2$\cite{densityAir}, $R_s = 287$\cite{specificGasConstantAir}.
+
+\subsection{The Momentum Equations} \label{sec:momentum}
+The momentum equations are a set of equations that describe the flow of a fluid on the surface of a rotating body. For our model we will use the f-plane approximation. The equations corresponding
+to the f-plane approximation are given in \autoref{eq:x momentum} and \autoref{eq:y momentum} \cite{momentumeqs}. Note that we are ignoring vertical movement, as this does not have a significant
+effect on the whole flow. All the symbols in \autoref{eq:x momentum} and \autoref{eq:y momentum} mean:
+
+\begin{itemize}
+    \item $u$: The east to west velocity (\si{ms^{-1}}).
+    \item $t$: The time (\si{s}).
+    \item $f$: The coriolis parameter as in \autoref{eq:coriolis}.
+    \item $v$: The north to south velocity (\si{ms^{-1}}).
+    \item $\rho$: The density of the atmosphere (\si{kgm^{-3}}).
+    \item $p$: The atmospheric pressure (\si{Pa}).
+    \item $x$: The local longitude coordinate (\si{m}).
+    \item $y$: The local latitude coordinate (\si{m}).
+\end{itemize}
+
+If we then define a vector $\bar{u}$ as $(u, v, 0)$, we can rewrite both \autoref{eq:x momentum} as \autoref{eq:x momentum laplace}. Here $\nabla u$ is the gradient of $u$ in both $x$ and $y$ 
+directions. Then if we write out $\nabla u$ we get \autoref{eq:x momentum final}. Similarly, if we want to get $\delta v$ instead of $\delta u$ we rewrite \autoref{eq:y momentum} to get 
+\autoref{eq:y momentum laplace} and \autoref{eq:y momentum final}.
+
+\begin{subequations}
+    \begin{equation}
+        \frac{Du}{Dt} - fv = -\frac{1}{\rho} \frac{\delta p}{\delta x}
+        \label{eq:x momentum}
+    \end{equation}
+    \begin{equation}
+        \frac{Dv}{Dt} - fu = -\frac{1}{\rho} \frac{\delta p}{\delta y}
+        \label{eq:y momentum}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta u}{\delta t} + \bar{u} \cdot \nabla u - fv = -\frac{1}{\rho}\frac{\delta p}{\delta x}
+        \label{eq:x momentum laplace}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta v}{\delta t} + \bar{u} \cdot \nabla v - fu = -\frac{1}{\rho}\frac{\delta p}{\delta y}
+        \label{eq:y momentum laplace}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta u}{\delta t} + u\frac{\delta u}{\delta x} + v\frac{\delta u}{\delta y} - fv = -\frac{1}{\rho}\frac{\delta p}{\delta x}
+        \label{eq:x momentum final}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta v}{\delta t} + u\frac{\delta v}{\delta x} + v\frac{\delta v}{\delta y} - fu = -\frac{1}{\rho}\frac{\delta p}{\delta y}
+        \label{eq:y momentum final}
+    \end{equation}
+\end{subequations}
+
+With the gradient functions defined in \autoref{alg:gradient x} and \autoref{alg:gradient y}, we can move on to the main code for the momentum equations. The main loop is shown in 
+\autoref{alg:stream3}. Do note that this loop replaces the one in \autoref{alg:stream2v2} as these calculate the same thing, but the new algorithm does it better.
+
+\begin{algorithm}
+    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
+    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lan, lon)$ \;
+    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lan, lon)$ \;
+    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
+    $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    $S_{py} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+            $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
+            $v[lan, lon] \leftarrow v[lan, lon] + \delta t \frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
+        }
+    }
+    \caption{Calculating the flow of the atmosphere (wind)}
+    \label{alg:stream3}
+\end{algorithm}
+
+\subsection{Improving the Coriolis Parameter}
+Another change introduced is in the coriolis parameter. Up until now it has been a constant, however we know that it varies along the latitude. So let's make it vary over the latitude. Recall 
+\autoref{eq:coriolis}, where $\Theta$ is the latitude. Coriolis ($f$) is currently defined in \autoref{alg:gradient}, so let's replace it with \autoref{alg:coriolis}.
+
+\begin{algorithm}
+    \SetAlgoLined
+    $\Omega \leftarrow 7.2921 \cdot 10^{-5}$ \;
+
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        $f[lat] \leftarrow 2\Omega \sin(lat \frac{\pi}{180})$ \;
+    }
+    \caption{Calculating the coriolis force}
+    \label{alg:coriolis}
+\end{algorithm}
+
+\subsection{Adding Friction}
+In order to simulate friction, we multiply the speeds $u$ and $v$ by $0.99$. Of course there are equations for friction but that gets complicated very fast, so instead we just assume that we
+have a constant friction factor. This multiplication is done directly after \autoref{alg:stream3} in \autoref{alg:stream4v1}.
+
+\subsection{Adding in Layers}
+With adding in atmospheric layers we need to add vertical winds, or in other words add the $w$ component of the velocity vectors. We do that by editing \autoref{alg:stream3}. We change it to 
+\autoref{alg:velocity}. Here we use gravity ($g$) instead of the coriolis force ($f$) and calculate the change in pressure. Therefore we need to store a copy of the pressure before we do any 
+calculations. This needs to be a copy due to aliasing \footnote{Aliasing is assigning a different name to a variable, while it remains the same variable. Take for instance that we declare a 
+variable $x$ and set it to be $4$. Then we say $y \leftarrow x$, which you might think is the same as saying they $y \leftarrow 4$ but behind the screen it is pointing to $x$. So if $x$ changes, 
+then so does $y$.}
+
+\begin{algorithm}
+    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
+    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lan, lon)$ \;
+    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lan, lon)$ \;
+    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
+    $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
+    \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
+                $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
+                $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
+                $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
+            }
+        }
+
+    $p_o \leftarrow copy(p)$ \;
+    }
+    \caption{Calculating the flow of the atmosphere (wind)}
+    \label{alg:velocity}
+\end{algorithm}

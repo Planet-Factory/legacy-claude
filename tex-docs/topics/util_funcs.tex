@@ -1,0 +1,330 @@
+\section{Utility Functions}
+With the control panel defined and explained, let us move over to some utility functions. Functions that can be used in all kinds of calculations, which we might need more often. In general it 
+concerns functions like calculating the gradient, the lacplacian or interpolation. 
+
+\subsection{Gradients}
+Let us define the gradient in the $x, y$ and $z$ directions. The functions can be found in \autoref{alg:gradient x}, \autoref{alg:gradient y} and \autoref{alg:gradient z}. We use these functions 
+in various other algorithms as the gradient (also known as derivative) is often used in physics. It denotes the rate of change, how much something changes over time. Velocity for instance denotes
+how far you move in a given time. Which is a rate of change, how much your distance to a given point changes over time. 
+
+In \autoref{alg:gradient z} $a.dimensions$ is the attribute that tells us how deeply nested the array $a$ is. If the result is $1$ we have just a normal array, if it is $2$ we have a double array 
+(an array at each index of the array) which is also called a matrix and if it is $3$ we have a triple array. We need this because we have a one-dimensional case, for when we do not use multiple 
+layers and a three-dimensional case for when we do use multiple layers. This distinction is needed to avoid errors being thrown when running the model with one or multiple layers. 
+
+This same concept can be seen in \autoref{alg:gradient x} and \autoref{alg:gradient y}, though here we check if $k$ is defined or \texttt{NULL}. We do this as sometimes we want to use this 
+function for matrices that does not have the third dimension. Hence we define a default value for $k$ which is \texttt{NULL}. \texttt{NULL} is a special value in computer science. It represents 
+nothing. This can be useful sometimes if you declare a variable to be something but it is referring to something that has been deleted or it is returned when some function fails. It usually 
+indicates that something special is going on. So here we use it in the special case where we do not want to consider the third dimension in the gradient. We also use forward differencing 
+(calculating the gradient by taking the difference of the cell and the next/previous cell, multiplied by $2$ to keep it fair) in \autoref{alg:gradient y} as that gives better results for the 
+calculations we will do later on.
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
+    \Output{Gradient in the $x$ direction}
+    \eIf{$k = \texttt{NULL}$}{
+        $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon] - a[i, (j - 1) \text{ mod } nlon]}{\delta x[i]}$ \;
+    }{
+        $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon, k] - a[i, (j - 1) \text{ mod } nlon, k]}{\delta x[i]}$ \;
+    }
+    \Return{$grad$} \;
+    \caption{Calculating the gradient in the $x$ direction}
+    \label{alg:gradient x}
+\end{algorithm}
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
+    \Output{Gradient in the $y$ direction}
+    \eIf{$k = \texttt{NULL}$}{
+        \uIf{$i == 0$}{
+            $grad \leftarrow 2 \frac{a[i + 1, j] - a[i, j]}{\delta y}$ \;
+        }\uElseIf{$i = nlat - 1$}{
+            $grad \leftarrow 2 \frac{a[i, j] - a[i - 1, j]}{\delta y}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
+        }
+    }{
+        \uIf{$i = 0$}{
+            $grad \leftarrow 2 \frac{a[i + 1, j, k] - a[i, j, k]}{\delta y}$ \;
+        }\uElseIf{$i = nlat - 1$}{
+            $grad \leftarrow 2 \frac{a[i, j, k] - a[i - 1, j, k]}{\delta y}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i + 1, j] - a[i - 1 j]}{\delta y}$ \;
+        }
+    }
+    \Return $grad$ \;
+    \caption{Calculating the gradient in the $y$ direction}
+    \label{alg:gradient y}
+\end{algorithm}
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
+    \Output{Gradient in the $z$ direction}
+    \uIf{$a.dimensions = 1$}{
+        \uIf{$k = 0$}{
+            $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
+        }\uElseIf{$k = nlevels - 1$}{
+            $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
+        }
+    } \uElse {
+        \uIf{$k = 0$}{
+            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
+        }\uElseIf{$k = nlevels - 1$}{
+            $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
+        }\uElse{
+            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
+        }
+    }
+    
+    \Return $grad$ \;
+    \caption{Calculating the gradient in the $z$ direction}
+    \label{alg:gradient z}
+\end{algorithm}
+
+\subsection{Laplacian Operator} \label{sec:laplace}
+The Laplacian operator ($\nabla^2$, sometimes also seen as $\Delta$) has two definitions, one for a vector field and one for a scalar field. The two concepts are not indpendent, a vector field 
+is composed of scalar fields \cite{vectorscalarfields}. Let us define a vector field first. A vector field is a function whose domain and range are a subset of the Eucledian $\mathbb{R}^3$ space. 
+A scalar field is then a function consisting out of several real variables (meaning that the variables can only take real numbers as valid values). So for instance the circle equation 
+$x^2 + y^2 = r^2$ is a scalar field as $x, y$ and $r$ are only allowed to take real numbers as their values. 
+
+With the vector and scalar fields defined, let us take a look at the Laplacian operator. For a scalar field $\phi$ the laplacian operator is defined as the divergence of the gradient of $\phi$
+\cite{laplacian}. But what are the divergence and gradient? The gradient is defined in \autoref{eq:gradient} and the divergence is defined in \autoref{eq:divergence}. Here $\phi$ is a vector 
+with components $x, y, z$ and $\Phi$ is a vector field with components $x, y, z$. $\Phi_1, \Phi_2$ and $\Phi_3$ refer to the functions that result in the corresponding $x, y$ and $z$ values 
+\cite{vectorscalarfields}. Also, $i, j$ and $k$ are the basis vectors of $\mathbb{R^3}$, and the multiplication of each term with their basis vector results in $\Phi_1, \Phi_2$ and $\Phi_3$
+respectively. If we then combine the two we get the Laplacian operator, as in \autoref{eq:laplacian scalar}.
+
+\begin{subequations}
+    \begin{equation}
+        \text{grad } \phi = \nabla \phi = \frac{\delta \phi}{\delta x}i + \frac{\delta \phi}{\delta y}j + \frac{\delta \phi}{\delta z}k
+        \label{eq:gradient}
+    \end{equation}
+    \begin{equation}
+        \text{div} \Phi = \nabla \cdot \Phi = \frac{\delta \Phi_1}{\delta x} + \frac{\delta \Phi_2}{\delta y} + \frac{\delta \Phi_3}{\delta z}
+        \label{eq:divergence}
+    \end{equation}
+    \begin{equation}
+        \nabla^2 \phi = \nabla \cdot \nabla \phi = \frac{\delta^2 \phi}{\delta x^2} + \frac{\delta^2 \phi}{\delta y^2} + \frac{\delta^2 \phi}{\delta z^2}
+        \label{eq:laplacian scalar}
+    \end{equation}
+\end{subequations}
+
+For a vector field $\Phi$ the Laplacian operator is defined as in \autoref{eq:laplacian vector}. Which essential boils down to taking the Laplacian operator of each function and multiply it by
+the basis vector.
+
+\begin{equation}
+    \nabla^2 \Phi = (\nabla^2 \Phi_1)i + (\nabla^2 \Phi_2)j + (\nabla^2 \Phi_3)k
+    \label{eq:laplacian vector}
+\end{equation}
+
+The code can be found in \autoref{alg:laplacian}. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
+respectively.
+
+\begin{algorithm}[hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{A matrix (double array) a}
+    \Output{A matrix (double array) with results for the laplacian operator for each element}
+    \eIf{$a.dimensions = 2$}{
+        \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+            \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+                $output[lat, lon] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon)}{\delta x[lat]} + \frac{\Delta_y(a, lat + 1, lon) - 
+                \Delta_y(a, lat - 1, lon)}{\delta y}$\;
+            }
+        }
+    }{
+        \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
+            \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+                \For{$k \leftarrow 0$ \KwTo $nlevels - 1$}{
+                    $output[lat, lon, k] \leftarrow \frac{\Delta_x(a, lat, (lon + 1) \text{ mod } nlon, k) - \Delta_x(a, lat, (lon - 1) \text{ mod } nlon, k)}{\delta x[lat]} + \frac{\Delta_y(a, 
+                    lat + 1, lon, k) - \Delta_y(a, lat - 1, lon, k)}{\delta y} + \frac{\Delta_z(a, lat, lon, k + 1) - \Delta_z(a, lat, lon, k + 1)}{2\delta z[k]}$\;
+                }
+            }
+        }
+    }
+    
+    \Return{$ouput$} \;
+    \caption{Calculate the laplacian operator over a matrix a}
+    \label{alg:laplacian}
+\end{algorithm}
+
+\subsection{Divergence}
+As we expect to use the divergence operator more often throughout our model, let us define a seperate function for it in \autoref{alg:divergence}. $\Delta_x$ and $\Delta_y$ in 
+\autoref{alg:divergence} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} respectively. We do the multiplication with the velocity vectors $u, v$ and $w$ here already, 
+as we expect that we might use it in combination with the divergence operator more frequently. What those vectors are and represent we will discuss in \autoref{sec:momentum}.
+
+\begin{algorithm}[!hbt]
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{A matrix (double array) $a$}
+    \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
+    \For{$i \leftarrow 0$ \KwTo $a.length$}{
+        \For{$j \leftarrow 0$ \KwTo $a[i].length$}{
+            \For{$k \leftarrow 0$ \KwTo $a[i, j].length$}{
+                $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw, i, j, k)$ \;
+            }
+        }
+    }
+    \Return{$output$} \;
+    \caption{Calculate the result of the divergence operator on a vector}
+    \label{alg:divergence}
+\end{algorithm}
+
+\subsection{Interpolation} \label{sec:interpolation}
+Interpolation is a form of estimation, where one has a set of data points and desires to know the values of other data points that are not in the original set of data points\cite{interpolation}. 
+Based on the original data points, it is estimated what the values of the new data points will be. There are various forms of interpolation like linear interpolation, polynomial interpolation 
+and spline interpolation. The CLAuDE model uses linear interpolation which is specified in \autoref{eq:interpolation}. Here $z$ is the point inbetween the known data points $x$ and $y$. 
+$\lambda$ is the factor that tells us how close $z$ is to $y$ in the interval $[0, 1]$. If $z$ is very close to $y$, $\lambda$ will have the value on the larger end of the interval, like 0.9.
+Whereas if $z$ is close to $x$ then $\lambda$ will have a value on the lower end of the interval, like 0.1.
+
+\begin{equation}
+    z = (1 - \lambda)x + \lambda y
+    \label{eq:interpolation}
+\end{equation}
+
+\subsection{3D smoothing} \label{sec:3dsmooth}
+As you can imagine the temperature, pressure and the like vary quite a lot over the whole planet. Which is something that we kind of want but not really. What we really want is to limit how 
+much variety we allow to exist. For this we are going to use Fast Fourier Transforms, also known as FFTs. A Fourier Transform decomposes a wave into its frequences. The fast bit comes from the 
+algorithm we use to calculate it. This is because doing it via the obvious way is very slow, in the order of $O(n^2)$ (for what that means, please visit \autoref{sec:runtime}). Whereas if we use 
+the FFT, we reduce the running time to $O(n\log(n))$. There are various ways to calculate the FFT, but we use the Cooley–Tukey algorithm \cite{fft}. To explain it, let us first dive into a normal 
+Fourier Transform.
+
+The best way to explain what a Fourier Transform does is to apply it to a sound. Sound is vibrations travelling through the air that reach your air and make the inner part of your air vibrate.
+If you plot the air pressure reaching your air versus the time, the result will have the form of a sinoidal wave. However, it is only a straight forward sinoidal wave (as if you plotted the 
+$\cos$ function) if the tone is pure. That is often not the case, and sounds are combinations of tones. This gives waves that are sinoidal but not very alike to the $\cos$ function. The FT will
+transform this "unpure" wave and splits them up into a set of waves that are all of pure tone. To do that we need complex numbers which are explained here \autoref{sec:complex}. 
+
+With that explanation out of the way, we now know that with Euler's formula (\autoref{eq:euler}) we can rotate on the complex plane. If we rotate one full circle per second, the formula changes 
+to \autoref{eq:euler rotate}, as the circumference of the unit circle is $2\pi$ and $t$ is in seconds. This rotates in the clock-wise direction, but we want to rotate in the clockwise direction, 
+so we need to add a $-$ to the exponent. If we also want to control how fast the rotation happens (which is called the frequency) then we change the equation to \autoref{eq:euler freq}. Note that
+the frequency unit is $Hz$ which is defined as $s^{-1}$, which means that a frequency of $10 Hz$ means 10 revolutions per second. Now we get our wave which we call $g(t)$ and plonk it in front 
+of the equation up until now. Which results in \autoref{eq:euler wave}. Visually, this means that we take the sound wave and wrap it around the origin. This might sound strange at first but bear 
+with me. If you track the center of mass (the average of all the points that form the graph) you will notice that it hovers around the origin. If you now change the frequency of the rotation ($f$)
+you will see that the center of mass moves a bit, usually around the origin. However, if the frequency of the rotation matches a frequency of the wave, then the center of mass is suddenly a 
+relatively long distance away from the origin. This indicates that we have found a frequency that composes the sound wave. Now how do we track the center of mass? That is done using integration,
+as in \autoref{eq:euler int}. Now to get to the final form, we forget about the fraction part. This means that the center of mass will still hover around the origin for the main part of the 
+rotation, but has a huge value for when the rotation is at the same frequency as one of the waves in the sound wave. The larger the difference between $t_2$ and $t_1$, the larger the value of the
+Fourier Transform. The final equation is given in \autoref{eq:ft}.
+
+\begin{subequations}
+    \begin{equation}
+        e^{ix} = \cos(x) + i\sin(x)
+        \label{eq:euler}
+    \end{equation}
+    \begin{equation}
+        e^{2\pi it}
+        \label{eq:euler rotate}
+    \end{equation}
+    \begin{equation}
+        e^{-2\pi ift}
+        \label{eq:euler freq}
+    \end{equation}
+    \begin{equation}
+        g(t)e^{-2\pi ift}
+        \label{eq:euler wave}
+    \end{equation}
+    \begin{equation}
+        \frac{1}{t_2 - t_1}\int^{t_2}_{t_1}g(t)e^{-2\pi ift}
+        \label{eq:euler int}
+    \end{equation}
+    \begin{equation}
+        \hat{g}(f) = \int^{t_2}_{t_1}g(t)e^{-2\pi ift}
+        \label{eq:ft}
+    \end{equation}
+\end{subequations}
+
+These Fourier Transforms have the great property that if you add them together you still have the relatively large distances of the center of mass to the origin at the original frequencies. It 
+is this property that enables us to find the frequencies that compose a sound wave. 
+
+Before moving on we first need to discuss some important properties of FTs. Actually, these properties only apply to complex roots of unity (the $e^{2\pi ift}$ part is a complex root of unity). 
+Due to the FT only being a coefficient $g(t)$ in front of a complex root of unity all these properties apply to FTs as well. Let us first start with the cancellation lemma as described in
+\autoref{lemma:cancellation} \cite{cancellation}. Note that $\omega^k_n = e^{\frac{2\pi k}{n}}$ which is very similar to the form we discussed previously if you realise that $f = \frac{1}{T}$. 
+So replace $k$ by $t$ and $n$ by $T = \frac{1}{f}$ and you get the form we have discussed earlier.
+
+\begin{lemma}[Cancellation Lemma] \label{lemma:cancellation}
+    $\omega^{dk}_{dn} = \omega^k_n$, for all $k \geq 0, n \geq 0$ and $d > 0$.
+\end{lemma}
+
+With that we also need to talk about the halving lemma (\autoref{lemma:halving}). This means that $(\omega^{k + \frac{n}{2}}_n)^2 = (\omega^k_n)^2$. 
+
+\begin{lemma}[Halving Lemma] \label{lemma:halving}
+    If $n > 0$ is even, then the squares of the $n$-complex $n^{\text{th}}$ roots of unity are the $\frac{n}{2}$-complex $\frac{n}{2}^{\text{th}}$ roots of unity.
+\end{lemma}
+
+Now that we know what a Fourier Transform is, we need to make it a Fast Fourier Transform, as you can imagine that calculating such a thing is quite difficult. Some smart people have thought
+about this and they came up with quite a fast algorithm, the Cooley-Tukey algorithm \cite{fft}, named after the people that thought of it. They use something we know as a Discrete Fourier 
+Transform which is described by \autoref{eq:dft}. Here $N$ is the total amount of samples from the continuous sound wave. This means that $0 \leq k \leq N - 1$ and $0 \leq n \leq N - 1$.
+
+Now with the DFT out of the way we can discuss the algorithm. Before we do, we assume that we have an input of $n$ elements, where $n$ is an exact power of $2$. Meaning $n = 2^k$ for some 
+integer $k$.
+
+\begin{algorithm}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{array $A$}
+    \Output{array $B$ with length $A.length - 1$ containing the DFT}
+    $n \leftarrow A.length$ \;
+    \uIf{$n = 1$}{
+        \Return{$A$} \;
+    }
+    $\omega_n \leftarrow e^{\frac{2\pi i}{n}}$ \;
+    $\omega \leftarrow 1$ \;
+    $a^0 \leftarrow (A[0], A[2], \dots, A[n - 2])$ \;
+    $a^1 \leftarrow (A[1], A[3], \dots, A[n - 1])$ \;
+    $y^0 \leftarrow $ \texttt{FFT}($a^0$) \;
+    $y^1 \leftarrow $ \texttt{FFT}($a^1$) \;
+    \For{$k \leftarrow 0$ \KwTo $\frac{n}{2} - 1$}{
+        $B[k] \leftarrow y^0[k] + \omega y^1[k]$ \;
+        $B[k + \frac{n}{2}] \leftarrow y^0[k] - \omega y^1[k]$ \;
+        $\omega \leftarrow \omega \omega_n$ \;
+    }
+    \Return{B}
+    \caption{One dimensional Fast Fourier Transformation}
+    \label{alg:FFT}
+\end{algorithm}
+
+There is just this one problem we have, the algorithm in \autoref{alg:FFT} can only handle one dimension, and we need to support multidimensional arrays. So let us define a multidimensional FFT 
+first in \autoref{eq:NFFT}. Here $N$ and $M$ are the amount of indices for the dimensions, where $M$ are the amount of indices for the first dimension and $N$ are the amount of indices for the 
+second dimension. This can of course be extended in the same way for a $p$-dimensional array.
+
+\begin{equation}
+    X_{k,l} = \sum_{m = 0}^{M - 1}\sum_{n = 0}^{N - 1} x_{m, n}e^{-2i\pi(\frac{mk}{M} + \frac{nl}{N})}
+    \label{eq:NFFT}
+\end{equation}
+
+It is at this point that the algorithm becomes very complicated. Therefore I would like to invite you to use a library for these kinds of calculations, like Numpy \cite{numpy} for Python. If you
+really want to use your own made version, or if you want to understand how the libraries sort of do it, then you may continue. I still advise you to use a library, as other people have made the 
+code for you. 
+
+We can calculate the result of such a multidimensional FFT by computing one-dimensional FFTs along each dimension in turn. Meaning we first calculate the result of the FFT along one dimension, 
+then we do that for the second dimension and so forth. Now the order of calculating the FFTs along each dimension does not matter. So you can calculate the third dimension first, and the first 
+dimension after that if you wish. This has the advantage that we can program a generic function without keeping track of the order of the dimensions. Now, the code is quite complicated but it 
+boils down to this: calculate the FFT along one dimension, then repeat it for the second dimension and multiply the two together and keep repeating that for all dimensions.
+
+With that out of the way, we need to create a smoothing operation out of it. We do this in \autoref{alg:smooth}. Keep in mind that \texttt{FFT} the call is to the 
+multidimensional Fast Fourier Transform algorithm, \texttt{IFFT} the call to the inverse of the multidimensional Fast Fourier Transform algorithm (also on the TODO list) and that the $int()$ 
+function ensures that the number in brackets is an integer. Also note that the inverse of the FFT might give complex answers, and we only want real answers which the $.real$ ensures. We only 
+take the real part and return that. $v$ is an optional parameter with default value $0.5$ which does absolutely nothing in this algorithm.
+
+\begin{algorithm}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Array $a$, smoothing factor $s$, vertical smoothing factor $v \leftarrow 0.5$}
+    \Output{Array $A$ with less variation}
+    $nlat \leftarrow a.length$ \;
+    $nlon \leftarrow a[0].length$ \;
+    $nlevels \leftarrow a[0][0].length$ \;
+    $temp \leftarrow \texttt{FFT}(a)$ \;
+    $temp[int(nlat s):int(nlat(1 - s)),:,:] \leftarrow 0$ \;
+    $temp[:,int(nlon s):int(nlon(1 - s)),:] \leftarrow 0$ \;
+    $temp[:,:,int(nlevels v):int(nlevels(1 - v))] \leftarrow 0$ \;
+    \Return $\texttt{IFFT}(temp).real$ \;
+    \caption{Smoothing function}
+    \label{alg:smooth}
+\end{algorithm}

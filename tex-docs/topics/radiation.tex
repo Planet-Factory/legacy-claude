@@ -1,0 +1,583 @@
+\section{Radiation} \label{sec:rad}
+Radiation is energy waves, some waves are visible like light, others are invisible like radio signals. As is the basis for physics, energy cannot be created nor destroyed, only changed from one
+form to another.
+
+\subsection{The First Law of Thermodynamics and the Stefan-Boltzmann Equation} \label{sec:first thermolaw}
+If energy goes into an object it must equal the outflowing energy plus the change of internal energy. Which is exactly what happens with the atmosphere. Radiation from the sun comes in, and 
+radiation from the atmosphere goes out. And along the way we heat the atmosphere and the planet which causes less radiation to be emitted than received. At least, that is the idea for Earth which
+may not apply to all planets. Let one thing be clear, more radiation cannot be emitted than is inserted, unless the planet and atmosphere are cooling. Anyway, we assume that the planet is a black 
+body, i.e. it absorbs all radiation on all wavelengths. This is captured in Stefan-Boltzmann's law (\autoref{eq:stefan-boltzmann}) \cite{stefan-boltzmann}. 
+
+In \autoref{eq:stefan-boltzmann} the symbols are:
+
+\begin{itemize}
+    \item $S$: The energy that reaches the top of the atmosphere, coming from the sun or a similar star, per second per meters squared (\si{Wm^{-2}}). This is also called the insolation.
+    \item $\sigma$: The Stefan-Boltzmann constant, $5.670373 \cdot 10^-8$ (\si{Wm^{-2}K^{-4}}) \cite{stefan-boltzmann}.
+    \item $T$: The temperature of the planet (\si{K}).
+\end{itemize}
+
+The energy difference between the energy that reaches the atmosphere and the temperature of the planet must be equal to the change in temperature of the planet, which is written in 
+\autoref{eq:sb rewritten}. The symbols on the right hand side are:
+
+\begin{itemize}
+    \item $\Delta U$: The change of internal energy (\si{J}) \cite{thermo1}.
+    \item $C$: The specific heat capacity of the object, i.e. how much energy is required to heat the object by one degree Kelvin (\si{JK^{-1}}).
+    \item $\Delta T$: The change in temperature (\si{K}).
+\end{itemize}
+
+We want to know the change of temperature $\Delta T$, so we rewrite the equation into \autoref{eq:sb rewritten2}. Here we added the $\delta t$ term to account for the time difference (or time 
+step). This is needed as we need an interval to calculate the difference in temperature over. Also we need to get the energy that we get (\si{J}) and not the energy per second (\si{W}), and by 
+adding this time step the units all match up perfectly.
+
+\begin{subequations}
+    \begin{equation}
+        S = SB = \sigma T^4
+        \label{eq:stefan-boltzmann}
+    \end{equation}
+    \begin{equation}
+        S - \sigma T^4 = \Delta U = C \Delta T
+        \label{eq:sb rewritten}
+    \end{equation}
+    \begin{equation}
+        \Delta T = \frac{\delta t(S - \sigma T^4)}{C}
+        \label{eq:sb rewritten2}
+    \end{equation}
+    \label{eq:basis}
+\end{subequations}
+
+The set of equations in \autoref{eq:basis} form the basis of the temperature exchange of the planet. However two crucial aspects are missing. Only half of the planet will be receiving light from 
+the sun at once, and the planet is a sphere. So we need to account for both in our equation. We do that in \autoref{eq:basis sphere correction}. We view the energy reacing the atmosphere as a 
+circular area of energy, with the equation for the are of a circle being \autoref{eq:basis circle} \cite{areaCircle}. The area of a sphere is in \autoref{eq:basis sphere} \cite{areaSphere}. In 
+both equations, $r$ is the radius of the circle/sphere. By using \autoref{eq:basis circle} and \autoref{eq:basis sphere} in \autoref{eq:sb rewritten2} we get \autoref{eq:basis sphere2} where 
+$r$ is replaced by $R$. It is common in physics literature to use capitals for large objects like planets. However we are not done yet since we can divide some stuff out. We end up with 
+\autoref{eq:basis sphere final} as the final equation we are going to use.
+
+\begin{subequations}
+    \begin{equation}
+        \pi r^2
+        \label{eq:basis circle}
+    \end{equation}
+    \begin{equation}
+        4 \pi r^2
+        \label{eq:basis sphere}
+    \end{equation}
+    \begin{equation}
+        \Delta T = \frac{\delta t (\pi R^2S - 4\pi R^2\sigma T^4)}{4\pi CR^2}
+        \label{eq:basis sphere2}
+    \end{equation}
+    \begin{equation}
+        \Delta T = \frac{\delta t (S - 4\sigma T^4)}{4C}
+        \label{eq:basis sphere final}
+    \end{equation}
+    \label{eq:basis sphere correction}
+\end{subequations}
+
+\subsection{Insolation}
+
+With the current equation we calculate the global average surface temperature of the planet itself. However, this planet does not have an atmosphere just yet. Basically we modelled the 
+temperature of a rock floating in space, let's change that with \autoref{eq:atmos}. Here we assume that the area of the atmosphere is equal to the area of the planet surface. Obviously
+this assumption is false, as the atmosphere is a sphere that is larger in radius than the planet, however the difference is not significant enough to account for it. We also define the
+atmosphere as a single layer. This is due to the accessibility of the model, we want to make it accessible, not university simulation grade. One thing to take into account for the 
+atmosphere is that it only partially absorbs energy. The sun (or a similar star) is relatively hot and sends out energy waves (radiation) with relatively low wavelengths. The planet is 
+relatively cold and sends out energy at long wavelengths. As a side note, all objects radiate energy. You can verify this by leaving something in the sun on a hot day for a while and 
+almost touch it later. You can feel the heat radiating from the object. The planet is no exception and radiates heat as well, though at a different wavelength than the sun. The 
+atmosphere absorbs longer wavelengths better than short wavelengths. For simplicity's sake we say that all of the sun's energy does not get absorbed by the atmosphere. The planet's 
+radiation will be absorbed partially by the atmosphere. Some of the energy that the atmosphere absorbs is radiated into space and some of that energy is radiated back onto the planet's 
+surface. We need to adjust \autoref{eq:basis sphere final} to account for the energy being radiated from the atmosphere back at the planet surface.
+
+So let us denote the temperature of the planet surface as $T_p$ and the temperature of the atmosphere as $T_a$. Let us also write the specific heat capacity of the planet surface as $C_p$ 
+instead of $C$. We add the term in \autoref{eq:atmos on surface improved} to \autoref{eq:basis sphere final} in \autoref{eq:surface change}. In \autoref{eq:atmos on surface}, $\epsilon$ is the 
+absorbtivity of the atmosphere, the fraction of energy that the atmosphere absorbs. We divided \autoref{eq:atmos on surface} by $\pi R^2$ as we did that with \autoref{eq:basis sphere final} as 
+well, so we needed to make it match that division.
+
+\begin{subequations}
+    \begin{equation}
+        4\pi R^2 \epsilon \sigma T_a^4
+        \label{eq:atmos on surface}
+    \end{equation}
+    \begin{equation}
+        4\epsilon \sigma T_a^4
+        \label{eq:atmos on surface improved}
+    \end{equation}
+    \begin{equation}
+        \Delta T_p = \frac{\delta t (S + 4\epsilon \sigma T_a^4 - 4\sigma T_p^4)}{4C_p}
+        \label{eq:surface change}
+    \end{equation}
+    \label{eq:atmos}
+\end{subequations}
+
+As you probably expected, the atmosphere can change in temperature as well. This is modelled by \autoref{eq:atmos change}, which is very similar to \autoref{eq:surface change}. There are
+some key differences though. Instead of subtracting the radiated heat of the atmosphere once we do it twice. This is because the atmosphere radiates heat into space and towards the 
+surface of the planet, which are two outgoing streams of energy instead of one for the planet (as the planet obviously cannot radiate energy anywhere else than into the atmosphere).
+$C_a$ is the specific heat capacity of the atmosphere.
+
+\begin{equation}
+    \Delta T_a = \frac{\delta t (\sigma T_p^4 - 2\epsilon\sigma T_a^4)}{C_a}
+    \label{eq:atmos change}
+\end{equation}
+
+\subsection{The Latitude Longitude Grid}
+With the current model, we only calculate the global average temperature. To calculate the temperature change along the surface and atmosphere at different points, we are going to use a grid.
+Fortunately the world has already defined such a grid for us, the latitude longitude grid \cite{latlong}. The latitude is the coordinate running from the south pole to the north pole, with -90 
+being the south pole and 90 being the north pole. The longitude runs parallel to the equator and runs from 0 to 360 which is the amount of degrees that an angle can take when calculating the 
+angle of a circle. So 0 degrees longitude is the same place as 360 degrees longitude. To do this however we need to move on from mathematical formulae to code (or in this case pseudocode).
+
+Pseudocode is a representation of real code. It is meant to be an abstraction of code such that it does not matter how you present it, but every coder should be able to read it and implement 
+it in their language of preference. This is usually easier to read than normal code, but more difficult to read than mathematical formulae. If you are unfamiliar with code or coding, look up 
+a tutorial online as there are numerous great ones.
+
+The pseudocode in \autoref{alg:stream1v1} defines the main function of the radiation part of the model. All values are initialised beforehand, based on either estimations, trial and error or 
+because they are what they are (like the Stefan-Boltzmann constant $\sigma$), which is all done in \autoref{sec:cp}. The total time $t$ starts at 0 and increases by $\delta t$ after every 
+update of the temperature. This is to account for the total time that the model has simulated (and it is also used later). What you may notice is the $T_p[lan, lon]$ notation. This is to indicate 
+that $T_p$ saves a value for each $lan$ and $lon$ combination. It is initialised as all zeroes for each index pair, and the values is changed based on the calculations. You can view $T_p$ like 
+the whole latitude longitude grid, where $T_p[lat, lon]$ is an individual cell of that grid indexed by a specific latitude longitude combination. Do note that from here on most, if not all
+functions need to be called \footnote{In case you are unfamiliar with calls, defining a function is defining how it works and calling a function is actually using it.} from another file which I 
+will call the master. The master file decides what parts of the model to use, what information it uses for plots and the like. We do it this way because we want to be able to switch out 
+calculations. Say that I find a more efficient way, or more detailed way, to calculate the temperature change. If everything was in one file, then I need to edit the source code of the project.
+With the master file structure, I can just swap out the reference to the project's implementation with a reference to my own implementation. This makes the life of the user (in this case the 
+programmer who has another implementation) easier and makes changing calculations in the future easier as well. Also note that what we pass on as parameters \footnote{Parameters are variables 
+that a function can use but are defined elsewhere. The real values of the variables are passed on to the funciton in the call.} in \autoref{alg:stream1v1} are the 
+things that change during the execution of the model or that are calculated beforehand and not constants. $S$ for instance is not constant (well at this point it is but in \autoref{sec:daynight} 
+we change that) amd the current time is obviously not constant. All constants can be found in \autoref{sec:cp}.
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{time $t$, amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -90$ \KwTo $90$}{
+        \For{$lon \leftarrow 0$ \KwTo $360$}{
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t (S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p}$ \;
+            $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
+        }
+    }
+    \caption{The main function for the temperature calculations}
+    \label{alg:stream1v1}
+\end{algorithm}
+
+\subsection{Day/Night Cycle} \label{sec:daynight}
+As you can see, the amount of energy that reaches the atmopsphere is constant. However this varies based on the position of the sun relative to the planet. To fix this, we have to assign a 
+function to $S$ that gives the correct amount of energy that lands on that part of the planet surface. This is done in \autoref{alg:solar}. In this algorithm the term insolation is mentioned, 
+which is $S$ used in the previous formulae if you recall. We use the $\cos$ function here to map the strength of the sun to a number between $0$ and $1$. The strength is dependent on the latitude, 
+but since that is in degrees and we need it in radians we transform it to radians by multiplying it by $\frac{\pi}{180}$. This function assumes the sun is at the equinox (center of the sun is 
+directly above the equator) \cite{equinox} at at all times. The second $\cos$ is needed to simulate the longitude that the sun has moved over the longitude of the equator. For that we need the 
+difference between the longitude of the point we want to calculate the energy for, and the longitude of the sun. The longitude of the sun is of course linked to the current time (as the sun is 
+in a different position at 5:00 than at 15:00). So we need to map the current time in seconds to the interval $[0,$ seconds in a day$]$. Therefore we need the mod function. The mod function 
+works like this: $x$ mod $y$ means subtract all multiples of $y$ from $x$ such that $0 \leq x < y$. So to map the current time to a time within one day, we do $-t$ mod $d$ where $-t$ is the 
+current time and $d$ is the amount of seconds in a day. We need $-t$ as this ensures that the sun moves in the right direction, with $t$ the sun would move in the opposite direction in our model 
+than how it would move in real life. When we did the calculation specified in \autoref{alg:solar} we return the final value (which means that the function call is "replaced" 
+\footnote{Replaced is not necessarily the right word, it is more like a mathematical function $f(x)$ where $y = f(x)$. You give it an $x$ and the value that correpsonds to that $x$ is saved in 
+$y$. So you can view the function call in pseudocode as a value that is calculated by a different function which is then used like a regular number.} by the value that the function calculates). 
+If the final value is less than 0, we need to return 0 as the sun cannot suck energy out of the planet (that it does not radiate itself, which would happen if a negative value is returned).
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{insolation $ins$, latitude $lat$, longitude $lon$, time $t$, time in a day $d$}
+    \Output{Amount of energy $S$ that hits the planet surface at the given latitude-time combination.}
+    $longitude \leftarrow 360 \cdot \frac{(-t \text{ mod } d)}{d}$ \;
+    $S \leftarrow ins \cdot \cos(lat \frac{\pi}{180}) \cos((lon - longitude) \cdot \frac{\pi}{180})$ \;
+    \eIf{$S < 0$}{
+        \Return{$0$}
+    }{
+        \Return{$S$}
+    }
+    \caption{Calculating the energy from the sun (or similar star) that reaches a part of the planet surface at a given latitude and time}
+    \label{alg:solar}
+\end{algorithm}
+
+By implementing \autoref{alg:solar}, \autoref{alg:stream1v1} must be changed as well, as $S$ is no longer constant for the whole planet surface. So let us do that in \autoref{alg:stream1v2}. Note 
+that $S$ is defined as the call to \autoref{alg:solar}. 
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t (S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p}$ \;
+            $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
+        }
+    }
+    \caption{The main function for the temperature calculations}
+    \label{alg:stream1v2}
+\end{algorithm}
+
+\subsection{Albedo}
+Albedo is basically the reflectiveness of a material (in our case the planet's surface) \cite{albedo}. The average albedo of the Earth is about 0.2. Do note that we change $C_p$ from a constant 
+to an array. We do this to allow adding in oceans or other terrain in the future. Same thing for the albedo, different terrain has different reflectiveness.
+
+\begin{algorithm}[hbt]
+    $a \leftarrow 0.2$ \;
+
+    $C_p \leftarrow 10^6$ \;
+    \caption{Defining albedo}
+    \label{alg:albedo}
+\end{algorithm}
+
+Now that we have that defined, we need to adjust the main loop of the program (\autoref{alg:stream1v2}). We need to add albedo into the
+equation and change $C_p$ from a constant to an array. The algorithm after these changes can be found in \autoref{alg:stream2v3}. We multiply by $1 - a$ since albedo represents how much energy is 
+reflected instead of absorbed, where we need the amount that is absorbed which is exactly equal to $1$ minus the amount that is reflected.
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{C_p[lat, lon]}$ \;
+            $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{C_a}$ \;
+        }
+    }
+    \caption{The main function for the temperature calculations}
+    \label{alg:stream2v3}
+\end{algorithm}
+
+\subsection{Temperature with Varying Density}
+The air density is not at all points exactly the same. This may be due to the winds blowing, or due to height changes in the terrain. We need to account for that, which is done in 
+\autoref{alg:temperature with density}.
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + 4\epsilon \sigma (T_a[lat, lon])^4 - 4\sigma (T_p[lat, lon])^4)}{\rho[lat, lon]C_p[lat, lon]}$ \;
+            $T_a[lat, lon] \leftarrow T_a[lat, lon] + \frac{\delta t (\sigma (T_p[lat, lon])^4 - 2\epsilon\sigma (T_a[lat, lon])^4)}{\rho[lat, lon]C_a}$ \;
+        }
+    }
+    \caption{The main function for the temperature calculations}
+    \label{alg:temperature with density}
+\end{algorithm}
+
+\subsection{Adding Layers}
+Remember \autoref{eq:atmos change}? We need this equation for every layer in the atmosphere. This also means that we have to adjust the main calculation of the code, which is described  in 
+\autoref{alg:temperature with density}. The $T_a$ needs to change, we need to either add a dimension (to indicate which layer of the atmosphere we are talking about) or we need to add different
+matrices for each atmosphere layer. We opt for adding a dimension as that costs less memory than defining new arrays 
+\footnote{This has to do with pointers, creating a new object always costs a bit more space than adding a dimension as we need a pointer to the object and what type of object it is whereas with 
+adding a dimension we do not need this additional information as it has already been defined}. So $T_a$, and all other matrices that have to do with the atmosphere (so not $T_p$ for instance) 
+are no longer indexed by $lat, lon$ but are indexed by $lat, lon, layer$. We need to account for one more thing, the absorbtion of energy from another layer. The new equation is shown in 
+\autoref{eq:atmos change layer}. Here $k$ is the layer of the atmosphere, $k = -1$ means that you use $T_p$ and $k = nlevels$ means that $T_{a_{nlevels}} = 0$ as that is space. Also, let us
+rewrite the equation a bit such that the variables that are repeated are only written once and stuff that is divided out is removed, which is done in \autoref{eq:atmos change layer improved}.
+Let us also clean up the equation for the change in the surface temperature (\autoref{eq:surface change}) in \autoref{eq:surface change improved}.
+
+\begin{subequations}
+    \begin{equation}
+        \Delta T_{a_k} = \frac{\delta t (\sigma \epsilon_{k - 1}T_{a_{k - 1}}^4 + \sigma \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_k\sigma T_{a_k}^4)}{C_a}
+        \label{eq:atmos change layer}
+    \end{equation}
+    \begin{equation}
+        \Delta T_{a_k} = \frac{\delta t \sigma (\epsilon_{k - 1}T_{a_{k - 1}}^4 + \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_kT_{a_k}^4)}{C_a}
+        \label{eq:atmos change layer improved}
+    \end{equation}
+    \begin{equation}
+        \Delta T_p = \frac{\delta t (S + \sigma(4\epsilon_pT_a^4 - 4T_p^4))}{4C_p}
+        \label{eq:surface change improved}
+    \end{equation}
+\end{subequations}
+
+With the changes made to the equation, we need to make those changes in the code as well. We need to add the new dimension to all matrices except $T_p$ and $a$ as they are unaffected (with 
+regards to the storage of the values) by the addition of multiple atmospheric layers. Every other matrix is affected. The new code can be found in \autoref{alg:temperature layer}. $\delta z$
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
+                $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + \sigma(4\epsilon[0](T_a[lat, lon, 0])^4 - 4(T_p[lat, lon])^4))}
+                {4C_p[lat, lon]}$ \;
+                \uIf{$layer = 0$}{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma((T_p[lat, lon])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
+                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }\uElseIf{$layer = nlevels - 1$}{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
+                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }\uElse{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 + \epsilon[layer + 1]T_a[lat, lon, layer + 1] 
+                    - 2\epsilon[layer](T_a[lat, lon, layer])^4)}{\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }
+            }
+        }
+    }
+    \caption{The main function for the temperature calculations}
+    \label{alg:temperature layer}
+\end{algorithm}
+
+We also need to initialise the $\epsilon$ value for each layer. We do that in \autoref{alg:epsilon}.
+
+\begin{algorithm}
+    $\epsilon[0] \leftarrow 0.75$ \;
+    \For{$i \leftarrow 1$ \KwTo $nlevels$}{
+        $\epsilon[i] \leftarrow 0.5\epsilon[i - 1]$
+    }
+    \caption{Intialisation of the insulation of each layer (also known as $\epsilon$)}
+    \label{alg:epsilon}
+\end{algorithm}
+
+\subsection{Grey Radiation Scheme}
+Inspired by the Isca project \cite{isca} and a paper describing the grey radiation scheme\cite{greyRad}.
+
+A radiation scheme is a model for how energy is redistributed using light in a system. Such a model is a Grey radiation scheme if you split it into two parts, short and long wavelength radiation.
+So you have two redistribution systems, one for short wavelength light and one for long wavelength light. Another assumption we make when using the Grey radiation scheme, is that the atmosphere 
+is transparent to short wavelength radiation, meaning it lets through light with short wavelengths. Additionally we use a two stream approximation, which means that we have a stream of radiation
+going up, and another stream of radiation going down. Note that these two streams are both long wavelength radiation, because we said earlier we assume the atmosphere completely ignores short 
+wavelength radiation.
+
+The two long wavelength radiation streams are described in \autoref{eq:upward radiation} and \autoref{eq:downward radiation} \cite{greyRad}. In those equations, the symbols are:
+
+\begin{itemize}
+    \item $U$: Upward flux.
+    \item $D$: Downward flux.
+    \item $B$: The Stefan-Boltzmann equation (see \autoref{eq:stefan-boltzmann}).
+    \item $\tau$: Optical depth.
+\end{itemize}
+
+\begin{subequations}
+    \begin{equation}
+        \frac{dU}{d\tau} = U - B
+        \label{eq:upward radiation}
+    \end{equation}
+    \begin{equation}
+        \frac{dD}{d\tau} = B - D
+        \label{eq:downward radiation}
+    \end{equation}
+\end{subequations}
+
+With \autoref{eq:upward radiation} and \autoref{eq:downward radiation} written down, we can discuss how they work. These equations need a boundary condition to work, a starting point if you like.
+For those equations the boundary conditions are that $U$ is at the surface equal to $B$ and that $D$ at the top of the atmosphere is equal to $0$. Meaning that in the beginning the top of the 
+atmosphere has no downward flux as there is no heat there, and that the bottom of the atmosphere has a lot of upward flux as most if not all of the heat is located there. Then after the spin up 
+time this should stabilise. We are interested in the change of the fluxes, so $dU$ and $dD$, to get those we need to multiply the right hand side by $d\tau$. Then we have the flow of radiation
+that we need. However we cannot solely use these two equations to calculate the heat of a given layer. For that we need a few more components. These are described in \autoref{eq:heat layer}. 
+Here $Q_R$ is the amount of heat in a layer, $c_p$ is the specific heat capacity of dry air (our atmosphere), $\rho$ is the density of the air in that layer and $\delta z$ is the change in height. 
+$\delta U - D$ are the change in net radiation, meaning the amount of radiation that is left over after you transferred the upward and downward flux. See it as incoming and outgoing energy for a 
+given layer, the net change (either cooling down or heating up) is what remains after you have subtracted the incoming energy from the outgoing energy. While this explanation is not entirely true 
+(as flux is not entirely equivalent to energy), it explains the concept the best.
+
+\begin{equation}
+    Q_R = \frac{1}{c_p\rho}\frac{\delta(U - D)}{\delta z}
+    \label{eq:heat layer}
+\end{equation}
+
+Now only one question remains: what is optical depth? Optical depth is the amount of work a photon has had to do to get to a certain point. This might sound really vague, but bear with me. 
+Optical depth describes how much stuff a certain photon has had to go through to get to a point. As you'd expect this is $0$ at the top of the atmosphere as space is a big vacuum so no stuff to 
+move through, so no work. Then the further the photon moves into the atmosphere, the more work the photon has had to do to get there. This is because it now needs to move through gases, like air,
+water vapour and other gases. Hence the closer the photon gets to the surface of the planet, the larger the optical depth is because the photon has had to work more to get there. This phenomenon
+is described in \autoref{eq:optical depth}. The symbols in the equation mean:
+
+\begin{itemize}
+    \item $\tau_0$: Optical depth at the surface.
+    \item $p$: Atmospheric pressure (\si{Pa}).
+    \item $p_s$: Atmospheric pressure at the surface (\si{Pa}).
+    \item $f_l$: The linear optical depth parameter, with a value of 0.1.
+\end{itemize}
+
+\begin{equation}
+    \tau = \tau_0[f_l(\frac{p}{p_s}) + (1 - f_l)(\frac{p}{p_s})^4]
+    \label{eq:optical depth}
+\end{equation}
+
+As one can see, \autoref{eq:optical depth} has two parts, a linear part and a quatric part (to the power $4$). The quatric term approximates the structure of water vapour in the atmosphere, which 
+roughly scales with $\frac{1}{4}$ with respect to the height. The linear term is present to fix numerical behaviour because this is an approximation which will not be completely correct (that's
+why it is an approximation) so we add this term to make it roughly right. The same thing holds for $f_l$ which can be manually tuned to fix weird numerical behaviour.
+
+With these equations in our mind, let's get coding. First we add the pressure profile, the pressure of all atmospheric layers at a lat lon point. We need this to accurately represent the optical 
+depth per atmospheric layer. Then we need to use the pressure profile with regards to \autoref{eq:optical depth}. The resulting code can be found in \autoref{alg:optical depth}. This algorithm 
+replaces the temperature calculations we have done in \autoref{alg:temperature layer}, as this is basically a better version of the calculations done in that algorithm. $f_l$ has a value of $0.1$
+and is located near all the other constants in the code, henceforth we will refer to this section in the code as the control panel, since most if not all of the constants can be tweaked here. 
+$\tau_0$ is a function that gives the surface optical depth for a given latitude. The corresponding equation can be found in \autoref{eq:optical depth surface} \cite{simon}. Translating this 
+into code is left as an exercise to the reader. $U[0]$ is the boundary condition discussed before (being the same as \autoref{eq:stefan-boltzmann}), just as $D[nlevels]$ is the boundary condition. 
+$S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents the call to \autoref{alg:solar}.
+
+\begin{algorithm}
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            $pressureProfile \leftarrow p[lat, lon, :]$ \;
+            $\tau = \tau_0(lat)f_l\frac{pressureProfile}{pressureProfile[0]} + (1 - f_l)(\frac{pressureProfile}{pressureProfile[0]})^4)$ \;
+            $U[0] \leftarrow \sigma T_p[lat, lon]^4$ \;
+
+            \For{$level \leftarrow 1$ \KwTo $nlevels$}{
+                $U[level] \leftarrow U[level - 1] - \frac{(\tau[level] - \tau[level - 1])(\sigma \cdot (mean(T_a[:, :, level]))^4)}{1 + (\tau[level - 1] - \tau[level])}$ \;
+            }
+
+            $D[nlevels - 1] \leftarrow 0$ \;
+
+            \For{$level \leftarrow nleves - 1$ \KwTo $0$}{
+                $D[level] \leftarrow D[level + 1] - \frac{(\tau[level + 1] - \tau[level])(\sigma \cdot (mean(T_a[:, :, level]))^4)}{1 + (\tau[level] - \tau[level + 1])}$ \;
+            }
+
+            \For{$level \leftarrow 0$ \KwTo $nlevels$}{
+                $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
+            }
+
+            $T_a[lat, lon, :] \leftarrow T_a[lat, lon, :] + Q$ \;
+
+            $S \leftarrow \texttt{solar}(I, lat, lon, t)$ \;
+
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] \frac{\delta t((1 - a[lat, lon]) S + S_z(D, 0, 0, 0) - \sigma T_p[lat, lon]^4)}{C_p[lat ,lon]}$ \;
+        }
+    }
+    \caption{Main function for calculating the temperature using radiation}
+    \label{alg:optical depth}
+\end{algorithm}
+
+\begin{equation}
+    \tau_0 = 3.75 + \cos(lat \frac{\pi}{90})\frac{4.5}{2}
+    \label{eq:optical depth surface}
+\end{equation}
+
+\subsection{Adding In Some Ozone (Or Something Else That Approximates It)}
+Adding in ozone in the stratosphere is hella complicated, so we leave that as an exercise to the reader as in true academic fashion. Just joking, if you want you can work on implementing ozone 
+however we opt not to because it is quite complicated. Instead we approximate it, which is decent enough for our purpose. We need to do it in \autoref{alg:optical depth} as we need to adjust the
+$Q$. We add in a check to see if we are currently calculating the radiation in the stratosphere. If so we add some radiation extra to replicate the effect of ozone. As can be seen in 
+\autoref{alg:ozone}, where we only focus on the $Q$ part of \autoref{alg:optical depth}, we add in some extra radiation based on how high the current layer calculation is, which scales with the
+height. 
+
+\begin{algorithm}
+    \For{$level \leftarrow 0$ \KwTo $nlevels$}{
+        $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
+        \uIf{$heights[level] > 20 \cdot 10^3$}{
+            $Q[level] \leftarrow Q[level] + \texttt{solar}(5, lat, lon, t) \frac{24 \cdot 60 \cdot 60(\frac{heights[level] - 20 \cdot 10^3}{10^3})^2}{30^2}$ \;
+        }
+    }
+    \caption{Replicating the effect of ozone}
+    \label{alg:ozone}
+\end{algorithm}
+
+\subsection{Tilting the Planet}
+In order to model a planet that has seasons, like Earth, we need to tilt the planet. This has as effect that the sun is not always directly above the equator but is above a certain band around
+the equator as the year moves on. This means that some hemispheres receive more/less sun based on what part of the year it is. Which corresponds to the various seasons we have on Earth. But in
+order to do that, we have to change the \texttt{solar} function. The new version as shown in \autoref{alg:solar tilt} will replace \autoref{alg:solar}. Here $\alpha$ is the tilt in degrees.
+
+\begin{algorithm}
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{insolation $ins$, latitude $lat$, longitude $lon$, time $t$, time in a day $d$}
+    \Output{Amount of energy $S$ that hits the planet surface at the given latitude, longitude and time combination.}
+    $sun\_lon \leftarrow -t \text{ mod } d$ \;
+    $sun\_lon \leftarrow sun\_lon \cdot \frac{360}{d}$ \;
+    $sun\_lat \leftarrow \alpha\cos(\frac{2t\pi}{year})$ \;
+    $S \leftarrow insolation\cos(\frac{\pi(lat - sun\_lat)}{180})$ \;
+
+    \uIf{$S < 0$}{
+        \Return{$0$} \;
+    } \uElse {
+        $lon\_diff \leftarrow lon - sun\_lon$ \;
+        $S \leftarrow S\cos(\frac{lon\_diff\pi}{180})$ \;
+
+        \uIf{$S < 0$}{
+            \uIf{$lat + sun\_lat > 90$ or $lat + sun\_lat < -90$}{
+                \Return{$insolation\cos(\frac{\pi(lat + sun\_lat)}{180})\cos(\frac{lon\_diff\pi}{180})$} \;
+            } \uElse {
+                \Return{$0$} \;
+            }
+        } \uElse {
+            \Return{$S$} \;
+        }
+    }
+    \caption{Calculating the energy from the sun (or similar star) that reaches a part of the planet surface at a given latitude and time}
+    \label{alg:solar tilt}
+\end{algorithm}
+
+What the code in \autoref{alg:solar tilt} does boils down to calculating the latitude and longitude of the sun and checking whether the planet receives any energy. If not return $0$ immediately.
+If so we check if the difference between the sun's longitude and the planet's longitude and calculate how much energy would hit the planet given that the sun is not straight above the equator. 
+We do this by multiplying the energy it would receive from the sun if it were above the equator $S$ by the cosine of the difference in longitudes, which represents the tilt. Then we check again 
+if the planet is receiving energy, if not we check if it happens around the poles. We do this because due to the tilt it can be the case that at certain points in the year the pole is in constant
+sunlight, i.e. the sun does not go down. This creates a sort of overshoot which needs to be accounted for. If it does this then we add the latitudes of the sun and the planet together and use
+that to calculate the energy that would hit that spot. If it is not the case that we are around the poles and we do not receive energy, then we return $0$. If it happens to be that we do receive 
+energy (so no negative values) then we return $S$.
+
+\subsection{The Theory Behind the Planar Approximation}
+It is time to deal with the pole situation. The north and south poles that is, not the lovely people over in Poland. We run into problems because the latitude longitude grid cells become to small 
+near the poles. Therefore, the magnitudes no longer fit into one cell and overflow into other cells which makes everything kind of funky. So we need to fix that, and we do that by a planar 
+approximation. 
+
+As said earlier, the grid cells on the latitude longitude grid get closer together the closer you get to the poles which poses problems. To fix this, we will be using a planar approximation of 
+the poles. What this means is that we will map the 3D grid near the poles onto a 2D plane parallel to the poles, as if we put a giant flat plane in the exact center of the poles and draw lines
+from the grid directly upwards to the plane. For a visual representation, please consult the stream with timestamp 1:38:25 \cite{polarPlane}, which includes some explanation. In the streamm we
+use $r$ to indicate the radius of the planet (which we assume is a sphere), $\theta$ for the longitude and $\lambda$ for the latitude. So we have spherical coordinates, which we need to transform
+into $x$ and $y$ coordinates on the plane. We also need the distance between the center point (the point where the plane touches the planet which is the center of the pole) and the projected 
+point on the plane from the grid (the location on the plane where a line from the gird upwards to the plane hits it). This distance is denoted by $a$ (Simon chose this one, not me). We then get 
+the following equations as shown in \autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar y}. 
+
+\begin{subequations}
+    \begin{equation}
+        a = r \cos(\theta)
+        \label{eq:polar distance}
+    \end{equation}
+    \begin{equation}
+        x = a \sin(\lambda)
+        \label{eq:polar x}
+    \end{equation}
+    \begin{equation}
+        y = a \cos(\lambda)
+        \label{eq:polar y}
+    \end{equation}
+\end{subequations}
+
+But what if we know $x$ and $y$ and want to know $\theta$ and $\lambda$? Pythagoras' Theorem then comes into play \cite{pythagoras}. We know that (due to Pythagoras) \autoref{eq:pythagoras} must 
+always be true. Then if we substitue $a$ by $\sqrt{x^2 + y^2}$ in \autoref{eq:polar distance} we get \autoref{eq:polar theta1}. Then we transform that equation such that we only have $\theta$ on 
+one side and the rest on the other side (since we want to know $\theta$) and we get \autoref{eq:polar theta3}.
+\begin{equation}
+    x^2 + y^2 = a^2
+    \label{eq:pythagoras}
+\end{equation}
+
+\begin{subequations}
+    \begin{equation}
+        \sqrt{x^2 + y^2} = r\cos(\theta)
+        \label{eq:polar theta1}
+    \end{equation}
+    \begin{equation}
+        \frac{\sqrt{x^2 + y^2}}{r} = \cos(\theta)
+        \label{eq:polar theta2}
+    \end{equation}
+    \begin{equation}
+        \cos^{-1}(\frac{\sqrt{x^2 + y^2}}{r}) = \theta
+        \label{eq:polar theta3}
+    \end{equation}
+\end{subequations}
+
+For $\lambda$ we need another trigonometric function which is the tangent ($\tan$). The tangent is defined in \autoref{eq:tan}. If we then take a look at \autoref{eq:polar x} and 
+\autoref{eq:polar y}, we see that $\lambda$ is present in both equations. So we need to use both to get $\lambda$ \footnote{Yes you could only use one but since we both know $x$ and $y$ it is a
+bit easier to use both than to only use one as you need to know $\theta$ at that point as well which may or may not be the case.}. So let's combine \autoref{eq:polar x} and \autoref{eq:polar y}
+in \autoref{eq:polar lambda1}, transform it such that we end up with only $\lambda$ on one side and the rest on the other side and we end up with \autoref{eq:polar lambda3}.
+
+\begin{equation}
+    \tan(\alpha) = \frac{\sin(\alpha)}{\cos(\alpha)}
+    \label{eq:tan}
+\end{equation}
+
+\begin{subequations}
+    \begin{equation}
+        \frac{x}{y} = \frac{a\sin(\lambda)}{a\cos(\lambda)} = \frac{\sin(\lambda)}{\cos(\lambda)}
+        \label{eq:polar lambda1}
+    \end{equation}
+    \begin{equation}
+        \frac{x}{y} = \tan(\lambda)
+        \label{eq:polar lambda2}
+    \end{equation}
+    \begin{equation}
+        \lambda = \tan^{-1}(\frac{x}{y})
+        \label{eq:polar lambda3}
+    \end{equation}
+\end{subequations}
+
+With this math we can fix a lot of stuff in the model. With this we can resample (mapping from sphere to plane) the pressure, density, temperarature and advection to the plane and ensure that 
+there are no more overflows and funky business. The implementation (code) for this will be done in a follow up stream, so stay tuned!

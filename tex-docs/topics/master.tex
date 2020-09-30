@@ -1,0 +1,156 @@
+\section{The Master File}
+The master file is the file that controls the model calculation. This file decides what calculations are used and  what is done with the calculations (which is not the scope of this manual).
+In other words, the master file combines all the calculations and theory from the previous sections and puts it all together to form a model. As mentioned earlier, this structure enables the 
+user to create their own version of the model. If one has their own calculations, or wants to use an older version of the calculations in this manual, then the user can define it themselves
+and call it instead of the calls that we use. The model is meant to be customisable, which this structure enables.
+
+\subsection{Adding a Spin-Up Time}
+Instead of having a static start (having the planet start from rest, so no rotations allowed) we will have the model start up for some time before we start simulating the climate extensively.
+To accomodate for this, we have to make some changes in the code. First we need to add two booleans (variables that can only take two values, either \texttt{TRUE} or \texttt{FALSE}) that we use
+to indicate to the model whether we want to simulate the wind and whether we want to simulate advection. This means that the main loop will have some changes made to it. After performing the 
+calculations in \autoref{alg:temperature with density} we would calculate the velocities and afterwards we would calculate the advection. Instead let us change it to what is shown in 
+\autoref{alg:stream4v1}.
+
+\begin{algorithm}
+    \While{\texttt{TRUE}}{
+        \autoref{alg:temperature with density} \;
+        \If{$velocity$}{
+            \autoref{alg:stream3} \;
+            \If{$advection$}{
+                \autoref{alg:advectionfix} \;
+            }
+        }
+    }
+    \caption{Main loop that can simulate velocities and advection conditionally}
+    \label{alg:stream4v1}
+\end{algorithm}
+
+Now to dynamically enable/disable the simulation of flow and advection we need to add the spin-up calculations to the main loop. So in \autoref{alg:stream4v1}, before 
+\autoref{alg:temperature with density} we add \autoref{alg:spinup}. What it does is it changes the timestep when spinnning up and disables flow simulation, and when a week has passed it reduces 
+the timestep and enables flow simulation. At this point in time, the advection is not dynamically enabled/disabled but it is done by the programmer.
+
+\begin{algorithm}
+    \eIf{$t < 7day$}{
+        $\delta t \leftarrow 60 \cdot 47$ \;
+        $velocity \leftarrow \texttt{FALSE}$ \;
+    }{
+        $\delta t \leftarrow 60 \cdot 9$ \;
+        $velocity \leftarrow \texttt{TRUE}$ \;
+    }
+    \caption{The spin-up block dynamically enabling or disabling flow simulation}
+    \label{alg:spinup}
+\end{algorithm}
+
+\subsection{Varying the Albedo}
+The albdeo (reflectiveness of the planet's surface) is of course not the same over the whole planet. To account for this, we instead vary the albedo slightly for each point in the latitude 
+longitude grid. The algorithm that does this is shown in \autoref{alg:albedo variance}. The uniform distribution basically says that each allowed value in the interval has an equal chance of 
+being picked \cite{uniformdist}.
+
+\begin{algorithm}
+    $V_a \leftarrow 0.02$ \;
+    \For{$lat \in [-nlat, nlat]$}{
+        \For{$lon \in [0, nlon]$}{
+            $R \leftarrow \text{ Pick a random number (from the uniform distribution) in the interval } [-V_a, V_a]$ \;
+            $a[lat, lon] \leftarrow a[lat, lon] + V_a \cdot R$\;
+        }
+    }
+    \caption{Varying the albedo of the planet}
+    \label{alg:albedo variance}
+\end{algorithm}
+
+\subsection{Non-uniform air density}
+While air density on the surface is in general consistent, this does not hold if you move up through the atmosphere. The planet will pull air down due to gravity, which means that more air is at 
+the planet surface than at the top of the atmosphere. Hence the air density changes throughout the atmosphere and we need to account for that. This is done in \autoref{alg:density}. Because this 
+is used in radiation, velocity and advection, we initialise this in the master file. Though one could argue it could be part of the control panel, we opt not to include any code other than 
+variable declarations in the control panel for greater clarity. This also means that we give the user the option to have only one layer (by skipping implementing this algorithm). Note that the 
+$\rho[:,: i]$ notation means that for every index in the first and second dimension, only change the value for the index $i$ in the third dimension.
+
+\begin{algorithm}
+    $\rho[:, :, 0] \leftarrow 1.3$ \;
+    \For{$i \in [1, nlevels-1]$}{
+        $\rho[:, :, i] \leftarrow 0.1\rho[:, :, i - 1]$
+    }
+    \caption{Initialisation of the air density $\rho$}
+    \label{alg:density}
+\end{algorithm}
+
+\subsection{Interpolating the Air Density}
+In order to interpolate (see \autoref{sec:interpolation}) the air density, to have a better estimation at each grid cell, we need data. However currently we are just guessing the air density at 
+higher levels, instead of taking real values. So let us change that. For that we are going to use the U.S. Standard Atmosphere, an industry standard measure of the atmosphere on Earth 
+\cite{usatmosp}. This data was provided in a text (\texttt{TXT}) file which of course needs to be read in order for the data to be used in the model. Here we only care for the density and the 
+temperature at a specific height. So the text file only contains those two columns of the data (and the height in km of course as that is the index of the row, the property that uniquely 
+identifies a row).
+
+With that in mind, let's get coding and importing the data. We do this in \autoref{alg:usatmosp}. As one can see we do not specify how to open the file or how to split the read line, as this 
+is language specific and not interesting to describe in detail. I refer you to the internet to search for how to open a text file in the language you are working in. Keep in mind in which 
+magnitude you are working and in which magnitude the data is. If you work with $km$ for height and the data is in $m$, you need to account for that somewhere by either transforming the imported 
+data or work in the other magnitude. 
+
+\begin{algorithm}
+    $data \leftarrow \text{open text file containing the us standard atmosphere data}$ \;
+    \ForEach{$line \in data$}{
+        Split $line$ into three components, $sh, st$ and $sd$, representing the height, temperature and density respectively \;
+        $standardHeight.add(sh)$ \;
+        $standardTemperature.add(st)$ \;
+        $standardDensity.add(sd)$ \;
+    }
+
+    $densityProfile \leftarrow \texttt{interpolate}(heights, standardHeight, standardDensity)$ \;
+    $temperatureProfile \leftarrow \texttt{interpolate}(heights, standardHeight, standardTemperature)$ \;
+
+    \For{$alt \in [0, nlevels]$}{
+        $\rho[:, :, alt] \leftarrow densityProfile[alt]$ \;
+        $T_a[:, :, alt] \leftarrow temperatureProfile[alt]$ \;
+    }
+    \caption{Loading in the U.S. Standard Atmosphere}
+    \label{alg:usatmosp}
+\end{algorithm}
+
+Note that the function \texttt{interpolate} takes three arguments, the first one being the data points that we want to have values for, the second one is the data points that we know and the 
+third one is the values for the data points that we know. This function may or may not exist in your programming language of choice, which might mean that you have to write it yourself. 
+The formula that we use for interpolation can be found in \autoref{eq:interpolation}, though you still need to figure out what value you need for $\lambda$ (see \autoref{sec:interpolation}). 
+This is left as an exercise for the reader.
+
+\subsection{Clamping the Velocities}
+Due to the boundaries in the advection calculations (see \autoref{sec:adv}) we get weird instabilities as the velocity calculations are executed on more cells. Which means that air is trying to 
+displace temperature (advect it) by flowing faster to those cells, but actually don't carry any temperature because we turned it off for those cells. This is something that we need to fix to get 
+rid of weirdness around the edges. This is done in \autoref{alg:velocity clamped}. Here the $bla:$ means from $bla$ to the last valid index, if the $:$ is in front of $bla$ then it means from 
+the first valid index to $bla$.
+
+\begin{algorithm}
+    \autoref{alg:velocity}
+    $u[(adv\_boun, -adv\_boun - 1), :, :] \leftarrow 0.5u[(adv\_boun, -adv\_boun - 1), :, :]$ \;
+    $v[(adv\_boun, -adv\_boun - 1), :, :] \leftarrow 0.5v[(adv\_boun, -adv\_boun - 1), :, :]$ \;
+    $w[(adv\_boun, -adv\_boun - 1), :, :] \leftarrow 0.5w[(adv\_boun, -adv\_boun - 1), :, :]$ \;
+
+    $u[:adv\_boun, :, :] \leftarrow 0 $\;
+    $v[:adv\_boun, :, :] \leftarrow 0 $\;
+    $w[:adv\_boun, :, :] \leftarrow 0 $\;
+
+    $u[-adv\_boun:, :, :] \leftarrow 0$ \;
+    $v[-adv\_boun:, :, :] \leftarrow 0$ \;
+    $w[-adv\_boun:, :, :] \leftarrow 0$ \;
+    \caption{Clamping the Velocities}
+    \label{alg:velocity clamped}
+\end{algorithm}
+
+\subsection{Smoothing all the things}
+On a planet wide scale, you have a lot of variety in the data. To counteract that we filter out the high frequency data. Which means that we filter out the data that occurs sporadically. So we 
+do not consider the data that occurs so infrequently that it means nothing. We do this for the radiation (temperature) and the velocity which is shown in \autoref{alg:smootht} and 
+\autoref{alg:smoothv} respectively. It is worth mentioning that \autoref{alg:smootht} is executed after we do the calculations for $T_a$ (shown in \autoref{alg:optical depth}). 
+\autoref{alg:smoothv} is done after \autoref{alg:velocity} but before \autoref{alg:velocity clamped}. 
+
+
+\begin{algorithm}
+    $T_a \leftarrow \texttt{Smooth}(T_a, smooth_t)$ \;
+    \caption{Smoothing the atmospheric temperature}
+    \label{alg:smootht}
+\end{algorithm}
+
+\begin{algorithm}
+    $u \leftarrow \texttt{Smooth}(u, smooth_u)$ \;
+    $v \leftarrow \texttt{Smooth}(v, smooth_v)$ \;
+    $w \leftarrow \texttt{Smooth}(w, smooth_w, smooth_{vert})$ \;
+    \caption{Smoothing the velocity}
+    \label{alg:smoothv}
+\end{algorithm}
