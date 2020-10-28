@@ -2,6 +2,75 @@
 Back when I was a young naive programmer, I made a thing. Now a few years down the line I made the thing again, but infinitely better. So I have no use for the old thing anymore. But fear not,
 old algorithms (used by CLAuDE) will be collected here. This is just for historical purposes.
 
+\subsection{Radiation}
+\subsubsection{Adding Layers}
+Remember \autoref{eq:atmos change}? We need this equation for every layer in the atmosphere. This also means that we have to adjust the main calculation of the code, which is described  in 
+\autoref{alg:temperature with density}. The $T_a$ needs to change, we need to either add a dimension (to indicate which layer of the atmosphere we are talking about) or we need to add different
+matrices for each atmosphere layer. We opt for adding a dimension as that costs less memory than defining new arrays 
+\footnote{This has to do with pointers, creating a new object always costs a bit more space than adding a dimension as we need a pointer to the object and what type of object it is whereas with 
+adding a dimension we do not need this additional information as it has already been defined}. So $T_a$, and all other matrices that have to do with the atmosphere (so not $T_p$ for instance) 
+are no longer indexed by $lat, lon$ but are indexed by $lat, lon, layer$. We need to account for one more thing, the absorbtion of energy from another layer. The new equation is shown in 
+\autoref{eq:atmos change layer}. Here $k$ is the layer of the atmosphere, $k = -1$ means that you use $T_p$ and $k = nlevels$ means that $T_{a_{nlevels}} = 0$ as that is space. Also, let us
+rewrite the equation a bit such that the variables that are repeated are only written once and stuff that is divided out is removed, which is done in \autoref{eq:atmos change layer improved}.
+Let us also clean up the equation for the change in the surface temperature (\autoref{eq:surface change}) in \autoref{eq:surface change improved}.
+
+\begin{subequations}
+    \begin{equation}
+        \Delta T_{a_k} = \frac{\delta t (\sigma \epsilon_{k - 1}T_{a_{k - 1}}^4 + \sigma \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_k\sigma T_{a_k}^4)}{C_a}
+        \label{eq:atmos change layer}
+    \end{equation}
+    \begin{equation}
+        \Delta T_{a_k} = \frac{\delta t \sigma (\epsilon_{k - 1}T_{a_{k - 1}}^4 + \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_kT_{a_k}^4)}{C_a}
+        \label{eq:atmos change layer improved}
+    \end{equation}
+    \begin{equation}
+        \Delta T_p = \frac{\delta t (S + \sigma(4\epsilon_pT_a^4 - 4T_p^4))}{4C_p}
+        \label{eq:surface change improved}
+    \end{equation}
+\end{subequations}
+
+With the changes made to the equation, we need to make those changes in the code as well. We need to add the new dimension to all matrices except $T_p$ and $a$ as they are unaffected (with 
+regards to the storage of the values) by the addition of multiple atmospheric layers. Every other matrix is affected. The new code can be found in \autoref{alg:temperature layer}. $\delta z$
+
+\begin{algorithm}[hbt]
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
+                $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + \sigma(4\epsilon[0](T_a[lat, lon, 0])^4 - 4(T_p[lat, lon])^4))}
+                {4C_p[lat, lon]}$ \;
+                \uIf{$layer = 0$}{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma((T_p[lat, lon])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
+                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }\uElseIf{$layer = nlevels - 1$}{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
+                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }\uElse{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 + \epsilon[layer + 1]T_a[lat, lon, layer + 1] 
+                    - 2\epsilon[layer](T_a[lat, lon, layer])^4)}{\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }
+            }
+        }
+    }
+    \caption{The main function for the temperature calculations}
+    \label{alg:temperature layer}
+\end{algorithm}
+
+We also need to initialise the $\epsilon$ value for each layer. We do that in \autoref{alg:epsilon}.
+
+\begin{algorithm}
+    $\epsilon[0] \leftarrow 0.75$ \;
+    \For{$i \leftarrow 1$ \KwTo $nlevels$}{
+        $\epsilon[i] \leftarrow 0.5\epsilon[i - 1]$
+    }
+    \caption{Intialisation of the insulation of each layer (also known as $\epsilon$)}
+    \label{alg:epsilon}
+\end{algorithm}
+
 \subsection{Velocity}
 \subsubsection{The Primitive Equations and Geostrophy}
 The primitive equations (also known as the momentum equations) is what makes the air move. It is actually kind of an injoke between physicists as they are called the primitive equations but 

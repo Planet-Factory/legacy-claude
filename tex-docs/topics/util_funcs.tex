@@ -63,27 +63,18 @@ calculations we will do later on.
 \begin{algorithm}[hbt]
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
+    \Input{Matrix (double array) $a$, array $p_z$, third index $k$}
     \Output{Gradient in the $z$ direction}
-    \uIf{$a.dimensions = 1$}{
-        \uIf{$k = 0$}{
-            $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
-        }\uElseIf{$k = nlevels - 1$}{
-            $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
-        }
-    } \uElse {
-        \uIf{$k = 0$}{
-            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
-        }\uElseIf{$k = nlevels - 1$}{
-            $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
-        }
+    $nlevels \leftarrow p_z.length$ \;
+    \uIf{$k = 0$}{
+        $grad \leftarrow \frac{a[k + 1] - a[k]}{p_z[k + 1] - p_z[k]}$ \;
+    }\uElseIf{$k = nlevels - 1$}{
+        $grad \leftarrow \frac{a[k] - a[k - 1]}{p_z[k] - p_z[k - 1]}$ \;
+    }\uElse{
+        $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{p_z[k + 1] - p_z[k - 1]}$ \;
     }
     
-    \Return $grad$ \;
+    \Return $-grad$ \;
     \caption{Calculating the gradient in the $z$ direction}
     \label{alg:gradient z}
 \end{algorithm}

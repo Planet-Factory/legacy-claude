@@ -115,7 +115,7 @@ exponential function the differences, you guessed it, become exponentially wrong
 prevent a blow up, we have disabled the call to the gradient $z$ function in \autoref{alg:divergence}. This ensures that the horizontal bits still work, but the vertical stuff does not.
 As always, we will try to fix this in the future. 
 
-\subsection{Adiabatic Motion}
+\subsection{Adiabatic Motion} \label{sec:thermal pot}
 Up until now, we have been moving air and the density of the atmosphere. However we have not transported any temperature yet. What this means is that if we have a packet of air (see it as a box
 filled with air, but the box is invisible) $P$ which is at the planet surface. There $P$ has temperature $T_1$. If we then move $P$ to a layer higher up in the atmosphere, $P$ will still have 
 the same temperature, which is wrong because the density differs. Due to this difference, there is either more or less pressure applied to the box of air which means that $P$ will contract or 
@@ -160,28 +160,22 @@ surface, then it would be temperature $T$ which is then equal to the thermal pot
 If we now re-arrange \autoref{eq:thermal potential} so that we have $T$ on one side and the rest on the other side, we get \autoref{eq:potential temp}. With this we can convert temperature into 
 potential temperature and vice versa. The whole process of moving temperature around is called adiabatic motion. Now it is time to get this into code. For this to work we need to translate both 
 \autoref{eq:thermal potential} and \autoref{eq:potential temp} into code and create an overarching function that calls the previously mentioned equations. Let us start with 
-\autoref{eq:thermal potential} which is described in \autoref{alg:temp to pot}. Note that $\frac{R}{C_a}$ does not change as they are constants, therefore we can precompute them which saves quite 
-a bit of time (namely $O(n^3)$ divisions, where $n$ is the length of each dimension of $T_a$). Also note that we can inverse the process by inserting a minus in the exponent and swapping $T_a$ 
-and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}. To avoid confusion we rename $p_0$ to $p_r$ as we talk about a reference pressure, instead of the already defined
-pressure from a previous calculation round.
+\autoref{eq:thermal potential} which is described in \autoref{alg:temp to pot}. Note that $\frac{R}{C_a}$ does not change as they are constants, therefore we can precompute them which saves 
+a bit of time (namely $O(n)$ divisions, where $n$ is the length of $p$). Also note that we can inverse the process by inserting a minus in the exponent and swapping $T_a$ 
+and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}.
 
 \begin{algorithm}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{temperature of the atmosphere $T_a$, air pressure $p$, boolean $back$}
+    \Input{temperature of the atmosphere (or potential temperature) $T_a$, air pressure $p$, boolean $back$}
     \Output{potential temperature $\theta$}
     \uIf{$back$}{
-        $\kappa \leftarrow -\frac{R}{C_a}$ \;
-    }\uElse{
         $\kappa \leftarrow \frac{R}{C_a}$ \;
+    }\uElse{
+        $\kappa \leftarrow -\frac{R}{C_a}$ \;
     }
-    \For{$i \leftarrow 0$ \KwTo $T_a.length$}{
-        \For{$j \leftarrow 0$ \KwTo $T_a[i].length$}{
-            $p_r \leftarrow p[i, j 0]$ \;
-            \For{$k \leftarrow 0$ \KwTo $T_a[i, j].length$}{
-                $\theta[i, j, k] \leftarrow T_a[i, j, k] (\frac{p[i, j, k]}{p_r})^{\kappa}$
-            }
-        }
+    \For{$k \leftarrow 0$ \KwTo $p.length$}{
+        $\theta[:, :, k] \leftarrow T_a[:, :, k] (\frac{p_z[k]}{p_z[0]})^{\kappa}$
     }
     \Return{$\theta$}
     \caption{Converting temperature into potential temperature}

@@ -260,72 +260,14 @@ The air density is not at all points exactly the same. This may be due to the wi
 \end{algorithm}
 
 \subsection{Adding Layers}
-Remember \autoref{eq:atmos change}? We need this equation for every layer in the atmosphere. This also means that we have to adjust the main calculation of the code, which is described  in 
-\autoref{alg:temperature with density}. The $T_a$ needs to change, we need to either add a dimension (to indicate which layer of the atmosphere we are talking about) or we need to add different
-matrices for each atmosphere layer. We opt for adding a dimension as that costs less memory than defining new arrays 
-\footnote{This has to do with pointers, creating a new object always costs a bit more space than adding a dimension as we need a pointer to the object and what type of object it is whereas with 
-adding a dimension we do not need this additional information as it has already been defined}. So $T_a$, and all other matrices that have to do with the atmosphere (so not $T_p$ for instance) 
-are no longer indexed by $lat, lon$ but are indexed by $lat, lon, layer$. We need to account for one more thing, the absorbtion of energy from another layer. The new equation is shown in 
-\autoref{eq:atmos change layer}. Here $k$ is the layer of the atmosphere, $k = -1$ means that you use $T_p$ and $k = nlevels$ means that $T_{a_{nlevels}} = 0$ as that is space. Also, let us
-rewrite the equation a bit such that the variables that are repeated are only written once and stuff that is divided out is removed, which is done in \autoref{eq:atmos change layer improved}.
-Let us also clean up the equation for the change in the surface temperature (\autoref{eq:surface change}) in \autoref{eq:surface change improved}.
+To add layers, we need a vertical coordinate. You would think that height is the logical and obvious choice right? You are right, but also quite wrong. We instead are going to use pressure. The 
+reason for this is quite simple: vertical advection (see \autoref{sec:adv}) when using height as vertical coordinate will not work, whereas using pressure allows vertical advection to work.
+Therefore we will use pressure as the vertical coordinate. This makes sense too, as there is less pressure at the top of the atmosphere than at the bottom of the atmosphere.
 
-\begin{subequations}
-    \begin{equation}
-        \Delta T_{a_k} = \frac{\delta t (\sigma \epsilon_{k - 1}T_{a_{k - 1}}^4 + \sigma \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_k\sigma T_{a_k}^4)}{C_a}
-        \label{eq:atmos change layer}
-    \end{equation}
-    \begin{equation}
-        \Delta T_{a_k} = \frac{\delta t \sigma (\epsilon_{k - 1}T_{a_{k - 1}}^4 + \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_kT_{a_k}^4)}{C_a}
-        \label{eq:atmos change layer improved}
-    \end{equation}
-    \begin{equation}
-        \Delta T_p = \frac{\delta t (S + \sigma(4\epsilon_pT_a^4 - 4T_p^4))}{4C_p}
-        \label{eq:surface change improved}
-    \end{equation}
-\end{subequations}
-
-With the changes made to the equation, we need to make those changes in the code as well. We need to add the new dimension to all matrices except $T_p$ and $a$ as they are unaffected (with 
-regards to the storage of the values) by the addition of multiple atmospheric layers. Every other matrix is affected. The new code can be found in \autoref{alg:temperature layer}. $\delta z$
-
-\begin{algorithm}[hbt]
-    \SetAlgoLined
-    \SetKwInput{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{amount of energy that hits the planet $S$}
-    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
-    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
-        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
-            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
-                $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + \sigma(4\epsilon[0](T_a[lat, lon, 0])^4 - 4(T_p[lat, lon])^4))}
-                {4C_p[lat, lon]}$ \;
-                \uIf{$layer = 0$}{
-                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma((T_p[lat, lon])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
-                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
-                }\uElseIf{$layer = nlevels - 1$}{
-                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
-                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
-                }\uElse{
-                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 + \epsilon[layer + 1]T_a[lat, lon, layer + 1] 
-                    - 2\epsilon[layer](T_a[lat, lon, layer])^4)}{\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
-                }
-            }
-        }
-    }
-    \caption{The main function for the temperature calculations}
-    \label{alg:temperature layer}
-\end{algorithm}
-
-We also need to initialise the $\epsilon$ value for each layer. We do that in \autoref{alg:epsilon}.
-
-\begin{algorithm}
-    $\epsilon[0] \leftarrow 0.75$ \;
-    \For{$i \leftarrow 1$ \KwTo $nlevels$}{
-        $\epsilon[i] \leftarrow 0.5\epsilon[i - 1]$
-    }
-    \caption{Intialisation of the insulation of each layer (also known as $\epsilon$)}
-    \label{alg:epsilon}
-\end{algorithm}
+Using pressure as your vertical coordinate does have some effect on the temperature. Instead of using the temperature, we will need to use potential temperature (as explained in 
+\autoref{sec:thermal pot}). Therefore you will need to convert from and back to temperature when reading in and outputting thermal data. A benefit is though that we do not need to keep track 
+of the air density anymore, as that is incorporated into the potential temperature. To avoid confusion with the previously defined temperature of the planet $T_p$ we will from now on refer to 
+the potential temperature as $T_{pot}$. The initial temperature of the atmosphere (which is read in in \autoref{sec:usatmosp}) is henceforth referred to as $T_i$.
 
 \subsection{Grey Radiation Scheme}
 Inspired by the Isca project \cite{isca} and a paper describing the grey radiation scheme\cite{greyRad}.
@@ -399,17 +341,17 @@ replaces the temperature calculations we have done in \autoref{alg:temperature l
 and is located near all the other constants in the code, henceforth we will refer to this section in the code as the control panel, since most if not all of the constants can be tweaked here. 
 $\tau_0$ is a function that gives the surface optical depth for a given latitude. The corresponding equation can be found in \autoref{eq:optical depth surface} \cite{simon}. Translating this 
 into code is left as an exercise to the reader. $U[0]$ is the boundary condition discussed before (being the same as \autoref{eq:stefan-boltzmann}), just as $D[nlevels]$ is the boundary condition. 
-$S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents the call to \autoref{alg:solar}.
+$S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents the call to \autoref{alg:solar}. $T_{trans}$ represents the call to \autoref{alg:temp to pot}.
 
 \begin{algorithm}
     \SetKwInput{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{amount of energy that hits the planet $S$}
-    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \Output{Potential temperature $T_{pot}$, temperature of the planet surface $T_p$}
+    $T_a \leftarrow T_{trans}(T_{pot}, p_z, \texttt{False})$ \;
     \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        $\tau = \tau_0(lat)f_l\frac{p_z}{p_z[0]} + (1 - f_l)(\frac{p_z}{p_z[0]})^4)$ \;
         \For{$lon \leftarrow 0$ \KwTo $nlot$}{
-            $pressureProfile \leftarrow p[lat, lon, :]$ \;
-            $\tau = \tau_0(lat)f_l\frac{pressureProfile}{pressureProfile[0]} + (1 - f_l)(\frac{pressureProfile}{pressureProfile[0]})^4)$ \;
             $U[0] \leftarrow \sigma T_p[lat, lon]^4$ \;
 
             \For{$level \leftarrow 1$ \KwTo $nlevels$}{
@@ -423,16 +365,18 @@ $S_z$ represents the call to \autoref{alg:gradient z}. \texttt{solar} represents
             }
 
             \For{$level \leftarrow 0$ \KwTo $nlevels$}{
-                $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
+                $Q[level] \leftarrow -287T_a[lat, lon, level] \frac{S_z(U - D, p_z, level)}{10^3 \cdot p_z[level]}$ \;
             }
 
             $T_a[lat, lon, :] \leftarrow T_a[lat, lon, :] + Q$ \;
 
             $S \leftarrow \texttt{solar}(I, lat, lon, t)$ \;
 
-            $T_p[lat, lon] \leftarrow T_p[lat, lon] \frac{\delta t((1 - a[lat, lon]) S + S_z(D, 0, 0, 0) - \sigma T_p[lat, lon]^4)}{C_p[lat ,lon]}$ \;
+            $T_p[lat, lon] \leftarrow T_p[lat, lon] \frac{\delta t((1 - a[lat, lon]) S + (D[0] - U[0]))}{C_p[lat ,lon]}$ \;
         }
     }
+    $T_{pot} \leftarrow T_{trans}(T_a, p_z, \texttt{True})$ \;
+    \Return{$T_p, T_{pot}$}
     \caption{Main function for calculating the temperature using radiation}
     \label{alg:optical depth}
 \end{algorithm}
@@ -450,10 +394,11 @@ $Q$. We add in a check to see if we are currently calculating the radiation in t
 height. 
 
 \begin{algorithm}
+    $inv \leftarrow \frac{1}{24*60*60}$ \;
     \For{$level \leftarrow 0$ \KwTo $nlevels$}{
-        $Q[level] \leftarrow - \frac{S_z(U - D, 0, 0, level)}{10^3 \cdot densityProfile[level]}$ \;
-        \uIf{$heights[level] > 20 \cdot 10^3$}{
-            $Q[level] \leftarrow Q[level] + \texttt{solar}(5, lat, lon, t) \frac{24 \cdot 60 \cdot 60(\frac{heights[level] - 20 \cdot 10^3}{10^3})^2}{30^2}$ \;
+        $Q[level] \leftarrow -287T_a\frac{S_z(U - D, 0, level)}{10^3 \cdot p_z[level]}$ \;
+        \uIf{$p_z[level] < 40000$}{
+            $Q[level] \leftarrow Q[level] + \texttt{solar}(5, lat, lon, t) inv(\frac{100}{p_z[level]})$ \;
         }
     }
     \caption{Replicating the effect of ozone}
