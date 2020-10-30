@@ -126,4 +126,11 @@ definitions can be found in \autoref{alg:model constants}. What the $adv$ boolea
     \For{$k \in [0, nlevels - 1]$}{
         $\delta z[k] \leftarrow p_z[k + 1] - p_z[k]$ \Comment*[l]{How far apart the gridpoints in the z direction are (\si{Pa})}
     }
+
+    $\Pi \leftarrow$ Array with the same amount of elements as $p_z$ \Comment*[l]{Dimensionless pressure that is used to easily convert from potential temperature to absolute temperature and 
+    vice versa}
+    $\kappa \leftarrow \frac{R}{C_p}$ \;
+    \For{$i \leftarrow 0$ \KwTo $\Pi.length$}{
+        $\Pi[i] \leftarrow C_p(\frac{p_z[i]}{p_z[0]})^{\kappa}$ \;
+    }
 \end{algorithm}

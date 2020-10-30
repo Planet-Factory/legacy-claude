@@ -63,7 +63,7 @@ calculations we will do later on.
 \begin{algorithm}[hbt]
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, array $p_z$, third index $k$}
+    \Input{Array $a$, array $p_z$, index $k$}
     \Output{Gradient in the $z$ direction}
     $nlevels \leftarrow p_z.length$ \;
     \uIf{$k = 0$}{
@@ -153,12 +153,12 @@ as we expect that we might use it in combination with the divergence operator mo
 \begin{algorithm}[!hbt]
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{A matrix (double array) $a$}
-    \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
+    \Input{A matrix (triple array) $a$, pressure field $p_z$}
+    \Output{A matrix (triple array) containing the result of the divergence operator taken over that element}
     \For{$i \leftarrow 0$ \KwTo $a.length$}{
         \For{$j \leftarrow 0$ \KwTo $a[i].length$}{
             \For{$k \leftarrow 0$ \KwTo $a[i, j].length$}{
-                $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw, i, j, k)$ \;
+                $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw[i, j, :], p_z, k)$ \;
             }
         }
     }

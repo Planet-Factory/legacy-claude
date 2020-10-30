@@ -92,16 +92,16 @@ With the gradient functions defined in \autoref{alg:gradient x} and \autoref{alg
 \autoref{alg:stream3}. Do note that this loop replaces the one in \autoref{alg:stream2v2} as these calculate the same thing, but the new algorithm does it better.
 
 \begin{algorithm}
-    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
-    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lan, lon)$ \;
-    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lan, lon)$ \;
-    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
-    $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
-    $S_{py} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
+    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lat, lon)$ \;
+    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lat, lon)$ \;
+    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lat, lon)$ \;
+    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lat, lon)$ \;
+    $S_{px} \leftarrow \texttt{gradient\_x}(p, lat, lon)$ \;
+    $S_{py} \leftarrow \texttt{gradient\_x}(p, lat, lon)$ \;
     \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
         \For{$lon \leftarrow 0$ \KwTo $nlon$}{
-            $u[lan, lon] \leftarrow u[lan, lon] + \delta t \frac{-u[lan, lon]S_{xu} - v[lan, lon]S_{yu} + f[lan]v[lan, lon] - S_{px}}{\rho}$ \;
-            $v[lan, lon] \leftarrow v[lan, lon] + \delta t \frac{-u[lan, lon]S_{xv} - v[lan, lon]S_{yv} - f[lan]u[lan, lon] - S_{py}}{\rho}$ \;
+            $u[lat, lon] \leftarrow u[lat, lon] + \delta t \frac{-u[lat, lon]S_{xu} - v[lat, lon]S_{yu} + f[lat]v[lat, lon] - S_{px}}{\rho}$ \;
+            $v[lat, lon] \leftarrow v[lat, lon] + \delta t \frac{-u[lat, lon]S_{xv} - v[lat, lon]S_{yv} - f[lat]u[lat, lon] - S_{py}}{\rho}$ \;
         }
     }
     \caption{Calculating the flow of the atmosphere (wind)}
@@ -132,26 +132,175 @@ With adding in atmospheric layers we need to add vertical winds, or in other wor
 \autoref{alg:velocity}. Here we use gravity ($g$) instead of the coriolis force ($f$) and calculate the change in pressure. Therefore we need to store a copy of the pressure before we do any 
 calculations. This needs to be a copy due to aliasing \footnote{Aliasing is assigning a different name to a variable, while it remains the same variable. Take for instance that we declare a 
 variable $x$ and set it to be $4$. Then we say $y \leftarrow x$, which you might think is the same as saying they $y \leftarrow 4$ but behind the screen it is pointing to $x$. So if $x$ changes, 
-then so does $y$.}
+then so does $y$.}. Since we use pressure as the vertical coordinate, we must be able to convert that into meters (why we opted for pressure is explained in \autoref{sec:rad layers}) in order to 
+be able to say something sensible about it. To do that we need the concept of geopotential height.
+
+\subsubsection{Dimensionless Pressure}
+Geopotential height is similar to geometric height, except that it also accounts for the variation in gravity over the planet \cite{geopot}. One could say that geopotential height is the 
+"gravity adjusted" height. That means that it is similar to the height, but not exactly the same. Height is a linear function, whereas the geopotential height is not, though it is very similar 
+to a linear function if you would plot it. Now to convert easily to and from potential temperature into temperature, we need another function which is known as the Exner function. The Exner 
+function is a dimensionless \footnote{Being dimensionless means that there is no dimension (unit) attached to the number. This is useful for many applications and is even used in daily life. For 
+instance when comparing price rises of different products, it is way more useful to talk about percentages (who are unitless) instead of how much you physically pay more (with your favourite 
+currency as the unit).} pressure. The Exner function is shown in \autoref{eq:exner} \cite{verticalcoords}. The symbols in the equation are: 
+
+\begin{itemize}
+    \item $c_p$: The specific heat capacity of the atmosphere.
+    \item $p$: Pressure (\si{Pa}).
+    \item $p_0$: Reference pressure to define the potential temperature (\si{Pa}).
+    \item $R$: The gas constant $8.3144621$ (\si{J(mol)^{-1}K}).
+    \item $T$: The absolute temperature (\si{K}).
+    \item $\theta$: the potential temperature (\si{K}).
+\end{itemize}
+
+Since the right hand side contains what we want to convert to and from, we can do some basic rewriting, which tells us what we need to code to convert potential temperature in absolute 
+temperature and vice versa. This is shown in \autoref{eq:temp exner} and \autoref{eq:potential temp exner} respectively.
+
+\begin{subequations}
+    \begin{equation}
+        \Pi = c_p(\frac{p}{p_0})^{\frac{R}{c_p}} = \frac{T}{\theta}
+        \label{eq:exner}
+    \end{equation}
+    \begin{equation}
+        T = \Pi\theta
+        \label{eq:temp exner}
+    \end{equation}
+    \begin{equation}
+        \theta = \frac{T}{\Pi}
+        \label{eq:potential temp exner}
+    \end{equation}
+\end{subequations}
+
+Now onto some code. Let us initialise $\Pi$ before we do any other calculations. This code is already present in the control panel section (\autoref{sec:cp}) as that is where it belongs, so for 
+further details please have a look at the code there. Now onto the geopotential height. 
+
+\subsubsection{Geopotential Height}
+As stated before, geopotential height is similar to geometric height, except that it also accounts for the variation in gravity over the planet. One could say that geopotential height is the 
+"gravity adjusted" height. That means that it is similar to the height, but not exactly the same. Height is a linear function, whereas the geopotential height is not, though it is very similar 
+to a linear function if you would plot it. Now one could ask why we would discuss dimensionless pressure before geopotential height. The answer is quite simple, in order to define geopotential 
+height, we need the Exner function to define it. Or rather, we need that function to convert potential temperature into geopotential height. How those three are related is shown in 
+\autoref{eq:geopot}. Then with a little transformation we can define how the geopotential height will look like, as shown in \autoref{eq:geopot final}. The symbols in both equations are:
+
+\begin{itemize}
+    \item $\Pi$: The Exner function.
+    \item $\theta$: Potential temperature (\si{K}).
+\end{itemize}
+
+\begin{subequations}
+    \begin{equation}
+        \theta + \frac{\delta\Phi}{\delta\Pi} = 0
+        \label{eq:geopot}
+    \end{equation}
+    \begin{equation}
+        \delta\Phi = -\theta\delta\Pi
+        \label{eq:geopot final}
+    \end{equation}
+\end{subequations}
+
+Now to turn this into code we need to be careful about a few things. First we are talking about a change in geopotential height here, so defining one level of geopotential height means that it 
+is dependent on the level below it. Second this calculatoin needs potential temperature and therefore it should be passed along to the velocity calculations function. With those two things out 
+of the way, we get the code as shown in \autoref{alg:geopot}. Note that \texttt{Smooth3D} refers to \autoref{alg:smooth}.
 
 \begin{algorithm}
-    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lan, lon)$ \;
-    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lan, lon)$ \;
-    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lan, lon)$ \;
-    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lan, lon)$ \;
-    $S_{px} \leftarrow \texttt{gradient\_x}(p, lan, lon)$ \;
-    $S_{py} \leftarrow \texttt{gradient\_y}(p, lan, lon)$ \;
+    \caption{Calculating the geopotential height}
+    \label{alg:geopot}
+    \For{$level \leftarrow 1$ \KwTo $nlevels$}{
+        $\Phi[:, :, level] \leftarrow \Phi[:, :, level - 1] - T_{pot}[:, :, level](\Pi[level] - \Pi[level - 1])$ \;
+    }
+    $\Phi \leftarrow \texttt{Smooth3D}(\Phi, smooth_t)$ \;
+\end{algorithm}
+
+\subsubsection{Finally Adding in the Layers}
+Now with the geopotential height and dimensionless pressure out of the way, we need to use those two concepts to add layers to the velocity calculations. Before we dive into the code however, 
+there are slight changes that we need to discuss. The equation shown in \autoref{eq:velocity} is the primitive equation (as discussed in \autoref{sec:primitive}). The momentum equations are 
+gesostrphic momentum, which are a special form of the primitive equation. Since this whole system must remain in equilibrium, we need to set the right hand side to $0$ as shown in 
+\autoref{eq:vel eq}. Now let us rewrite \autoref{eq:velocity} into \autoref{eq:velocity int}. We replaze $z$ with pressure as that is our vertical coordinate. $\omega$ is the velocity of the 
+pressure field, as defined in \autoref{eq:vert vel}. Note that $p_k$ is the pressure for layer $k$ and $p_0$ is the pressure at the planet surface. Now we need to turn the velocity of the 
+pressure field into the velocity of a packet of air (see it as a box of air being moved), which is done in \autoref{eq:vertical velocity}. Here $\rho$ is the density and $g$ is gravity 
+(\si{ms^{-2}}).
+
+\begin{subequations}
+    \begin{equation}
+        \frac{\delta T}{\delta x} + \frac{\delta T}{ \delta y} + \frac{\delta T}{\delta z} = \nabla T
+        \label{eq:velocity}
+    \end{equation}
+    \begin{equation}
+        \nabla T = 0
+        \label{eq:vel eq}
+    \end{equation}
+    \begin{equation}
+        \frac{\delta u}{\delta x} + \frac{\delta v}{\delta y} + \frac{\delta\omega}{\delta p} = 0
+        \label{eq:velocity int}
+    \end{equation}
+    \begin{equation}
+        \omega_k = -\int^{p_k}_{p_0}\frac{\delta u}{\delta x} + \frac{\delta v}{\delta y} dp
+        \label{eq:vert vel}
+    \end{equation}
+    \begin{equation}
+        w = \omega \rho g
+        \label{eq:vertical velocity}
+    \end{equation}
+\end{subequations}
+
+But I hear you say, what is the density? Since we have moved to pressure coordinates we can actually calculate the density rather than store it. This is done in \autoref{eq:density}, where each 
+symbol means:
+
+\begin{itemize}
+    \item $\rho$: The density of the atmosphere.
+    \item $p$: The pressure of the atmosphere (\si{Pa}).
+    \item $c$: Specific heat capacity of the atmosphere (\si{JKg^{-1}K^{-1}}).
+    \item $T$: Temperature of the atmosphere (\si{K}).
+\end{itemize}
+
+\begin{equation}
+    \rho = \frac{p}{cT}
+    \label{eq:density}
+\end{equation}
+
+Finally, let us convert \autoref{eq:vertical velocity} to code in \autoref{alg:velocity}. Here $T_{trans}$ is a call to the algorithm as described in \autoref{alg:temp to pot}. 
+\texttt{gradient\_x}, \texttt{gradient\_y} and \texttt{gradient\_z} are calls to \autoref{alg:gradient x}, \autoref{alg:gradient y} and \autoref{alg:gradient z} respectively.
+
+\begin{algorithm}
+    //\texttt{The following variables are function calls to algorithms and their shorthand notations are used in the loops}\\
+    $S_{xu} \leftarrow \texttt{gradient\_x}(u, lat, lon, layer)$ \;
+    $S_{yu} \leftarrow \texttt{gradient\_y}(u, lat, lon, layer)$ \;
+    $S_{xv} \leftarrow \texttt{gradient\_x}(v, lat, lon, layer)$ \;
+    $S_{yv} \leftarrow \texttt{gradient\_y}(v, lat, lon, layer)$ \;
+    $S_{zu} \leftarrow \texttt{gradient\_z}(u[lat, lon], p_z, layer)$ \;
+    $S_{zv} \leftarrow \texttt{gradient\_z}(v[lat, lon], p_z, layer)$ \;
+    $S_{px} \leftarrow \texttt{gradient\_x}(geopot, lat, lon, layer)$ \;
+    $S_{py} \leftarrow \texttt{gradient\_y}(geopot, lat, lon, layer)$ \;
+
+    //\texttt{The following variables are real variables}\\
+    $nlat \leftarrow \Phi.length$ \;
+    $nlon \leftarrow \Phi[0].length$ \;
+    $u_t \leftarrow $ array like $u$ \;
+    $v_t \leftarrow $ array like $v$ \;
+    $w_t \leftarrow $ array like $w$ \;
     \For{$lat \leftarrow 1$ \KwTo $nlat - 1$}{
         \For{$lon \leftarrow 0$ \KwTo $nlon$}{
             \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
-                $u[lan, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}{\rho}$ \;
-                $v[lan, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}{\rho}$ \;
-                $w[lan, lon, layer] \leftarrow w[lat, lon, layer] - \frac{p[lat, lon, layer] - p_o[lat, lon, layer]}{\delta t\rho[lat, lon, layer]g}$ \;
+                $u_t[lat, lon, layer] \leftarrow u[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xu} - v[lat, lon, layer]S_{yu} + f[lat]v[lat, lon, layer] - S_{px}}
+                    {10^5u[lat, lon, layer]}$ \;
+                $v_t[lat, lon, layer] \leftarrow v[lat, lon, layer] + \delta t \frac{-u[lat, lon, layer]S_{xv} - v[lat, lon, layer]S_{yv} - f[lat]u[lat, lon, layer] - S_{py}}
+                    {10^5v[lat, lon, layer]}$ \;
             }
         }
-
-    $p_o \leftarrow copy(p)$ \;
     }
+
+    $T_a \leftarrow T_{trans}(T_{pot}, p_z, \texttt{False})$ \;
+
+    \For{$lat \leftarrow 2$ \KwTo $nlat - 2$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlon$}{
+            \For{$level \leftarrow 1$ \KwTo $nlevels$}{
+                $w_t[lat, lon, level] \leftarrow  w_t[lat, lon, level - 1] - \frac{(p_z[level] - p_z[level - 1])p_z[level]g(S_{xu} + S_{yv})}{C_pT_a[lat, lon, layer]}$ \;
+            }
+        }
+    }
+
+    $u \leftarrow u + u_t$ \;
+    $v \leftarrow v + v_t$ \;
+    $w \leftarrow w + w_t$ \;
+    $p_0 \leftarrow copy(p)$ \;
     \caption{Calculating the flow of the atmosphere (wind)}
     \label{alg:velocity}
 \end{algorithm}

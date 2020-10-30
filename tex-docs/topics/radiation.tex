@@ -259,7 +259,7 @@ The air density is not at all points exactly the same. This may be due to the wi
     \label{alg:temperature with density}
 \end{algorithm}
 
-\subsection{Adding Layers}
+\subsection{Adding Layers} \label{sec:rad layers}
 To add layers, we need a vertical coordinate. You would think that height is the logical and obvious choice right? You are right, but also quite wrong. We instead are going to use pressure. The 
 reason for this is quite simple: vertical advection (see \autoref{sec:adv}) when using height as vertical coordinate will not work, whereas using pressure allows vertical advection to work.
 Therefore we will use pressure as the vertical coordinate. This makes sense too, as there is less pressure at the top of the atmosphere than at the bottom of the atmosphere.
