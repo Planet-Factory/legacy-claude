@@ -133,4 +133,8 @@ definitions can be found in \autoref{alg:model constants}. What the $adv$ boolea
     \For{$i \leftarrow 0$ \KwTo $\Pi.length$}{
         $\Pi[i] \leftarrow C_p(\frac{p_z[i]}{p_z[0]})^{\kappa}$ \;
     }
+    $pl_l \leftarrow 4$ \Comment*[l]{Polar Plane Approximation Lower Grid Limit}
+    $pl_u \leftarrow 4$ \Comment*[l]{Polar Plane Approximation Upper Grid Limit}
+    $pl_r \leftarrow \delta x [nlat-pl_l]$ \Comment*[l]{The resolution for the polar plane approximation}
+    $grid\_size \leftarrow 2r\cos(lat[nlat-pl_l] \frac{\pi}{180})$ \Comment*[l]{How large each grid cell is for the planar approximation}
 \end{algorithm}
