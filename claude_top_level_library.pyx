@@ -37,7 +37,7 @@ def laplacian_3D(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
 	return output
 
 # divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field
-def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
+def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_levels):
 	cdef np.ndarray output = np.zeros_like(a)
 	cdef np.ndarray au, av, aw
 	cdef np.int_t nlat, nlon, nlevels, i, j, k 
@@ -53,61 +53,39 @@ def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,n
 	for i in range(nlat):
 		for j in range(nlon):
 			for k in range(nlevels):
-				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + low_level.scalar_gradient_z(aw,dz,i,j,k)
+				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + low_level.scalar_gradient_z_1D(aw[i,j,:],pressure_levels,k)
+				
 	return output
 
-# specifically thermal advection, converts temperature field to potential temperature field, then advects (adiabatically), then converts back to temperature
-def thermal_advection(np.ndarray temperature_atmos,np.ndarray air_pressure,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
-	cdef np.ndarray output = np.zeros_like(temperature_atmos)
-	cdef np.ndarray au, av, aw
-	cdef np.int_t nlat, nlon, nlevels, i, j, k 
-	cdef np.ndarray theta = low_level.t_to_theta(temperature_atmos,air_pressure)
-
-	nlat = output.shape[0]
-	nlon = output.shape[1]
-	nlevels = output.shape[2]
-
-	au = theta*u
-	av = theta*v
-	aw = theta*w
-
-	for i in range(nlat):
-		for j in range(nlon):
-			for k in range(nlevels):
-				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + low_level.scalar_gradient_z(aw,dz,i,j,k)
-	
-	output = low_level.theta_to_t(output,air_pressure)
-
-	return output
-
-def radiation_calculation(np.ndarray temperature_world, np.ndarray temperature_atmos, np.ndarray air_pressure, np.ndarray air_density, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.ndarray heights, np.ndarray dz, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
+def radiation_calculation(np.ndarray temperature_world, np.ndarray potential_temperature, np.ndarray pressure_levels, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
-	cdef np.int_t nlat,nlon,nlevels,i,j
+	cdef np.int_t nlat,nlon,nlevels,i,j,k
 	cdef DTYPE_f fl = 0.1
-	cdef np.ndarray upward_radiation,downward_radiation,optical_depth,Q, pressure_profile, density_profile
-	cdef DTYPE_f sun_lat
+	cdef np.ndarray upward_radiation,downward_radiation,optical_depth,Q,temperature_atmos
+	cdef DTYPE_f sun_lat, inv_day
 
+	inv_day = 1/(24*60*60)
+
+	temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels)
 	nlat = temperature_atmos.shape[0]	
 	nlon = temperature_atmos.shape[1]
 	nlevels = temperature_atmos.shape[2]
 
 	upward_radiation = np.zeros(nlevels)
 	downward_radiation = np.zeros(nlevels)
-	optical_depth = np.zeros(nlevels)
 	Q = np.zeros(nlevels)
 
 	for i in range(nlat):
+		
 		sun_lat = low_level.surface_optical_depth(lat[i])
+		optical_depth = sun_lat*(fl*(pressure_levels/pressure_levels[0]) + (1-fl)*(pressure_levels/pressure_levels[0])**4)
+		
 		for j in range(nlon):
-			# calculate optical depth
-			pressure_profile = air_pressure[i,j,:]
-			density_profile = air_density[i,j,:]
-			optical_depth = sun_lat*(fl*(pressure_profile/pressure_profile[0]) + (1-fl)*(pressure_profile/pressure_profile[0])**4)
 			
 			# calculate upward longwave flux, bc is thermal radiation at surface
 			upward_radiation[0] = low_level.thermal_radiation(temperature_world[i,j])
 			for k in np.arange(1,nlevels):
-				upward_radiation[k] = (upward_radiation[k-1] - (optical_depth[k]-optical_depth[k-1])*(low_level.thermal_radiation(temperature_atmos[i,j,k])))/(1+optical_depth[k-1]-optical_depth[k])
+				upward_radiation[k] = (upward_radiation[k-1] - (optical_depth[k]-optical_depth[k-1])*(low_level.thermal_radiation(temperature_atmos[i,j,k])))/(1 + optical_depth[k-1] - optical_depth[k])
 
 			# calculate downward longwave flux, bc is zero at TOA (in model)
 			downward_radiation[-1] = 0
@@ -116,42 +94,46 @@ def radiation_calculation(np.ndarray temperature_world, np.ndarray temperature_a
 			
 			# gradient of difference provides heating at each level
 			for k in np.arange(nlevels):
-				Q[k] = -low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,dz,k)/(1E3*density_profile[k])
-				# make sure model does not have a higher top than 50km!!
+				Q[k] = -287*temperature_atmos[i,j,k]*low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,pressure_levels,k)/(1000*pressure_levels[k])
 				# approximate SW heating of ozone
-				if heights[k] > 20E3:
-					Q[k] += low_level.solar(5,lat[i],lon[j],t,day, year, axial_tilt)*((((heights[k]-20E3)/1E3)**2)/(30**2))/(24*60*60)
+				if pressure_levels[k] < 400*100:
+					Q[k] += low_level.solar(75,lat[i],lon[j],t,day, year, axial_tilt)*inv_day*(100/pressure_levels[k])
 
 			temperature_atmos[i,j,:] += Q*dt
 
 			# update surface temperature with shortwave radiation flux
 			temperature_world[i,j] += dt*((1-albedo[i,j])*(low_level.solar(insolation,lat[i],lon[j],t, day, year, axial_tilt) + downward_radiation[0]) - upward_radiation[0])/heat_capacity_earth[i,j] 
 	
-	return temperature_world, temperature_atmos
+	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
-def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray air_pressure,np.ndarray ref_pressure_profile,np.ndarray air_density,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,np.ndarray dz,DTYPE_f dt):
+def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
+	
 	# introduce temporary arrays to update velocity in the atmosphere
 	cdef np.ndarray u_temp = np.zeros_like(u)
 	cdef np.ndarray v_temp = np.zeros_like(v)
 	cdef np.ndarray w_temp = np.zeros_like(u)
+	cdef np.ndarray temperature_atmos
 
 	cdef np.int_t nlat,nlon,nlevels,i,j,k
-	cdef DTYPE_f inv_density,inv_dt_grav
 
-	nlat = air_pressure.shape[0]
-	nlon = air_pressure.shape[1]
-	nlevels = air_pressure.shape[2]
-	inv_dt_grav = 1/(dt*gravity)
+	nlat = geopotential.shape[0]
+	nlon = geopotential.shape[1]
+	nlevels = len(pressure_levels)
 
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
 	for i in np.arange(2,nlat-2).tolist():
 		for j in range(nlon):
 			for k in range(nlevels):
-				inv_density = 1/air_density[i,j,k]
-				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z(u,dz,i,j,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(air_pressure,dx,nlon,i,j,k)*inv_density - 1E-6*u[i,j,k])
-				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z(v,dz,i,j,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(air_pressure,dy,nlat,i,j,k)*inv_density - 1E-6*v[i,j,k])
-				# w_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(w,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(w,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z(w,dz,i,j,k) - inv_density*low_level.scalar_gradient_z(air_pressure,dz,i,j,k) - gravity - 1E-6*w[i,j,k])
-				w_temp[i,j,k] += dt*( - inv_density*low_level.scalar_gradient_z_1D((air_pressure[i,j,:]-ref_pressure_profile),dz,k) - gravity - 1E-6*w[i,j,k])
+				
+				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(u[i,j,:],pressure_levels,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(geopotential,dx,nlon,i,j,k) - 1E-5*u[i,j,k])
+				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(v[i,j,:],pressure_levels,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(geopotential,dy,nlat,i,j,k) - 1E-5*v[i,j,k])
+	
+	temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels)
+
+	for i in np.arange(2,nlat-2).tolist():
+		for j in range(nlon):
+			for k in np.arange(1,nlevels).tolist():
+				w_temp[i,j,k] = w_temp[i,j,k-1] - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( low_level.scalar_gradient_x(u,dx,nlon,i,j,k) + low_level.scalar_gradient_y(v,dy,nlat,i,j,k) )/(287*temperature_atmos[i,j,k])
 
 	u += u_temp
 	v += v_temp
@@ -160,6 +142,10 @@ def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray air_p
 	# approximate surface friction
 	u[:,:,0] *= 0.8
 	v[:,:,0] *= 0.8
+
+	# try to eliminate problems at top boundary
+	u[:,:,-1] *= 0.5
+	v[:,:,-1] *= 0.5
 
 	return u,v,w
 

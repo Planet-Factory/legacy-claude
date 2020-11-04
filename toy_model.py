@@ -8,38 +8,45 @@ import matplotlib.pyplot as plt
 import time, sys, pickle
 import claude_low_level_library as low_level
 import claude_top_level_library as top_level
+from scipy.interpolate import interp2d
+# from twitch import prime_sub
 
 ######## CONTROL ########
 
 day = 60*60*24					# define length of day (used for calculating Coriolis as well) (s)
 resolution = 5					# how many degrees between latitude and longitude gridpoints
-nlevels = 20					# how many vertical layers in the atmosphere
-top = 40E3						# top of atmosphere (m)
 planet_radius = 6.4E6			# define the planet's radius (m)
 insolation = 1370				# TOA radiation from star (W m^-2)
 gravity = 9.81 					# define surface gravity for planet (m s^-2)
 axial_tilt = -23.5/2			# tilt of rotational axis w.r.t. solar plane
 year = 365*day					# length of year (s)
 
+pressure_levels = np.array([1000,950,900,800,700,600,500,400,350,300,250,200,150,100,75,50,25,10,5,2,1])
+pressure_levels *= 100
+nlevels = len(pressure_levels)
+
+top = nlevels
+
 dt_spinup = 60*137
-dt_main = 60*0.1
-spinup_length = 10*day
+dt_main = 60*3.5
+spinup_length = 1*day
 
 ###
 
 advection = True 				# if you want to include advection set this to be True
-advection_boundary = 3			# how many gridpoints away from poles to apply advection
+advection_boundary = 5			# how many gridpoints away from poles to apply advection
 smoothing_parameter_t = 0.6
 smoothing_parameter_u = 0.6
 smoothing_parameter_v = 0.6
-smoothing_parameter_w = 0.2
+smoothing_parameter_w = 0.4
 
 save = False 					# save current state to file?
-load = True  					# load initial state from file?
+load = False  					# load initial state from file?
 
 plot = True 					# display plots of output?
-level_plots = True 			# display plots of output on vertical levels?
-nplots = 4						# how many levels you want to see plots of (evenly distributed through column)
+diagnostic = True 				# display raw fields for diagnostic purposes
+level_plots = False 			# display plots of output on vertical levels?
+nplots = 3						# how many levels you want to see plots of (evenly distributed through column)
 
 ###########################
 
@@ -49,46 +56,40 @@ lon = np.arange(0,360,resolution)
 nlat = len(lat)
 nlon = len(lon)
 lon_plot, lat_plot = np.meshgrid(lon, lat)
-heights = np.arange(0,top,top/nlevels)
-heights_plot, lat_z_plot = np.meshgrid(lat,heights)
+heights_plot, lat_z_plot = np.meshgrid(lat,pressure_levels/100)
 
 # initialise arrays for various physical fields
 temperature_world = np.zeros((nlat,nlon)) + 290
-temperature_atmos = np.zeros((nlat,nlon,nlevels))
-air_pressure = np.zeros_like(temperature_atmos)
-u = np.zeros_like(temperature_atmos)
-v = np.zeros_like(temperature_atmos)
-w = np.zeros_like(temperature_atmos)
-air_density = np.zeros_like(temperature_atmos)
+potential_temperature = np.zeros((nlat,nlon,nlevels))
+u = np.zeros_like(potential_temperature)
+v = np.zeros_like(potential_temperature)
+w = np.zeros_like(potential_temperature)
+atmosp_addition = np.zeros_like(potential_temperature)
 
-# #######################
+##########################
 
 # read temperature and density in from standard atmosphere
 f = open("standard_atmosphere.txt", "r")
-standard_height = []
 standard_temp = []
-standard_density = []
+standard_pressure = []
 for x in f:
-	h, t, r = x.split()
-	standard_height.append(float(h))
+	h, t, r, p = x.split()
 	standard_temp.append(float(t))
-	standard_density.append(float(r))
+	standard_pressure.append(float(p))
 f.close()
 
-density_profile = np.interp(x=heights/1E3,xp=standard_height,fp=standard_density)
-temp_profile = np.interp(x=heights/1E3,xp=standard_height,fp=standard_temp)
+# density_profile = np.interp(x=heights/1E3,xp=standard_height,fp=standard_density)
+temp_profile = np.interp(x=pressure_levels[::-1],xp=standard_pressure[::-1],fp=standard_temp[::-1])[::-1]
 for k in range(nlevels):
-	air_density[:,:,k] = density_profile[k]
-	temperature_atmos[:,:,k] = temp_profile[k]
+	potential_temperature[:,:,k] = temp_profile[k]
 
-###########################
+potential_temperature = low_level.t_to_theta(potential_temperature,pressure_levels)
+geopotential = np.zeros_like(potential_temperature)
 
-# weight_above = np.interp(x=heights/1E3,xp=standard_height,fp=standard_density)
-# top_index = np.argmax(np.array(standard_height) >= top/1E3)
-# if standard_height[top_index] == top/1E3:
-# 	weight_above = np.trapz(np.interp(x=standard_height[top_index:],xp=standard_height,fp=standard_density),standard_height[top_index:])*gravity*1E3
-# else:
-# 	weight_above = np.trapz(np.interp(x=np.insert(standard_height[top_index:], 0, top/1E3),xp=standard_height,fp=standard_density),np.insert(standard_height[top_index:], 0, top/1E3))*gravity*1E3
+sigma = np.zeros_like(pressure_levels)
+kappa = 287/1000
+for i in range(len(sigma)):
+	sigma[i] = 1E3*(pressure_levels[i]/pressure_levels[0])**kappa
 
 ###########################
 
@@ -103,9 +104,6 @@ for i in range(nlat):
 specific_gas = 287
 thermal_diffusivity_roc = 1.5E-6
 
-ref_pressure_profile = density_profile*specific_gas*temp_profile
-air_pressure = air_density*specific_gas*temperature_atmos
-
 # define planet size and various geometric constants
 circumference = 2*np.pi*planet_radius
 circle = np.pi*planet_radius**2
@@ -119,59 +117,129 @@ angular_speed = 2*np.pi/day
 for i in range(nlat):
 	dx[i] = dy*np.cos(lat[i]*np.pi/180)
 	coriolis[i] = angular_speed*np.sin(lat[i]*np.pi/180)
-dz = np.zeros(nlevels)
-for k in range(nlevels-1): dz[k] = heights[k+1] - heights[k]
-dz[-1] = dz[-2]
 
 #################### SHOW TIME ####################
+
+# pole_lower_limit = 4
+# polar_grid_resolution = dx[-pole_lower_limit]
+# size_of_grid = planet_radius*np.cos(lat[-pole_lower_limit]*np.pi/180)
+
+# x_coords = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+# y_coords = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+
+# xx,yy = np.meshgrid(x_coords,y_coords)
+
+# polar_coords = []
+
+# for i in range(xx.shape[0]):
+# 	for j in range(xx.shape[1]):
+		
+# 		lat_point = np.arcsin((xx[i,j]**2 + yy[i,j]**2)**0.5/planet_radius)
+# 		lon_point = np.arctan2(yy[i,j],xx[i,j])
+# 		polar_coords.append((lat_point,lon_point))
+
+# polar_data = np.zeros((pole_lower_limit,nlon))
+
+# for i in range(pole_lower_limit):
+# 	polar_data[i,:] = lat[i]
+
+# f = interp2d(lat[:pole_lower_limit]*np.pi/180, lon*np.pi/180, np.transpose(polar_data))
+
+# print(lat[:pole_lower_limit]*np.pi/180)
+# print(polar_coords)
+
+# polar_plane = np.zeros_like(xx)
+# index = 0
+# for i in range(xx.shape[0]):
+# 	for j in range(xx.shape[1]):
+# 		polar_plane[i,j] = f(polar_coords[index][0],polar_coords[index][1])
+# 		index += 1
+
+# print(polar_plane)
+
+# plt.imshow(polar_plane)
+# plt.show()
+
+# sys.exit()
+
+#######################################################################################################################################################################################################################
 
 # INITIATE TIME
 t = 0
 
 if load:
 	# load in previous save file
-	temperature_atmos,temperature_world,u,v,w,t,air_pressure,air_density,albedo = pickle.load(open("save_file.p","rb"))
+	potential_temperature,temperature_world,u,v,w,t,albedo = pickle.load(open("save_file.p","rb"))
 
 if plot:
-	# set up plot
-	f, ax = plt.subplots(2,figsize=(9,9))
-	f.canvas.set_window_title('CLAuDE')
-	test = ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic')
-	ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=1)
-	ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmos,axis=1)), cmap='seismic',levels=15)
-	ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1)), colors='white',levels=20,linewidths=1,alpha=0.8)
-	ax[1].streamplot(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1)),np.transpose(np.mean(10*w,axis=1)),color='black',density=0.75)
-	plt.subplots_adjust(left=0.1, right=0.75)
-	ax[0].set_title('Ground temperature')
-	ax[0].set_xlim(lon.min(),lon.max())
-	ax[1].set_title('Atmosphere temperature')
-	ax[1].set_xlim(lat.min(),lat.max())
-	ax[1].set_ylim(heights.min(),heights.max())
-	cbar_ax = f.add_axes([0.85, 0.15, 0.05, 0.7])
+	if not diagnostic:
+		# set up plot
+		f, ax = plt.subplots(2,figsize=(9,9))
+		f.canvas.set_window_title('CLAuDE')
+		test = ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic')
+		ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=1)
+		ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
+		ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], colors='white',levels=20,linewidths=1,alpha=0.8)
+		ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(10*w,axis=1))[:top,:],color='black')
+		plt.subplots_adjust(left=0.1, right=0.75)
+		ax[0].set_title('Surface temperature')
+		ax[0].set_xlim(lon.min(),lon.max())
+		ax[1].set_title('Atmosphere temperature')
+		ax[1].set_xlim(lat.min(),lat.max())
+		ax[1].set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
+		ax[1].set_yscale('log')		
+		ax[1].set_ylabel('Pressure (hPa)')
+		ax[1].set_xlabel('Latitude')
+		cbar_ax = f.add_axes([0.85, 0.15, 0.05, 0.7])
+		f.colorbar(test, cax=cbar_ax)
+		cbar_ax.set_title('Temperature (K)')
+		f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
 
-	f.colorbar(test, cax=cbar_ax)
-	cbar_ax.set_title('Temperature (K)')
-	f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
+		if level_plots:
 
-	# allow for live updating as calculations take place
+			level_divisions = int(np.floor(nlevels/nplots))
+			level_plots_levels = range(nlevels)[::level_divisions][::-1]
 
-	if level_plots:
-
-		level_divisions = int(np.floor(nlevels/nplots))
-		level_plots_levels = range(nlevels)[::level_divisions]
-
-		g, bx = plt.subplots(nplots,figsize=(9,8),sharex=True)
-		g.canvas.set_window_title('CLAuDE atmospheric levels')
-		for k, z in zip(range(nplots), level_plots_levels):	
-			z += 1
-			bx[k].contourf(lon_plot, lat_plot, temperature_atmos[:,:,z], cmap='seismic')
-			bx[k].set_title(str(heights[z])+' km')
-			bx[k].set_ylabel('Latitude')
-		bx[-1].set_xlabel('Longitude')
-
+			g, bx = plt.subplots(nplots,figsize=(9,8),sharex=True)
+			g.canvas.set_window_title('CLAuDE pressure levels')
+			for k, z in zip(range(nplots), level_plots_levels):	
+				z += 1
+				bx[k].contourf(lon_plot, lat_plot, potential_temperature[:,:,z], cmap='seismic')
+				bx[k].set_title(str(pressure_levels[z]/100)+' hPa')
+				bx[k].set_ylabel('Latitude')
+			bx[-1].set_xlabel('Longitude')
+	else:
+		# set up plot
+		f, ax = plt.subplots(2,2,figsize=(9,9))
+		f.canvas.set_window_title('CLAuDE')
+		ax[0,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], cmap='seismic')
+		ax[0,0].set_title('u')
+		ax[0,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:], cmap='seismic')
+		ax[0,1].set_title('v')
+		ax[1,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1))[:top,:], cmap='seismic')
+		ax[1,0].set_title('w')
+		ax[1,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic')
+		ax[1,1].set_title('atmosp_addition')
+		for axis in ax.ravel():
+			axis.set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
+			axis.set_yscale('log')
+		f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
+	
 	plt.ion()
 	plt.show()
 	plt.pause(2)
+
+	if not diagnostic:
+		ax[0].cla()
+		ax[1].cla()
+		if level_plots:
+			for k in range(nplots):
+				bx[k].cla()		
+	else:
+		ax[0,0].cla()
+		ax[0,1].cla()	
+		ax[1,0].cla()
+		ax[1,1].cla()
 
 while True:
 
@@ -189,24 +257,26 @@ while True:
 	print('T: ',round(temperature_world.max()-273.15,1),' - ',round(temperature_world.min()-273.15,1),' C')
 	print('U: ',round(u.max(),2),' - ',round(u.min(),2),' V: ',round(v.max(),2),' - ',round(v.min(),2),' W: ',round(w.max(),2),' - ',round(w.min(),2))
 
-	# before_radiation = time.time()
-	temperature_world, temperature_atmos = top_level.radiation_calculation(temperature_world, temperature_atmos, air_pressure, air_density, heat_capacity_earth, albedo, insolation, lat, lon, heights, dz, t, dt, day, year, axial_tilt)
-	temperature_atmos = top_level.smoothing_3D(temperature_atmos,smoothing_parameter_t)
-	# time_taken = float(round(time.time() - before_radiation,3))
-	# print('Radiation: ',str(time_taken),'s')
+	before_radiation = time.time()
+	temperature_world, potential_temperature = top_level.radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, day, year, axial_tilt)
+	potential_temperature = top_level.smoothing_3D(potential_temperature,smoothing_parameter_t)
+	time_taken = float(round(time.time() - before_radiation,3))
+	print('Radiation: ',str(time_taken),'s')
 
-	# update air pressure
-	old_pressure = np.copy(air_pressure)
-	air_pressure = air_density*specific_gas*temperature_atmos
+	# update geopotential field
+	for k in np.arange(1,nlevels):
+		geopotential[:,:,k] = geopotential[:,:,k-1] - potential_temperature[:,:,k]*(sigma[k]-sigma[k-1])
+	geopotential = top_level.smoothing_3D(geopotential,smoothing_parameter_t)
 
 	if velocity:
 
 		before_velocity = time.time()
-		u,v,w = top_level.velocity_calculation(u,v,w,air_pressure,ref_pressure_profile,air_density,coriolis,gravity,dx,dy,dz,dt)
+		u,v,w = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
 		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.1)
 		
+		# boundary shite
 		u[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
 		v[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
 		w[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
@@ -214,97 +284,106 @@ while True:
 		u[:advection_boundary,:,:] = 0
 		v[:advection_boundary,:,:] = 0
 		w[:advection_boundary,:,:] = 0
-
 		u[-advection_boundary:,:,:] = 0
 		v[-advection_boundary:,:,:] = 0
 		w[-advection_boundary:,:,:] = 0
 
-		# time_taken = float(round(time.time() - before_velocity,3))
-		# print('Velocity: ',str(time_taken),'s')
+		w[:,:,-1] *= 0
+		w[:,:,-2] *= 0.1
+		w[:,:,-3] *= 0.5
+
+		time_taken = float(round(time.time() - before_velocity,3))
+		print('Velocity: ',str(time_taken),'s')
 
 		if advection:
-			# before_advection = time.time()
+			before_advection = time.time()
 
 			# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
-
-			atmosp_addition = dt*top_level.thermal_advection(temperature_atmos,air_pressure,u,v,w,dx,dy,dz)
-			temperature_atmos[advection_boundary:-advection_boundary,:,:] -= atmosp_addition[advection_boundary:-advection_boundary,:,:]
-			temperature_atmos[advection_boundary-1,:,:] -= 0.5*atmosp_addition[advection_boundary-1,:,:]
-			temperature_atmos[-advection_boundary,:,:] -= 0.5*atmosp_addition[-advection_boundary,:,:]
-
-			# as density is now variable, allow for mass advection
-			density_addition = dt*top_level.divergence_with_scalar(air_density,u,v,w,dx,dy,dz)
-			air_density[advection_boundary:-advection_boundary,:,:] -= density_addition[advection_boundary:-advection_boundary,:,:]
-			air_density[(advection_boundary-1),:,:] -= 0.5*density_addition[advection_boundary-1,:,:]
-			air_density[-advection_boundary,:,:] -= 0.5*density_addition[-advection_boundary,:,:]
+			atmosp_addition = dt*top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,pressure_levels)
+			atmosp_addition[(-advection_boundary,advection_boundary-1),:,:] *= 0.5
+			atmosp_addition[:advection_boundary,:,:] *= 0
+			atmosp_addition[-advection_boundary:,:,:] *= 0
+			atmosp_addition[:,:,-1] *= 0
+			atmosp_addition[:,:,-2] *= 0.5
+			potential_temperature -= atmosp_addition
 
 			# temperature_world -= dt*(thermal_diffusivity_roc*top_level.laplacian_2D(temperature_world,dx,dy))
 
-			# time_taken = float(round(time.time() - before_advection,3))
-			# print('Advection: ',str(time_taken),'s')
+			time_taken = float(round(time.time() - before_advection,3))
+			print('Advection: ',str(time_taken),'s')
 	
 	# before_plot = time.time()
 	if plot:
 
-		tropopause_height = np.zeros(nlat)
-		for i in range(nlat):
-			k = 2
-			if low_level.scalar_gradient_z_1D(np.mean(temperature_atmos[i,:,:],axis=0),dz,k) > 0: 
-				k += 1
-				while low_level.scalar_gradient_z_1D(np.mean(temperature_atmos[i,:,:],axis=0),dz,k) < 0: 
-				 	k += 1
-			else:
-				while low_level.scalar_gradient_z_1D(np.mean(temperature_atmos[i,:,:],axis=0),dz,k) < 0: 
-					k += 1
-			tropopause_height[i] = heights[k]
-
 		# update plot
-		test = ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic',levels=15)
-		if velocity:	ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=1)
-		ax[0].set_title('$\it{Ground} \quad \it{temperature}$')
-		ax[0].set_xlim((lon.min(),lon.max()))
-		ax[0].set_ylim((lat.min(),lat.max()))
-		ax[0].set_ylabel('Latitude')
-		ax[0].axhline(y=0,color='black',alpha=0.3)
-		ax[0].set_xlabel('Longitude')
+		if not diagnostic:
+			ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic',levels=15)
+			if velocity:	
+				ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=0.75)
+			ax[0].set_title('$\it{Ground} \quad \it{temperature}$')
+			ax[0].set_xlim((lon.min(),lon.max()))
+			ax[0].set_ylim((lat.min(),lat.max()))
+			ax[0].set_ylabel('Latitude')
+			ax[0].axhline(y=0,color='black',alpha=0.3)
+			ax[0].set_xlabel('Longitude')
 
-		# ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(temperature_atmos,axis=1)), cmap='seismic',levels=15)
-		ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1)), cmap='seismic',levels=15)
-		ax[1].plot(lat_plot,tropopause_height,color='black',linestyle='--',linewidth=3,alpha=0.5)
-		if velocity:
-			ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1)), colors='white',levels=20,linewidths=1,alpha=0.8)
-			ax[1].streamplot(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1)),np.transpose(np.mean(10*w,axis=1)),color='black',density=0.75)
-		ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
-		ax[1].set_xlim((-90,90))
-		ax[1].set_ylim((0,heights.max()))
-		ax[1].set_ylabel('Height (m)')
-		ax[1].set_xlabel('Latitude')
-
-		f.colorbar(test, cax=cbar_ax)
-		cbar_ax.set_title('Temperature (K)')
-		f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
+			test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
+			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(potential_temperature,axis=1)), cmap='seismic',levels=15)
+			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:], cmap='seismic',levels=15)
+			if velocity:
+				ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], colors='white',levels=20,linewidths=1,alpha=0.8)
+				ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(10*w,axis=1))[:top,:],color='black')
+			ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
+			ax[1].set_xlim((-90,90))
+			ax[1].set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
+			ax[1].set_ylabel('Pressure (hPa)')
+			ax[1].set_xlabel('Latitude')
+			ax[1].set_yscale('log')
+			f.colorbar(test, cax=cbar_ax)
+			cbar_ax.set_title('Temperature (K)')
+			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
 		
-		if level_plots:
-			quiver_padding = int(50/resolution)
-			skip=(slice(None,None,2),slice(None,None,2))
-			for k, z in zip(range(nplots), level_plots_levels):	
-				z += 1
-				bx[k].contourf(lon_plot, lat_plot, temperature_atmos[:,:,z], cmap='seismic',levels=15)
-				bx[k].streamplot(lon_plot, lat_plot, u[:,:,z], v[:,:,z], color='white',density=1.5)
-				bx[k].set_title(str(round(heights[z]/1E3))+' km')
-				bx[k].set_ylabel('Latitude')
-				bx[k].set_xlim((lon.min(),lon.max()))
-				bx[k].set_ylim((lat.min(),lat.max()))				
-			bx[-1].set_xlabel('Longitude')
-
+			if level_plots:
+				quiver_padding = int(50/resolution)
+				skip=(slice(None,None,2),slice(None,None,2))
+				for k, z in zip(range(nplots), level_plots_levels):	
+					z += 1
+					bx[k].contourf(lon_plot, lat_plot, potential_temperature[:,:,z], cmap='seismic',levels=15)
+					bx[k].streamplot(lon_plot, lat_plot, u[:,:,z], v[:,:,z], color='white',density=1.5)
+					bx[k].set_title(str(round(pressure_levels[z]/100))+' hPa')
+					bx[k].set_ylabel('Latitude')
+					bx[k].set_xlim((lon.min(),lon.max()))
+					bx[k].set_ylim((lat.min(),lat.max()))				
+				bx[-1].set_xlabel('Longitude')		
+		else:
+			ax[0,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], cmap='seismic')
+			ax[0,0].set_title('u')
+			ax[0,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:], cmap='seismic')
+			ax[0,1].set_title('v')
+			ax[1,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1))[:top,:], cmap='seismic')
+			ax[1,0].set_title('w')
+			ax[1,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic')
+			ax[1,1].set_title('atmosp_addition')
+			for axis in ax.ravel():
+				axis.set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
+				axis.set_yscale('log')
+			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
+		
 		plt.pause(0.01)
 		
-		ax[0].cla()
-		ax[1].cla()
+		if not diagnostic:
+			ax[0].cla()
+			ax[1].cla()
+			
+			if level_plots:
+				for k in range(nplots):
+					bx[k].cla()			
+		else:
+			ax[0,0].cla()
+			ax[0,1].cla()
+			ax[1,0].cla()
+			ax[1,1].cla()
 
-		if level_plots:
-			for k in range(nplots):
-				bx[k].cla()
 	# time_taken = float(round(time.time() - before_plot,3))
 	# print('Plotting: ',str(time_taken),'s')
 
@@ -316,7 +395,7 @@ while True:
 	print('Time: ',str(time_taken),'s')
 
 	if save:
-		pickle.dump((temperature_atmos,temperature_world,u,v,w,t,air_pressure,air_density,albedo), open("save_file.p","wb"))
+		pickle.dump((potential_temperature,temperature_world,u,v,w,t,albedo), open("save_file.p","wb"))
 
 	if np.isnan(u.max()):
 		sys.exit()

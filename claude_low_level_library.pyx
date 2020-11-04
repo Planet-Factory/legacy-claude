@@ -7,6 +7,7 @@ cimport cython
 ctypedef np.float64_t DTYPE_f
 cdef float inv_180 = np.pi/180
 cdef float inv_90 = np.pi/90
+cdef DTYPE_f sigma = 5.67E-8
 
 # define various useful differential functions:
 # gradient of scalar field a in the local x direction at point i,j
@@ -33,30 +34,19 @@ def scalar_gradient_y_2D(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int
 	else:
 		return (a[i+1,j]-a[i-1,j])/dy
 
-def scalar_gradient_z(np.ndarray a,np.ndarray dz,np.int_t i,np.int_t j,np.int_t k):
-	cdef np.int_t nlevels = len(dz)
+def scalar_gradient_z_1D(np.ndarray a,np.ndarray pressure_levels,np.int_t k):
+	cdef np.int_t nlevels = len(pressure_levels)
 	if k == 0:
-		return (a[i,j,k+1]-a[i,j,k])/dz[k]
+		return -(a[k+1]-a[k])/(pressure_levels[k+1]-pressure_levels[k])
 	elif k == nlevels-1:
-		return (a[i,j,k]-a[i,j,k-1])/dz[k]
+		return -(a[k]-a[k-1])/(pressure_levels[k]-pressure_levels[k-1])
 	else:
-		return (a[i,j,k+1]-a[i,j,k-1])/(2*dz[k])
-
-def scalar_gradient_z_1D(np.ndarray a,np.ndarray dz,np.int_t k):
-	cdef np.int_t nlevels = len(dz)
-	if k == 0:
-		return (a[k+1]-a[k])/dz[k]
-	elif k == nlevels-1:
-		return (a[k]-a[k-1])/dz[k]
-	else:
-		return (a[k+1]-a[k-1])/(2*dz[k])
+		return -(a[k+1]-a[k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
 
 def surface_optical_depth(DTYPE_f lat):
-	# cdef DTYPE_f inv_90
-	return 4 + np.cos(lat*inv_90)*2
+	return 4# + np.cos(lat*inv_90)*2
 
 def thermal_radiation(DTYPE_f a):
-	cdef DTYPE_f sigma = 5.67E-8
 	return sigma*(a**4)
 
 # power incident on (lat,lon) at time t
@@ -87,24 +77,24 @@ def solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,DT
 def profile(np.ndarray a):
 	return np.mean(np.mean(a,axis=0),axis=0)
 
-def t_to_theta(np.ndarray temperature_atmos, np.ndarray air_pressure):
+def t_to_theta(np.ndarray temperature_atmos, np.ndarray pressure_levels):
 	cdef np.ndarray output = np.zeros_like(temperature_atmos)
-	cdef np.int_t i,j,k
+	cdef np.int_t k
 	cdef DTYPE_f inv_p0
-	for i in range(output.shape[0]):
-		for j in range(output.shape[1]):
-			inv_p0 = 1/air_pressure[i,j,0]
-			for k in range(output.shape[2]):
-				output[i,j,k] = temperature_atmos[i,j,k]*(air_pressure[i,j,k]*inv_p0)**0.286
+
+	inv_p0 = 1/pressure_levels[0]
+	for k in range(len(pressure_levels)):
+		output[:,:,k] = temperature_atmos[:,:,k]*(pressure_levels[k]*inv_p0)**(-0.286)
+
 	return output
 
-def theta_to_t(np.ndarray theta, np.ndarray air_pressure):
+def theta_to_t(np.ndarray theta, np.ndarray pressure_levels):
 	cdef np.ndarray output = np.zeros_like(theta)
-	cdef np.int_t i,j,k
+	cdef np.int_t k
 	cdef DTYPE_f inv_p0
-	for i in range(output.shape[0]):
-		for j in range(output.shape[1]):
-			inv_p0 = 1/air_pressure[i,j,0]
-			for k in range(output.shape[2]):
-				output[i,j,k] = theta[i,j,k]*(air_pressure[i,j,k]*inv_p0)**-0.286
+
+	inv_p0 = 1/pressure_levels[0]
+	for k in range(len(pressure_levels)):
+		output[:,:,k] = theta[:,:,k]*(pressure_levels[k]*inv_p0)**(0.286)
+
 	return output
