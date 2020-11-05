@@ -17,18 +17,18 @@ The diffusion equation, as written in \autoref{eq:diffusion}, describes how the 
 \end{itemize}
 
 \begin{equation}
-    \bar{u} = \alpha \nabla^2 u
     \label{eq:diffusion}
+    \bar{u} = \alpha \nabla^2 u
 \end{equation}
 
 Now to get this into code we need the following algorithms \autoref{alg:laplacian} and \autoref{alg:diffusion}. \autoref{alg:laplacian} implements the laplacian operator, whereas 
 \autoref{alg:diffusion} implements the diffusion calculations.  $\nabla^2$ in \autoref{alg:diffusion} represents the call to \autoref{alg:laplacian}.
 
 \begin{algorithm}
-    $T_a \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a)$ \;
-    $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
     \caption{The main calculations for calculating the effects of diffusion}
     \label{alg:diffusion}
+    $T_a \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a)$ \;
+    $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
 \end{algorithm}
 
 \subsection{Adding in Advection}
@@ -43,19 +43,19 @@ going to change that. The advection equation is shown in \autoref{eq:advection}.
 \end{itemize}
 
 \begin{equation}
-    \frac{\delta \psi}{\delta t} + \nabla \cdot (\psi u) = 0
     \label{eq:advection}
+    \frac{\delta \psi}{\delta t} + \nabla \cdot (\psi u) = 0
 \end{equation}
 
 With the divergence functon defined in \autoref{alg:divergence}, we now need to adjust \autoref{alg:diffusion} to incorporate this effect. The resulting algorithm can be found in 
 \autoref{alg:advection}. Here $\nabla$ represents the function call to \autoref{alg:divergence}.
 
 \begin{algorithm}
+    \caption{The main calculations for calculating the effects of advection}
+    \label{alg:advection}
     $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
     $T_a \leftarrow T_a + T_{add}[5:-5, :] \text{ //Only add } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + 5, nlat - 5]$. \;
     $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
-    \caption{The main calculations for calculating the effects of advection}
-    \label{alg:advection}
 \end{algorithm}
 
 Now that we have the air moving, we also need to account for the moving of the density. This is because moving air to a certain place will change the air density at that place if the air at that 
@@ -63,8 +63,8 @@ place does not move away at the same rate. Say we are moving air to $x$ at $y \ 
 The equation we will need for that is the mass continuity equation as shown in \autoref{eq:mass continuity} \cite{masscontinue}.
 
 \begin{equation}
-    \frac{\delta \rho}{\delta t} + \nabla \cdot (\rho v) = 0
     \label{eq:mass continuity}
+    \frac{\delta \rho}{\delta t} + \nabla \cdot (\rho v) = 0
 \end{equation}
 
 Using this equation means that we will no longer assume that the atmosphere is incompressible. Therefore we need to change a few things in the code. First we need to change the $\rho$ in 
@@ -74,12 +74,12 @@ to calculate $\rho$ after the movement of air has taken place, so we need to cha
 
 
 \begin{algorithm}
+    \caption{The main calculations for calculating the effects of advection}
+    \label{alg:advectionv2}
     $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
     $T_a \leftarrow T_a + T_{add}[5:-5, :] \text{ //Only add } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + 5, nlat - 5]$. \;
     $\rho \leftarrow \rho + \delta t \nabla \rho$ \;
     $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
-    \caption{The main calculations for calculating the effects of advection}
-    \label{alg:advectionv2}
 \end{algorithm}
 
 Currently the advection does not work like it should. This is probably due to boundary issues, where we get too close to the poles and it starts freaking out there \cite{simon}. So to fix this 
@@ -88,12 +88,12 @@ we are going to define boundaries and assume that the advection only works withi
 boundary. 
 
 \begin{algorithm}
-        $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
-        $T_a \leftarrow T_a - 0.5T_{add}[adv\_bound:-adv\_boun, :] \text{ //Only subtract } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$. \;
-        $\rho[adv\_boun: -adv\_boun, :] \leftarrow \rho - 0.5(\delta t \nabla \rho) \text{ //Only change the density for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$ \;
-        $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
-        \caption{The main calculations for calculating the effects of advection}
+    \caption{The main calculations for calculating the effects of advection}
     \label{alg:advectionfix}
+    $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_a) + \nabla(T_a)$ \;
+    $T_a \leftarrow T_a - 0.5T_{add}[adv\_bound:-adv\_boun, :] \text{ //Only subtract } T_{add} \text{ to } T_a \text{ for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$. \;
+    $\rho[adv\_boun: -adv\_boun, :] \leftarrow \rho - 0.5(\delta t \nabla \rho) \text{ //Only change the density for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$ \;
+    $T_p \leftarrow T_p + \delta t \alpha_p \nabla^2(T_p)$ \;
 \end{algorithm}
 
 \subsection{Layers, layers and layers}
@@ -102,14 +102,14 @@ add it, with \autoref{alg:advection layer} as a result. Here the ':' means all i
 \autoref{sec:thermal pot}. 
 
 \begin{algorithm}
+    \caption{The main calculations for calculating the effects of advection}
+    \label{alg:advection layer}
     $T_{add} \leftarrow T_a + \delta t \alpha_a \nabla^2(T_{pot}) + \nabla(T_{pot})$ \;
     $T_{add} \leftarrow 0.5T_{add}[adv\_boun:-adv\_boun, :, :] \text{ //Only halve } T_{add} \text{ for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$. \;
     $T_{add}[-adv\_boun:, :, :] \leftarrow 0 \text{//Only replace by 0 in the interval [0, adv\_boun]}$ \;
     $T_{add}[:adv\_boun, :, :] \leftarrow 0 \text{//Only replace by 0 in the interval [nlat - adv\_boun, nlat]}$ \;
     $T_{pot} \leftarrow T_{pot} - T_{add}[adv\_boun:-adv\_boun, :, :] \text{ //Only subtract } T_{add} \text{ from } T_{pot} \text{ for indices in the interval }$
         $[-nlat + adv\_boun, nlat - adv\_boun]$. \;
-    \caption{The main calculations for calculating the effects of advection}
-    \label{alg:advection layer}
 \end{algorithm}
 
 \subsection{Adiabatic Motion} \label{sec:thermal pot}
@@ -120,10 +120,10 @@ expand. This obviously changes it's temperature as the air molecules are closer 
 For a visual representation, please consult \autoref{fig:thermal potential}.
 
 \begin{figure}
+    \label{fig:thermal potential}
     \centering
     \includegraphics[width=0.9\textwidth]{figures/potential_temperature.jpg}
     \caption{Visual representation of why we need Thermal Potential \cite{simon}.}
-    \label{fig:thermal potential}
 \end{figure}
 
 As seen in \autoref{fig:thermal potential}, the packet of air (next to $T_1$) moves up into a higher layer of the atmosphere and ends up at the top (next to $T_2$). The packet has grown bigger, 
@@ -145,12 +145,12 @@ surface, then it would be temperature $T$ which is then equal to the thermal pot
 
 \begin{subequations}
     \begin{equation}
-        \theta = T(\frac{p_0}{p})^{\frac{R}{C_a}}
         \label{eq:thermal potential}
+        \theta = T(\frac{p_0}{p})^{\frac{R}{C_a}}
     \end{equation}
     \begin{equation}
-        T = \theta(\frac{p}{p_0})^{\frac{R}{C_a}}
         \label{eq:potential temp}
+        T = \theta(\frac{p}{p_0})^{\frac{R}{C_a}}
     \end{equation}
 \end{subequations}
 
@@ -162,6 +162,8 @@ a bit of time (namely $O(n)$ divisions, where $n$ is the length of $p$). Also no
 and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}.
 
 \begin{algorithm}
+    \caption{Converting temperature into potential temperature}
+    \label{alg:temp to pot}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{temperature of the atmosphere (or potential temperature) $T_a$, air pressure $p$, boolean $back$}
@@ -175,20 +177,18 @@ and $\theta$, which can easily be done in the call to \autoref{alg:temp to pot}.
         $\theta[:, :, k] \leftarrow T_a[:, :, k] (\frac{p_z[k]}{p_z[0]})^{\kappa}$
     }
     \Return{$\theta$}
-    \caption{Converting temperature into potential temperature}
-    \label{alg:temp to pot}
 \end{algorithm}
 
 Now we only need to do one more thing, replace the algorithm that calculates $T_{pot}$ as a result of advection. Let us do that in \autoref{alg:advection pot}, where \texttt{ThermalAdv} is the 
 call to \autoref{alg:divergence}.
 
 \begin{algorithm}
+    \caption{The main calculations for calculating the effects of advection}
+    \label{alg:advection pot}
     $T_{add} \leftarrow T_{pot} + \nabla(T_{pot}, p_z)$\;
     $T_{add} \leftarrow 0.5T_{add}[adv\_boun:-adv\_boun, :, :] \text{ //Only halve } T_{add} \text{ for indices in the interval } [-nlat + adv\_boun, nlat - adv\_boun]$. \;
     $T_{add}[-adv\_boun:, :, :] \leftarrow 0 \text{//Only replace by 0 in the interval [0, adv\_boun]}$ \;
     $T_{add}[:adv\_boun, :, :] \leftarrow 0 \text{//Only replace by 0 in the interval [nlat - adv\_boun, nlat]}$ \;
     $T_{pot} \leftarrow T_{pot} - T_{add}[adv\_boun:-adv\_boun, :, :] \text{ //Only subtract } T_{add} \text{ from } T_{pot} \text{ for indices in the interval }$
         $[-nlat + adv\_boun, nlat - adv\_boun]$. \;
-    \caption{The main calculations for calculating the effects of advection}
-    \label{alg:advection pot}
 \end{algorithm}

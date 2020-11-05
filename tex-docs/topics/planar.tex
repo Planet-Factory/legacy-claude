@@ -14,16 +14,16 @@ the following equations as shown in \autoref{eq:polar distance}, \autoref{eq:pol
 
 \begin{subequations}
     \begin{equation}
-        a = r \cos(\theta)
         \label{eq:polar distance}
+        a = r \cos(\theta)
     \end{equation}
     \begin{equation}
-        x = a \sin(\lambda)
         \label{eq:polar x}
+        x = a \sin(\lambda)
     \end{equation}
     \begin{equation}
-        y = a \cos(\lambda)
         \label{eq:polar y}
+        y = a \cos(\lambda)
     \end{equation}
 \end{subequations}
 
@@ -31,22 +31,22 @@ But what if we know $x$ and $y$ and want to know $\theta$ and $\lambda$? Pythago
 always be true. Then if we substitue $a$ by $\sqrt{x^2 + y^2}$ in \autoref{eq:polar distance} we get \autoref{eq:polar theta1}. Then we transform that equation such that we only have $\theta$ on 
 one side and the rest on the other side (since we want to know $\theta$) and we get \autoref{eq:polar theta3}.
 \begin{equation}
-    x^2 + y^2 = a^2
     \label{eq:pythagoras}
+    x^2 + y^2 = a^2
 \end{equation}
 
 \begin{subequations}
     \begin{equation}
-        \sqrt{x^2 + y^2} = r\cos(\theta)
         \label{eq:polar theta1}
+        \sqrt{x^2 + y^2} = r\cos(\theta)
     \end{equation}
     \begin{equation}
-        \frac{\sqrt{x^2 + y^2}}{r} = \cos(\theta)
         \label{eq:polar theta2}
+        \frac{\sqrt{x^2 + y^2}}{r} = \cos(\theta)
     \end{equation}
     \begin{equation}
-        \cos^{-1}(\frac{\sqrt{x^2 + y^2}}{r}) = \theta
         \label{eq:polar theta3}
+        \arccos(\frac{\sqrt{x^2 + y^2}}{r}) = \theta
     \end{equation}
 \end{subequations}
 
@@ -56,22 +56,22 @@ bit easier to use both than to only use one as you need to know $\theta$ at that
 in \autoref{eq:polar lambda1}, transform it such that we end up with only $\lambda$ on one side and the rest on the other side and we end up with \autoref{eq:polar lambda3}.
 
 \begin{equation}
-    \tan(\alpha) = \frac{\sin(\alpha)}{\cos(\alpha)}
     \label{eq:tan}
+    \tan(\alpha) = \frac{\sin(\alpha)}{\cos(\alpha)}
 \end{equation}
 
 \begin{subequations}
     \begin{equation}
-        \frac{x}{y} = \frac{a\sin(\lambda)}{a\cos(\lambda)} = \frac{\sin(\lambda)}{\cos(\lambda)}
         \label{eq:polar lambda1}
+        \frac{x}{y} = \frac{a\sin(\lambda)}{a\cos(\lambda)} = \frac{\sin(\lambda)}{\cos(\lambda)}
     \end{equation}
     \begin{equation}
-        \frac{x}{y} = \tan(\lambda)
         \label{eq:polar lambda2}
+        \frac{x}{y} = \tan(\lambda)
     \end{equation}
     \begin{equation}
-        \lambda = \tan^{-1}(\frac{x}{y})
         \label{eq:polar lambda3}
+        \lambda = \arctan(\frac{x}{y})
     \end{equation}
 \end{subequations}
 
@@ -81,7 +81,9 @@ coordinate as elements). Since the documentation is not language specific I inst
 the libraries that do this for you, or start coding your own after finding out how to do that (your mileage may vary). Currently I will not explain how to do this but perhaps in a future update 
 I will. Maybe. Anyway, the code for the grid can be found in \autoref{alg:polar grid}. For more explanation about interpolation, please refer to \autoref{sec:interpolation}. Note that the $z$ in 
 \autoref{sec:interpolation} refers to $data$, with $x$ and $y$ being $lon$ and $lat$ respectively. The result of the interpolation is a function, and given an $x$ and $y$ coordinate it will give 
-back a value. The only thing we still need to do is to convert $lon$, $lat$ coordinates into $x$, $y$ coordinates. Yup you guessed it right, we still need to do that...
+back a value. The only thing we still need to do is to convert $x$ and $y$ coordinates into $lat$ and $lon$ coordinates, were we make use of \autoref{eq:polar theta3} 
+\footnote{Simon and I disagree whether the arcsin or arccos should be used, however the model is not working as of yet and therefore I opt to leave both in. When everything is working the right 
+function will be used. Apologies!} and \autoref{eq:polar lambda3}.
 
 \begin{algorithm}\
     \caption{Generating the grid for polar approximation}
@@ -89,12 +91,28 @@ back a value. The only thing we still need to do is to convert $lon$, $lat$ coor
     $coords_x \leftarrow $ array going from $0$ to $grid\_size$ with steps of $pl_r$ \;
     $coords_u \leftarrow $ array going from $0$ to $grid\_size$ with steps of $pl_r$ \;
     $grid \leftarrow $ turn the coordinate vectors $coords_x$ and $coords_y$ into a grid \;
+    $polar\_coords \leftarrow $ empty list (filled in the future with coordinates) \;
+
+    \For{$i \leftarrow 0$ \KwTo $grid.x.length$}{
+        \For{$j \leftarrow 0$ \KwTo $grid.x[i].length$}{
+            $lat\_point \leftarrow \arcsin(\frac{\sqrt{x^2 + y^2}}{r})$ \;
+            $lon\_point \leftarrow \arctan(\frac{grid.x[i, j]}{grid.y[i,j]})$ \;
+            $polar\_coords.append(lat\_point, lon\_point)$ \;
+        }
+    }
+
     $data \leftarrow 2D$ array filled with 0's, with $nlon$ arrays of size $pl_l$ \;
 
     \For{$i \leftarrow 0$ \KwTo $pl_l$}{
         $data[i, :] \leftarrow lat[nlat - i]$ \;
     }
 
-    $f \leftarrow$ function resulting from the interpolation of $lon$ and $lat$ with $data$ as the data points \;
-    $plane \leftarrow f(x, y)$ \;
+    $f \leftarrow$ function resulting from the interpolation of $lon \frac{\pi}{180}$ and $lat \frac{\pi}{180}$ with $data$ as the data points \;
+    $index \leftarrow 0$ \;
+    \For{$i \leftarrow 0$ \KwTo $grid.x.length$}{
+        \For{$j \leftarrow 0$ \KwTo $grid.x[i].length$}{
+            $plane[i, j] \leftarrow f(polar\_coords[index][0], polar\_coords[index][1])$ \;
+            $index \leftarrow index + 1$ \;
+        }
+    }
 \end{algorithm}
