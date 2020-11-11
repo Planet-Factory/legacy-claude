@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import time, sys, pickle
 import claude_low_level_library as low_level
 import claude_top_level_library as top_level
-from scipy.interpolate import interp2d
+from scipy.interpolate import interp2d, RectBivariateSpline
 # from twitch import prime_sub
 
 ######## CONTROL ########
@@ -43,8 +43,8 @@ smoothing_parameter_w = 0.4
 save = False 					# save current state to file?
 load = False  					# load initial state from file?
 
-plot = True 					# display plots of output?
-diagnostic = True 				# display raw fields for diagnostic purposes
+plot = False 					# display plots of output?
+diagnostic = False 				# display raw fields for diagnostic purposes
 level_plots = False 			# display plots of output on vertical levels?
 nplots = 3						# how many levels you want to see plots of (evenly distributed through column)
 
@@ -120,47 +120,43 @@ for i in range(nlat):
 
 #################### SHOW TIME ####################
 
-# pole_lower_limit = 4
-# polar_grid_resolution = dx[-pole_lower_limit]
-# size_of_grid = planet_radius*np.cos(lat[-pole_lower_limit]*np.pi/180)
+# initialise grid
+pole_lower_latitude_limit = 5
+polar_grid_resolution = dx[-pole_lower_latitude_limit]/5
+size_of_grid = planet_radius*np.cos(lat[-pole_lower_latitude_limit]*np.pi/180)
+grid_x_values = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_y_values = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_xx,grid_yy = np.meshgrid(grid_x_values,grid_y_values)
 
-# x_coords = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-# y_coords = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_lat_coords = []
+grid_lon_coords = []
+for i in range(grid_xx.shape[0]):
+	for j in range(grid_xx.shape[1]):
+		lat_point = -np.arccos((grid_xx[i,j]**2 + grid_yy[i,j]**2)**0.5/planet_radius)*180/np.pi
+		lon_point = np.arctan2(grid_yy[i,j],grid_xx[i,j])*180/np.pi
+		grid_lat_coords.append(lat_point)
+		grid_lon_coords.append(lon_point)
 
-# xx,yy = np.meshgrid(x_coords,y_coords)
+polar_x_coords = []
+polar_y_coords = []
+for i in range(pole_lower_latitude_limit):
+	for j in range(nlon):
+		polar_x_coords.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
+		polar_y_coords.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
 
-# polar_coords = []
 
-# for i in range(xx.shape[0]):
-# 	for j in range(xx.shape[1]):
-		
-# 		lat_point = np.arcsin((xx[i,j]**2 + yy[i,j]**2)**0.5/planet_radius)
-# 		lon_point = np.arctan2(yy[i,j],xx[i,j])
-# 		polar_coords.append((lat_point,lon_point))
+def beam_me_up(lat,lon,data,pole_lower_latitude_limit,grid_size,grid_lat_coords,grid_lon_coords):
+	'''Projects data on lat-lon grid to x-y polar grid'''
+	f = RectBivariateSpline(lat[:pole_lower_latitude_limit], lon, data)
+	polar_plane = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
+	return polar_plane
 
-# polar_data = np.zeros((pole_lower_limit,nlon))
+def beam_me_down(lat,lon,data,pole_lower_latitude_limit,polar_x_coords,polar_y_coords):
+	'''projects data from x-y polar grid onto lat-lon grid'''
+	f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data)
+	resample = f(polar_x_coords,polar_y_coords,grid=False).reshape((pole_lower_latitude_limit,len(lon)))
+	return resample
 
-# for i in range(pole_lower_limit):
-# 	polar_data[i,:] = lat[i]
-
-# f = interp2d(lat[:pole_lower_limit]*np.pi/180, lon*np.pi/180, np.transpose(polar_data))
-
-# print(lat[:pole_lower_limit]*np.pi/180)
-# print(polar_coords)
-
-# polar_plane = np.zeros_like(xx)
-# index = 0
-# for i in range(xx.shape[0]):
-# 	for j in range(xx.shape[1]):
-# 		polar_plane[i,j] = f(polar_coords[index][0],polar_coords[index][1])
-# 		index += 1
-
-# print(polar_plane)
-
-# plt.imshow(polar_plane)
-# plt.show()
-
-# sys.exit()
 
 #######################################################################################################################################################################################################################
 
@@ -383,6 +379,14 @@ while True:
 			ax[0,1].cla()
 			ax[1,0].cla()
 			ax[1,1].cla()
+
+	polar_plane = beam_me_up(lat,lon,potential_temperature[:pole_lower_latitude_limit,:,0],pole_lower_latitude_limit,grid_xx.shape[0],grid_lat_coords,grid_lon_coords)
+	resample = beam_me_down(lat,lon,polar_plane,pole_lower_latitude_limit,polar_x_coords,polar_y_coords)
+
+	# f,ax = plt.subplots(2)
+	# ax[0].contourf(potential_temperature[:pole_lower_latitude_limit,:,0])
+	# ax[1].contourf(polar_plane)
+	# plt.show()
 
 	# time_taken = float(round(time.time() - before_plot,3))
 	# print('Plotting: ',str(time_taken),'s')
