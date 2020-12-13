@@ -39,3 +39,6 @@ CLAuDE is currently being developed on Wednesday [Twitch](https://twitch.tv/drsi
 
 ### Licensing
 TODO: Add LICENSE  
+
+### THIS FORK
+The purpose of this fork is to determine what backend/system allows for the easiest speedup.
