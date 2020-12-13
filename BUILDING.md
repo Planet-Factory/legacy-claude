@@ -69,6 +69,8 @@ The following programs and libraries are required to build CLAuDE:
 
 If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib`.
 
+Depending upon your system you may also need to install `tkinter` to view the graphics, which corresponds to the package `python3-tk`.
+
 ### 1. Clone the repository.
 Using the git command line, and cloning via https, this command will do it:
 ```
