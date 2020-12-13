@@ -36,7 +36,7 @@ If you choose to use MinGW, follow the instructions in the [cython documentation
 If you choose to use Microsoft Visual C/C++, follow the instructions on the [Python website](https://wiki.python.org/moin/WindowsCompilers).
 
 ### 3. Use pip to install python libraries
-Using command prompt, install the pip packages [cython](https://pypi.org/project/Cython/), [numpy](https://pypi.org/project/numpy/), and [matplotlib](https://pypi.org/project/matplotlib/), as well as [setuptools](https://pypi.org/project/setuptools/), if for some reason it is not already installed.
+Using the command prompt, install the following pip packages: [cython](https://pypi.org/project/Cython/), [numpy](https://pypi.org/project/numpy/), [matplotlib](https://pypi.org/project/matplotlib/), and [numba](https://pypi.org/project/numba/), as well as [setuptools](https://pypi.org/project/setuptools/), if for some reason it is not already installed.
 The syntax to install a package with pip is
 ```
 pip install PACKAGE
@@ -66,8 +66,9 @@ The following programs and libraries are required to build CLAuDE:
  - cython
  - numpy
  - matplotlib
+ - numba
 
-If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib`.
+If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib` `python3-numba`.
 
 ### 1. Clone the repository.
 Using the git command line, and cloning via https, this command will do it:
@@ -146,7 +147,7 @@ git clone https://github.com/Planet-Factory/claude.git
 ```
 
 ### 3. Install dependencies
-To build the project, you require `python`, as well as the python libraries `setuptools`, `cython`, `numpy`, and `matplotlib`.
+To build the project, you require `python`, as well as the python libraries `setuptools`, `cython`, `numpy`, `numba` and `matplotlib`.
 First, use brew to install python:
 ```
 brew install python
@@ -157,6 +158,7 @@ Then, use `pip`, a python package manager that is installed with python to insta
 pip install cython
 pip install numpy
 pip install matplotlib
+pip install numba
 ```
 
 ### 4. Using Cython, compile `claude_low_level_library` and `claude_top_level_library`

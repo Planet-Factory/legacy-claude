@@ -5,7 +5,7 @@
 
 import numpy as np 
 import matplotlib.pyplot as plt
-import time, sys, pickle
+import time, sys, pickle, numba
 import claude_low_level_library as low_level
 import claude_top_level_library as top_level
 from scipy.interpolate import interp2d, RectBivariateSpline
@@ -200,6 +200,7 @@ def beam_me_down(lon,data,pole_low_index,grid_x_values,grid_y_values,polar_x_coo
 		f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data[:,:,k])
 		resample[:,:,k] = f(polar_x_coords,polar_y_coords,grid=False).reshape((int(len(polar_x_coords)/len(lon)),len(lon)))
 	return resample
+@numba.njit
 def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data): 
 	output = np.zeros_like(polar_data)
 	overlap = abs(pole_low_index - pole_high_index)
@@ -228,6 +229,7 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data):
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 
 	return output
+@numba.njit
 def grid_x_gradient(data,i,j,k):
 	if j == 0:
 		value = (data[i,j+1,k] - data[i,j,k])/(polar_grid_resolution)
@@ -236,6 +238,7 @@ def grid_x_gradient(data,i,j,k):
 	else:
 		value = (data[i,j+1,k] - data[i,j-1,k])/(2*polar_grid_resolution)
 	return value
+@numba.njit
 def grid_y_gradient(data,i,j,k):
 	if i == 0:
 		value = (data[i+1,j,k] - data[i,j,k])/(polar_grid_resolution)
@@ -244,6 +247,7 @@ def grid_y_gradient(data,i,j,k):
 	else:
 		value = (data[i+1,j,k] - data[i-1,j,k])/(2*polar_grid_resolution)
 	return value
+@numba.njit
 def grid_p_gradient(data,i,j,k,pressure_levels):
 	if k == 0:
 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
@@ -252,6 +256,7 @@ def grid_p_gradient(data,i,j,k,pressure_levels):
 	else:
 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
 	return value
+@numba.njit
 def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
@@ -263,6 +268,7 @@ def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
 				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
 	return x_dot,y_dot
+@numba.njit
 def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
@@ -274,6 +280,7 @@ def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
 				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
 	return x_dot,y_dot
+@numba.njit
 def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
 	output = np.zeros_like(x_dot)
 	for i in range(output.shape[0]):
@@ -309,6 +316,7 @@ def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,
 				reproj_v[i,j,k] = - reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
 
 	return reproj_u, reproj_v
+@numba.njit
 def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
 	output = np.zeros_like(data)
 	data_x_dot = data*x_dot
