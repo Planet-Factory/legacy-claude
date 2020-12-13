@@ -18,35 +18,39 @@ resolution = 5					# how many degrees between latitude and longitude gridpoints
 planet_radius = 6.4E6			# define the planet's radius (m)
 insolation = 1370				# TOA radiation from star (W m^-2)
 gravity = 9.81 					# define surface gravity for planet (m s^-2)
-axial_tilt = -23.5/2			# tilt of rotational axis w.r.t. solar plane
+axial_tilt = 23.5/2				# tilt of rotational axis w.r.t. solar plane
 year = 365*day					# length of year (s)
 
 pressure_levels = np.array([1000,950,900,800,700,600,500,400,350,300,250,200,150,100,75,50,25,10,5,2,1])
 pressure_levels *= 100
 nlevels = len(pressure_levels)
 
-top = nlevels
+top = -1
 
 dt_spinup = 60*137
-dt_main = 60*3.5
-spinup_length = 1*day
+dt_main = 60*15.5
+spinup_length = 2*day
 
 ###
 
 advection = True 				# if you want to include advection set this to be True
-advection_boundary = 5			# how many gridpoints away from poles to apply advection
-smoothing_parameter_t = 0.6
-smoothing_parameter_u = 0.6
-smoothing_parameter_v = 0.6
+smoothing_parameter_t = 0.9
+smoothing_parameter_u = 0.7
+smoothing_parameter_v = 0.7
 smoothing_parameter_w = 0.4
 
 save = False 					# save current state to file?
-load = False  					# load initial state from file?
+load = True  					# load initial state from file?
 
-plot = False 					# display plots of output?
+above = False
+
+plot = True					# display plots of output?
 diagnostic = False 				# display raw fields for diagnostic purposes
 level_plots = False 			# display plots of output on vertical levels?
 nplots = 3						# how many levels you want to see plots of (evenly distributed through column)
+
+pole_lower_latitude_limit = -60
+pole_higher_latitude_limit = -75
 
 ###########################
 
@@ -56,7 +60,7 @@ lon = np.arange(0,360,resolution)
 nlat = len(lat)
 nlon = len(lon)
 lon_plot, lat_plot = np.meshgrid(lon, lat)
-heights_plot, lat_z_plot = np.meshgrid(lat,pressure_levels/100)
+heights_plot, lat_z_plot = np.meshgrid(lat,pressure_levels[:top]/100)
 
 # initialise arrays for various physical fields
 temperature_world = np.zeros((nlat,nlon)) + 290
@@ -120,43 +124,217 @@ for i in range(nlat):
 
 #################### SHOW TIME ####################
 
+pole_low_index_S = np.where(lat > pole_lower_latitude_limit)[0][0]
+pole_high_index_S = np.where(lat > pole_higher_latitude_limit)[0][0]
+
 # initialise grid
-pole_lower_latitude_limit = 5
-polar_grid_resolution = dx[-pole_lower_latitude_limit]/5
-size_of_grid = planet_radius*np.cos(lat[-pole_lower_latitude_limit]*np.pi/180)
-grid_x_values = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-grid_y_values = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-grid_xx,grid_yy = np.meshgrid(grid_x_values,grid_y_values)
+polar_grid_resolution = dx[-pole_low_index_S]
+size_of_grid = planet_radius*np.cos(lat[-pole_low_index_S]*np.pi/180)
 
-grid_lat_coords = []
-grid_lon_coords = []
-for i in range(grid_xx.shape[0]):
-	for j in range(grid_xx.shape[1]):
-		lat_point = -np.arccos((grid_xx[i,j]**2 + grid_yy[i,j]**2)**0.5/planet_radius)*180/np.pi
-		lon_point = np.arctan2(grid_yy[i,j],grid_xx[i,j])*180/np.pi
-		grid_lat_coords.append(lat_point)
-		grid_lon_coords.append(lon_point)
+### south pole ###
+grid_x_values_S = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_y_values_S = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_xx_S,grid_yy_S = np.meshgrid(grid_x_values_S,grid_y_values_S)
 
-polar_x_coords = []
-polar_y_coords = []
-for i in range(pole_lower_latitude_limit):
+grid_side_length = len(grid_x_values_S)
+
+grid_lat_coords_S = []
+grid_lon_coords_S = []
+for i in range(grid_xx_S.shape[0]):
+	for j in range(grid_xx_S.shape[1]):
+		lat_point = -np.arccos((grid_xx_S[i,j]**2 + grid_yy_S[i,j]**2)**0.5/planet_radius)*180/np.pi
+		lon_point = 180 - np.arctan2(grid_yy_S[i,j],grid_xx_S[i,j])*180/np.pi
+		grid_lat_coords_S.append(lat_point)
+		grid_lon_coords_S.append(lon_point)
+
+polar_x_coords_S = []
+polar_y_coords_S = []
+for i in range(pole_low_index_S):
 	for j in range(nlon):
-		polar_x_coords.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
-		polar_y_coords.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
+		polar_x_coords_S.append( planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
+		polar_y_coords_S.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
 
+### north pole ###
+pole_low_index_N = np.where(lat < -pole_lower_latitude_limit)[0][-1]
+pole_high_index_N = np.where(lat < -pole_higher_latitude_limit)[0][-1]
 
-def beam_me_up(lat,lon,data,pole_lower_latitude_limit,grid_size,grid_lat_coords,grid_lon_coords):
+grid_x_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_y_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+grid_xx_N,grid_yy_N = np.meshgrid(grid_x_values_N,grid_y_values_N)
+
+grid_lat_coords_N = []
+grid_lon_coords_N = []
+for i in range(grid_xx_N.shape[0]):
+	for j in range(grid_xx_N.shape[1]):
+		lat_point = np.arccos((grid_xx_N[i,j]**2 + grid_yy_N[i,j]**2)**0.5/planet_radius)*180/np.pi
+		lon_point = 180 - np.arctan2(grid_yy_N[i,j],grid_xx_N[i,j])*180/np.pi
+		grid_lat_coords_N.append(lat_point)
+		grid_lon_coords_N.append(lon_point)
+
+polar_x_coords_N = []
+polar_y_coords_N = []
+for i in np.arange(pole_low_index_N,nlat):
+	for j in range(nlon):
+		polar_x_coords_N.append( planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
+		polar_y_coords_N.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
+
+print(pole_low_index_S,pole_high_index_S)
+print(pole_low_index_N,pole_high_index_N)
+
+def beam_me_up_2D(lats,lon,data,pole_low_index,grid_size,grid_lat_coords,grid_lon_coords):
 	'''Projects data on lat-lon grid to x-y polar grid'''
-	f = RectBivariateSpline(lat[:pole_lower_latitude_limit], lon, data)
+	f = RectBivariateSpline(lats, lon, data)
 	polar_plane = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
 	return polar_plane
-
-def beam_me_down(lat,lon,data,pole_lower_latitude_limit,polar_x_coords,polar_y_coords):
+def beam_me_up(lats,lon,data,pole_low_index,grid_size,grid_lat_coords,grid_lon_coords):
+	'''Projects data on lat-lon grid to x-y polar grid'''
+	polar_plane = np.zeros((grid_size,grid_size,data.shape[2]))
+	for k in range(data.shape[2]):
+		f = RectBivariateSpline(lats, lon, data[:,:,k])
+		polar_plane[:,:,k] = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
+	return polar_plane
+def beam_me_down(lon,data,pole_low_index,grid_x_values,grid_y_values,polar_x_coords,polar_y_coords):
 	'''projects data from x-y polar grid onto lat-lon grid'''
-	f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data)
-	resample = f(polar_x_coords,polar_y_coords,grid=False).reshape((pole_lower_latitude_limit,len(lon)))
+	resample = np.zeros((int(len(polar_x_coords)/len(lon)),len(lon),data.shape[2]))
+	for k in range(data.shape[2]):
+		f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data[:,:,k])
+		resample[:,:,k] = f(polar_x_coords,polar_y_coords,grid=False).reshape((int(len(polar_x_coords)/len(lon)),len(lon)))
 	return resample
+def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data): 
+	output = np.zeros_like(polar_data)
+	overlap = abs(pole_low_index - pole_high_index)
 
+	if lat[pole_low_index] < 0:
+		for k in range(output.shape[2]):
+			for i in range(pole_low_index):
+				
+				if i < pole_high_index:
+					scale_polar_data = 0.0
+					scale_reprojected_data = 1.0
+				else:
+					scale_polar_data = (i-pole_high_index)/overlap
+					scale_reprojected_data = 1 - (i-pole_high_index)/overlap
+				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
+	else:	# PROBLEM APPEARS TO BE HERE IN NORTH POLE BOUNDARY
+		for k in range(output.shape[2]):
+			for i in range(nlat-pole_low_index):
+				
+				if i + pole_low_index + 1 > pole_high_index:
+					scale_polar_data = 0.0
+					scale_reprojected_data = 1.0
+				else:
+					scale_polar_data = i/overlap
+					scale_reprojected_data = 1-(i/overlap)
+				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
+
+	return output
+def grid_x_gradient(data,i,j,k):
+	if j == 0:
+		value = (data[i,j+1,k] - data[i,j,k])/(polar_grid_resolution)
+	elif j == grid_side_length-1:
+		value = (data[i,j,k] - data[i,j-1,k])/(polar_grid_resolution)
+	else:
+		value = (data[i,j+1,k] - data[i,j-1,k])/(2*polar_grid_resolution)
+	return value
+def grid_y_gradient(data,i,j,k):
+	if i == 0:
+		value = (data[i+1,j,k] - data[i,j,k])/(polar_grid_resolution)
+	elif i == grid_side_length-1:
+		value = (data[i,j,k] - data[i-1,j,k])/(polar_grid_resolution)
+	else:
+		value = (data[i+1,j,k] - data[i-1,j,k])/(2*polar_grid_resolution)
+	return value
+def grid_p_gradient(data,i,j,k,pressure_levels):
+	if k == 0:
+		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
+	elif k == nlevels-1:
+		value = (data[i,j,k]-data[i,j,k-1])/(pressure_levels[k]-pressure_levels[k-1])
+	else:
+		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
+	return value
+def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
+	x_dot = np.zeros_like(polar_plane)
+	y_dot = np.zeros_like(polar_plane)
+	for i in range(grid_side_length):
+		for j in range(grid_side_length):
+			for k in range(polar_plane.shape[2]):
+				# x_dot[i,j,k] = -grid_y_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
+				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
+				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
+				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+	return x_dot,y_dot
+def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
+	x_dot = np.zeros_like(polar_plane)
+	y_dot = np.zeros_like(polar_plane)
+	for i in range(grid_side_length):
+		for j in range(grid_side_length):
+			for k in range(polar_plane.shape[2]):
+				# x_dot[i,j,k] = -grid_y_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
+				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
+				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
+				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+	return x_dot,y_dot
+def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
+	output = np.zeros_like(x_dot)
+	for i in range(output.shape[0]):
+		for j in range(output.shape[1]):
+			for k in range(output.shape[2]):
+				output[i,j,k] = - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( grid_x_gradient(x_dot,i,j,k) + grid_y_gradient(y_dot,i,j,k) )/(287*temperature[i,j,k])
+	return output
+def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,data):
+	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
+	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
+
+	reproj_u = np.zeros_like(data)
+	reproj_v = np.zeros_like(data)
+
+	for i in range(data.shape[0]):
+		for j in range(data.shape[1]):
+			for k in range(data.shape[2]):
+				reproj_u[i,j,k] = - reproj_x_dot[i,j,k]*np.sin(lon[j]*np.pi/180) - reproj_y_dot[i,j,k]*np.cos(lon[j]*np.pi/180)
+				reproj_v[i,j,k] = reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) - reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
+
+	return reproj_u, reproj_v
+def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,data):
+	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
+	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
+
+	reproj_u = np.zeros_like(data)
+	reproj_v = np.zeros_like(data)
+
+	for i in range(data.shape[0]):
+		for j in range(data.shape[1]):
+			for k in range(data.shape[2]):
+				reproj_u[i,j,k] = reproj_x_dot[i,j,k]*np.sin(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.cos(lon[j]*np.pi/180)
+				reproj_v[i,j,k] = - reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
+
+	return reproj_u, reproj_v
+def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
+	output = np.zeros_like(data)
+	data_x_dot = data*x_dot
+	data_y_dot = data*y_dot
+	data_z_dot = data*z_dot
+	for i in range(data.shape[0]):
+		for j in range(data.shape[1]):
+			for k in range(data.shape[2]):
+				output[i,j,k] = grid_x_gradient(data_x_dot,i,j,k) + grid_y_gradient(data_y_dot,i,j,k) + grid_p_gradient(data_z_dot,i,j,k,pressure_levels)
+	return output
+
+# create Coriolis data on north and south planes
+data = np.zeros((nlat-pole_low_index_N,nlon))
+for i in np.arange(pole_low_index_N,nlat):
+	data[i-pole_low_index_N,:] = coriolis[i]
+coriolis_plane_N = beam_me_up_2D(lat[pole_low_index_N:],lon,data,pole_low_index_N,grid_xx_N.shape[0],grid_lat_coords_N,grid_lon_coords_N)
+data = np.zeros((pole_low_index_S,nlon))
+for i in range(pole_low_index_S):
+	data[i,:] = coriolis[i]
+coriolis_plane_S = beam_me_up_2D(lat[:pole_low_index_S],lon,data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
+
+x_dot_N = np.zeros((grid_side_length,grid_side_length,nlevels))
+y_dot_N = np.zeros((grid_side_length,grid_side_length,nlevels))
+
+x_dot_S = np.zeros((grid_side_length,grid_side_length,nlevels))
+y_dot_S = np.zeros((grid_side_length,grid_side_length,nlevels))
 
 #######################################################################################################################################################################################################################
 
@@ -237,6 +415,11 @@ if plot:
 		ax[1,0].cla()
 		ax[1,1].cla()
 
+if above:
+	g,gx = plt.subplots(1,3, figsize=(15,5))
+	plt.ion()
+	plt.show()
+
 while True:
 
 	initial_time = time.time()
@@ -251,7 +434,7 @@ while True:
 	# print current time in simulation to command line
 	print("+++ t = " + str(round(t/day,2)) + " days +++")
 	print('T: ',round(temperature_world.max()-273.15,1),' - ',round(temperature_world.min()-273.15,1),' C')
-	print('U: ',round(u.max(),2),' - ',round(u.min(),2),' V: ',round(v.max(),2),' - ',round(v.min(),2),' W: ',round(w.max(),2),' - ',round(w.min(),2))
+	print('U: ',round(u.max(),2),' - ',round(u.min(),2),' V: ',round(v.max(),2),' - ',round(v.min(),2),' W: ',round(w.max(),2),' - ',round(w.min(),4))
 
 	before_radiation = time.time()
 	temperature_world, potential_temperature = top_level.radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, day, year, axial_tilt)
@@ -262,31 +445,31 @@ while True:
 	# update geopotential field
 	for k in np.arange(1,nlevels):
 		geopotential[:,:,k] = geopotential[:,:,k-1] - potential_temperature[:,:,k]*(sigma[k]-sigma[k-1])
-	geopotential = top_level.smoothing_3D(geopotential,smoothing_parameter_t)
 
 	if velocity:
 
 		before_velocity = time.time()
-		u,v,w = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
+		u,v = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
+
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
-		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.1)
+
+		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
+		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
+
+		u[:,:,-1] *= 0.1
+		v[:,:,-1] *= 0.1
+
+		for k in range(nlevels):
+			w[:,:,k] *= pressure_levels[k]/pressure_levels[0]
 		
-		# boundary shite
-		u[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
-		v[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
-		w[(advection_boundary,-advection_boundary-1),:,:] *= 0.5
+		w[:,:,0] = -w[:,:,1]
+		# w[:,:,2] *= 0.1
+		# w[:,:,3] *= 0.5
 
-		u[:advection_boundary,:,:] = 0
-		v[:advection_boundary,:,:] = 0
-		w[:advection_boundary,:,:] = 0
-		u[-advection_boundary:,:,:] = 0
-		v[-advection_boundary:,:,:] = 0
-		w[-advection_boundary:,:,:] = 0
-
-		w[:,:,-1] *= 0
-		w[:,:,-2] *= 0.1
-		w[:,:,-3] *= 0.5
+		# u *= 0
+		# v *= 0
+		# w *= 0
 
 		time_taken = float(round(time.time() - before_velocity,3))
 		print('Velocity: ',str(time_taken),'s')
@@ -294,23 +477,98 @@ while True:
 		if advection:
 			before_advection = time.time()
 
-			# allow for thermal advection in the atmosphere, and heat diffusion in the atmosphere and the ground
+			# allow for thermal advection in the atmosphere
 			atmosp_addition = dt*top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,pressure_levels)
-			atmosp_addition[(-advection_boundary,advection_boundary-1),:,:] *= 0.5
-			atmosp_addition[:advection_boundary,:,:] *= 0
-			atmosp_addition[-advection_boundary:,:,:] *= 0
-			atmosp_addition[:,:,-1] *= 0
-			atmosp_addition[:,:,-2] *= 0.5
-			potential_temperature -= atmosp_addition
-
-			# temperature_world -= dt*(thermal_diffusivity_roc*top_level.laplacian_2D(temperature_world,dx,dy))
 
 			time_taken = float(round(time.time() - before_advection,3))
 			print('Advection: ',str(time_taken),'s')
-	
-	# before_plot = time.time()
-	if plot:
 
+			before_projection = time.time()
+
+			###################################################################
+
+			### north pole ###
+			north_temperature_data = potential_temperature[pole_low_index_N:,:,:]
+			north_polar_plane_temperature = beam_me_up(lat[pole_low_index_N:],lon,north_temperature_data,pole_low_index_N,grid_xx_N.shape[0],grid_lat_coords_N,grid_lon_coords_N)
+			north_polar_plane_actual_temperature = low_level.theta_to_t(north_polar_plane_temperature,pressure_levels)
+			
+			north_geopotential_data = geopotential[pole_low_index_N:,:,:]
+			north_polar_plane_geopotential = beam_me_up(lat[pole_low_index_N:],lon,north_geopotential_data,pole_low_index_N,grid_xx_N.shape[0],grid_lat_coords_N,grid_lon_coords_N)
+			
+			# calculate local velocity on Cartesian grid (CARTESIAN)
+			x_dot_add,y_dot_add = grid_velocities_north(north_polar_plane_geopotential,grid_side_length,coriolis_plane_N)
+			x_dot_N += x_dot_add
+			y_dot_N += y_dot_add
+			z_dot = grid_vertical_velocity(x_dot_N,y_dot_N,pressure_levels,gravity,north_polar_plane_actual_temperature)
+			# advect temperature field, isolate field to subtract from existing temperature field (CARTESIAN)
+			north_polar_plane_addition = polar_plane_advect(north_polar_plane_temperature,x_dot_N,y_dot_N,z_dot,pressure_levels)
+			
+			# project velocities onto polar grid (POLAR)
+			reproj_u_N, reproj_v_N = project_velocities_north(lon,x_dot_N,y_dot_N,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,north_temperature_data)
+			reproj_w_N = beam_me_down(lon,z_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
+			# combine velocities with those calculated on polar grid (POLAR)
+			reproj_u_N = combine_data(pole_low_index_N,pole_high_index_N,u[pole_low_index_N:,:,:],reproj_u_N)
+			reproj_v_N = combine_data(pole_low_index_N,pole_high_index_N,v[pole_low_index_N:,:,:],reproj_v_N)
+			reproj_w_N = combine_data(pole_low_index_N,pole_high_index_N,w[pole_low_index_N:,:,:],reproj_w_N)
+			# add the combined velocities to the global velocity arrays
+			u[pole_low_index_N:,:,:] = reproj_u_N
+			v[pole_low_index_N:,:,:] = reproj_v_N
+			w[pole_low_index_N:,:,:] = reproj_w_N
+
+			north_temperature_resample = combine_data(pole_low_index_N,pole_high_index_N,north_temperature_data,beam_me_down(lon,north_polar_plane_temperature,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N))
+
+			# project addition to temperature field onto polar grid (POLAR)
+			north_reprojected_addition = -beam_me_down(lon,north_polar_plane_addition,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
+			# combine addition calculated on polar grid with that calculated on the cartestian grid (POLAR)
+			north_addition_smoothed = combine_data(pole_low_index_N,pole_high_index_N,atmosp_addition[pole_low_index_N:,:,:],north_reprojected_addition)
+			# add the blended/combined addition to global temperature addition array
+			atmosp_addition[pole_low_index_N:,:,:] = north_addition_smoothed
+
+			###################################################################
+
+			### south pole ###
+			south_temperature_data = potential_temperature[:pole_low_index_S,:,:]
+			south_polar_plane_temperature = beam_me_up(lat[:pole_low_index_S],lon,south_temperature_data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
+			south_polar_plane_actual_temperature = low_level.theta_to_t(south_polar_plane_temperature,pressure_levels)
+
+			south_geopotential_data = geopotential[:pole_low_index_S,:,:]
+			south_polar_plane_geopotential = beam_me_up(lat[:pole_low_index_S],lon,south_geopotential_data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
+			
+			x_dot_add,y_dot_add = grid_velocities_south(south_polar_plane_geopotential,grid_side_length,coriolis_plane_S)
+			x_dot_S += x_dot_add
+			y_dot_S += y_dot_add
+			z_dot = grid_vertical_velocity(x_dot_S,y_dot_S,pressure_levels,gravity,south_polar_plane_actual_temperature)
+			south_polar_plane_addition = polar_plane_advect(south_polar_plane_temperature,x_dot_S,y_dot_S,z_dot,pressure_levels)
+
+			reproj_u_S, reproj_v_S = project_velocities_south(lon,x_dot_S,y_dot_S,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,south_temperature_data)
+			reproj_w_S = beam_me_down(lon,z_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
+			
+			reproj_u_S = combine_data(pole_low_index_S,pole_high_index_S,u[:pole_low_index_S,:,:],reproj_u_S)
+			reproj_v_S = combine_data(pole_low_index_S,pole_high_index_S,v[:pole_low_index_S,:,:],reproj_v_S)
+			reproj_w_S = combine_data(pole_low_index_S,pole_high_index_S,w[:pole_low_index_S,:,:],reproj_w_S)
+
+			south_temperature_resample = combine_data(pole_low_index_S,pole_high_index_S,south_temperature_data,beam_me_down(lon,south_polar_plane_temperature,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S))
+			
+			south_reprojected_addition = beam_me_down(lon,south_polar_plane_addition,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)	
+			south_addition_smoothed = combine_data(pole_low_index_S,pole_high_index_S,atmosp_addition[:pole_low_index_S,:,:],south_reprojected_addition)
+			atmosp_addition[:pole_low_index_S,:,:] = south_addition_smoothed		
+
+			u[:pole_low_index_S,:,:] = reproj_u_S
+			v[:pole_low_index_S,:,:] = reproj_v_S
+			w[:pole_low_index_S,:,:] = reproj_w_S
+
+			# atmosp_addition = top_level.smoothing_3D(atmosp_addition,0.4,0.4)
+			atmosp_addition[:,:,0] = atmosp_addition[:,:,1]
+
+			###################################################################
+
+			potential_temperature -= atmosp_addition
+
+			time_taken = float(round(time.time() - before_projection,3))
+			print('Projection: ',str(time_taken),'s')
+
+	if plot:
+		before_plot = time.time()
 		# update plot
 		if not diagnostic:
 			ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic',levels=15)
@@ -364,9 +622,30 @@ while True:
 				axis.set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
 				axis.set_yscale('log')
 			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
-		
-		plt.pause(0.01)
-		
+
+		time_taken = float(round(time.time() - before_plot,3))
+		print('Plotting: ',str(time_taken),'s')	
+	if above and velocity and advection:
+		sample = -2
+		gx[0].set_title('Original data')
+		gx[1].set_title('Polar plane')
+		gx[2].set_title('Reprojected data')
+
+		# gx[0].contourf(lon,lat[:pole_low_index_S],south_temperature_data[:,:,sample])
+		# gx[1].contourf(grid_x_values_S,grid_y_values_S,south_polar_plane_temperature[:,:,sample])
+		# gx[1].quiver(grid_x_values_S,grid_y_values_S,x_dot_S[:,:,sample],y_dot_S[:,:,sample])
+		# gx[2].contourf(lon,lat[:pole_low_index_S],south_temperature_resample[:,:,sample])
+		# gx[2].quiver(lon[::5],lat[:pole_low_index_S],reproj_u_S[:,::5,sample],reproj_v_S[:,::5,sample])
+
+		gx[0].contourf(lon,lat[pole_low_index_N:],north_temperature_data[:,:,sample])
+		gx[1].contourf(grid_x_values_N,grid_y_values_N,north_polar_plane_temperature[:,:,sample])
+		gx[1].quiver(grid_x_values_N,grid_y_values_N,x_dot_N[:,:,sample],y_dot_N[:,:,sample])
+		gx[2].contourf(lon,lat[pole_low_index_N:],north_temperature_resample[:,:,sample])
+		gx[2].quiver(lon[::5],lat[pole_low_index_N:],reproj_u_N[:,::5,sample],reproj_v_N[:,::5,sample])
+	
+	# clear plots
+	if plot or above:	plt.pause(0.01)
+	if plot:
 		if not diagnostic:
 			ax[0].cla()
 			ax[1].cla()
@@ -379,19 +658,12 @@ while True:
 			ax[0,1].cla()
 			ax[1,0].cla()
 			ax[1,1].cla()
+	if above:
+		gx[0].cla()
+		gx[1].cla()
+		gx[2].cla()
 
-	polar_plane = beam_me_up(lat,lon,potential_temperature[:pole_lower_latitude_limit,:,0],pole_lower_latitude_limit,grid_xx.shape[0],grid_lat_coords,grid_lon_coords)
-	resample = beam_me_down(lat,lon,polar_plane,pole_lower_latitude_limit,polar_x_coords,polar_y_coords)
-
-	# f,ax = plt.subplots(2)
-	# ax[0].contourf(potential_temperature[:pole_lower_latitude_limit,:,0])
-	# ax[1].contourf(polar_plane)
-	# plt.show()
-
-	# time_taken = float(round(time.time() - before_plot,3))
-	# print('Plotting: ',str(time_taken),'s')
-
-	# advance time by one timestep
+	# advance time by one timesteps
 	t += dt
 
 	time_taken = float(round(time.time() - initial_time,3))

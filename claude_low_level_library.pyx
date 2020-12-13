@@ -11,14 +11,14 @@ cdef DTYPE_f sigma = 5.67E-8
 
 # define various useful differential functions:
 # gradient of scalar field a in the local x direction at point i,j
-def scalar_gradient_x(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j,np.int_t k):
+cpdef scalar_gradient_x(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j,np.int_t k):
 	return (a[i,(j+1)%nlon,k]-a[i,(j-1)%nlon,k])/dx[i]
 
-def scalar_gradient_x_2D(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j):
+cpdef scalar_gradient_x_2D(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j):
 	return (a[i,(j+1)%nlon]-a[i,(j-1)%nlon])/dx[i]
 
 # gradient of scalar field a in the local y direction at point i,j
-def scalar_gradient_y(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t j,np.int_t k):
+cpdef scalar_gradient_y(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t j,np.int_t k):
 	if i == 0:
 		return 2*(a[i+1,j,k]-a[i,j,k])/dy
 	elif i == nlat-1:
@@ -26,7 +26,7 @@ def scalar_gradient_y(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t 
 	else:
 		return (a[i+1,j,k]-a[i-1,j,k])/dy
 
-def scalar_gradient_y_2D(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t j):
+cpdef scalar_gradient_y_2D(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t j):
 	if i == 0:
 		return 2*(a[i+1,j]-a[i,j])/dy
 	elif i == nlat-1:
@@ -34,7 +34,7 @@ def scalar_gradient_y_2D(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int
 	else:
 		return (a[i+1,j]-a[i-1,j])/dy
 
-def scalar_gradient_z_1D(np.ndarray a,np.ndarray pressure_levels,np.int_t k):
+cpdef scalar_gradient_z_1D(np.ndarray a,np.ndarray pressure_levels,np.int_t k):
 	cdef np.int_t nlevels = len(pressure_levels)
 	if k == 0:
 		return -(a[k+1]-a[k])/(pressure_levels[k+1]-pressure_levels[k])
@@ -43,14 +43,14 @@ def scalar_gradient_z_1D(np.ndarray a,np.ndarray pressure_levels,np.int_t k):
 	else:
 		return -(a[k+1]-a[k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
 
-def surface_optical_depth(DTYPE_f lat):
+cpdef surface_optical_depth(DTYPE_f lat):
 	return 4# + np.cos(lat*inv_90)*2
 
-def thermal_radiation(DTYPE_f a):
+cpdef thermal_radiation(DTYPE_f a):
 	return sigma*(a**4)
 
 # power incident on (lat,lon) at time t
-def solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,DTYPE_f  year,DTYPE_f  axial_tilt):
+cpdef solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,DTYPE_f  year,DTYPE_f  axial_tilt):
 	cdef float sun_longitude = -t % day
 	cdef float sun_latitude = axial_tilt*np.cos(t*2*np.pi/year)
 	cdef float value = insolation*np.cos((lat-sun_latitude)*inv_180)
@@ -74,10 +74,10 @@ def solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,DT
 		else:
 			return value
 
-def profile(np.ndarray a):
+cpdef profile(np.ndarray a):
 	return np.mean(np.mean(a,axis=0),axis=0)
 
-def t_to_theta(np.ndarray temperature_atmos, np.ndarray pressure_levels):
+cpdef t_to_theta(np.ndarray temperature_atmos, np.ndarray pressure_levels):
 	cdef np.ndarray output = np.zeros_like(temperature_atmos)
 	cdef np.int_t k
 	cdef DTYPE_f inv_p0
@@ -88,7 +88,7 @@ def t_to_theta(np.ndarray temperature_atmos, np.ndarray pressure_levels):
 
 	return output
 
-def theta_to_t(np.ndarray theta, np.ndarray pressure_levels):
+cpdef theta_to_t(np.ndarray theta, np.ndarray pressure_levels):
 	cdef np.ndarray output = np.zeros_like(theta)
 	cdef np.int_t k
 	cdef DTYPE_f inv_p0

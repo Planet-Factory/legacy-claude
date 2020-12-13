@@ -8,7 +8,7 @@ cimport cython
 ctypedef np.float64_t DTYPE_f
 
 # laplacian of scalar field a
-def laplacian_2D(np.ndarray a,np.ndarray dx,DTYPE_f dy):
+cpdef laplacian_2D(np.ndarray a,np.ndarray dx,DTYPE_f dy):
 	cdef np.ndarray output = np.zeros_like(a)
 	cdef np.int_t nlat,nlon,i,j
 	cdef DTYPE_f inv_dx, inv_dy
@@ -21,7 +21,7 @@ def laplacian_2D(np.ndarray a,np.ndarray dx,DTYPE_f dy):
 			output[i,j] = (low_level.scalar_gradient_x_2D(a,dx,nlon,i,j) - low_level.scalar_gradient_x_2D(a,dx,nlon,i,j))*inv_dx + (low_level.scalar_gradient_y_2D(a,dy,nlat,i+1,j) - low_level.scalar_gradient_y_2D(a,dy,nlat,i-1,j))*inv_dy
 	return output
 
-def laplacian_3D(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
+cpdef laplacian_3D(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
 	cdef np.ndarray output = np.zeros_like(a)
 	cdef np.int_t nlat,nlon,nlevels,i,j,k
 	cdef DTYPE_f inv_dx, inv_dy
@@ -37,7 +37,7 @@ def laplacian_3D(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
 	return output
 
 # divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field
-def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_levels):
+cpdef divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_levels):
 	cdef np.ndarray output = np.zeros_like(a)
 	cdef np.ndarray au, av, aw
 	cdef np.int_t nlat, nlon, nlevels, i, j, k 
@@ -57,7 +57,7 @@ def divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,n
 				
 	return output
 
-def radiation_calculation(np.ndarray temperature_world, np.ndarray potential_temperature, np.ndarray pressure_levels, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
+cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_temperature, np.ndarray pressure_levels, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
 	cdef np.int_t nlat,nlon,nlevels,i,j,k
 	cdef DTYPE_f fl = 0.1
@@ -106,7 +106,7 @@ def radiation_calculation(np.ndarray temperature_world, np.ndarray potential_tem
 	
 	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
-def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
+cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
 	
 	# introduce temporary arrays to update velocity in the atmosphere
 	cdef np.ndarray u_temp = np.zeros_like(u)
@@ -125,31 +125,37 @@ def velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray press
 		for j in range(nlon):
 			for k in range(nlevels):
 				
-				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(u[i,j,:],pressure_levels,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(geopotential,dx,nlon,i,j,k) - 1E-5*u[i,j,k])
-				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(v[i,j,:],pressure_levels,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(geopotential,dy,nlat,i,j,k) - 1E-5*v[i,j,k])
+				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(u[i,j,:],pressure_levels,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(geopotential,dx,nlon,i,j,k) - 1E-4*u[i,j,k])
+				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(v[i,j,:],pressure_levels,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(geopotential,dy,nlat,i,j,k) - 1E-4*v[i,j,k])
+	u += u_temp
+	v += v_temp
 	
-	temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels)
+	# approximate surface friction
+	u[:,:,0] *= 0.8
+	v[:,:,0] *= 0.8
 
+	return u,v
+
+cpdef w_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
+	cdef np.ndarray w_temp = np.zeros_like(u)
+	cdef np.ndarray temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels) 
+	
+	cdef np.int_t nlat,nlon,nlevels,i,j,k
+
+	nlat = geopotential.shape[0]
+	nlon = geopotential.shape[1]
+	nlevels = len(pressure_levels)
+	
 	for i in np.arange(2,nlat-2).tolist():
 		for j in range(nlon):
 			for k in np.arange(1,nlevels).tolist():
 				w_temp[i,j,k] = w_temp[i,j,k-1] - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( low_level.scalar_gradient_x(u,dx,nlon,i,j,k) + low_level.scalar_gradient_y(v,dy,nlat,i,j,k) )/(287*temperature_atmos[i,j,k])
 
-	u += u_temp
-	v += v_temp
 	w += w_temp
 
-	# approximate surface friction
-	u[:,:,0] *= 0.8
-	v[:,:,0] *= 0.8
+	return w
 
-	# try to eliminate problems at top boundary
-	u[:,:,-1] *= 0.5
-	v[:,:,-1] *= 0.5
-
-	return u,v,w
-
-def smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter, DTYPE_f vert_smooth_parameter=0.5):
+cpdef smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter, DTYPE_f vert_smooth_parameter=0.5):
 	cdef np.int_t nlat = a.shape[0]
 	cdef np.int_t nlon = a.shape[1]
 	cdef np.int_t nlevels = a.shape[2]
