@@ -6,14 +6,16 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import time, sys, pickle
-import claude_low_level_library as low_level
-import claude_top_level_library as top_level
+import claude_low_level_library_numba as low_level
+import claude_top_level_library_numba as top_level
 from scipy.interpolate import interp2d, RectBivariateSpline
 # from twitch import prime_sub
 
 import atexit
 from multiprocessing import Process, Queue
 from plotting_utils import plotter_thread
+
+from numba import jit, njit, prange, vectorize, guvectorize, float64, int64
 
 ######## CONTROL ########
 
@@ -55,6 +57,14 @@ nplots = 3						# how many levels you want to see plots of (evenly distributed t
 
 pole_lower_latitude_limit = -60
 pole_higher_latitude_limit = -75
+
+#######################################
+# Chattercube/FractalMachinist
+
+# At this point, the main math is tens of times too fast for matplotlib to update
+# Set DROP_FRAMES = True to prevent a backup/queue of frames to draw
+# Set DROP_FRAMES = False to allow a backlog and ensure that every timestep gets drawn
+DROP_FRAMES = True
 
 ###########################
 
@@ -204,6 +214,8 @@ def beam_me_down(lon,data,pole_low_index,grid_x_values,grid_y_values,polar_x_coo
 		f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data[:,:,k])
 		resample[:,:,k] = f(polar_x_coords,polar_y_coords,grid=False).reshape((int(len(polar_x_coords)/len(lon)),len(lon)))
 	return resample
+
+@jit(parallel=True)
 def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data): 
 	output = np.zeros_like(polar_data)
 	overlap = abs(pole_low_index - pole_high_index)
@@ -232,6 +244,8 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data):
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 
 	return output
+
+@jit
 def grid_x_gradient(data,i,j,k):
 	if j == 0:
 		value = (data[i,j+1,k] - data[i,j,k])/(polar_grid_resolution)
@@ -240,6 +254,9 @@ def grid_x_gradient(data,i,j,k):
 	else:
 		value = (data[i,j+1,k] - data[i,j-1,k])/(2*polar_grid_resolution)
 	return value
+
+
+@jit
 def grid_y_gradient(data,i,j,k):
 	if i == 0:
 		value = (data[i+1,j,k] - data[i,j,k])/(polar_grid_resolution)
@@ -248,6 +265,8 @@ def grid_y_gradient(data,i,j,k):
 	else:
 		value = (data[i+1,j,k] - data[i-1,j,k])/(2*polar_grid_resolution)
 	return value
+
+@jit
 def grid_p_gradient(data,i,j,k,pressure_levels):
 	if k == 0:
 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
@@ -256,71 +275,97 @@ def grid_p_gradient(data,i,j,k,pressure_levels):
 	else:
 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
 	return value
+
+@jit
 def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
-	for i in range(grid_side_length):
-		for j in range(grid_side_length):
-			for k in range(polar_plane.shape[2]):
+	for i in prange(grid_side_length):
+		for j in prange(grid_side_length):
+			for k in prange(polar_plane.shape[2]):
 				# x_dot[i,j,k] = -grid_y_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
 				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
 	return x_dot,y_dot
+
+
+@njit(parallel=True)
 def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
-	for i in range(grid_side_length):
-		for j in range(grid_side_length):
-			for k in range(polar_plane.shape[2]):
+	for i in prange(grid_side_length):
+		for j in prange(grid_side_length):
+			for k in prange(polar_plane.shape[2]):
 				# x_dot[i,j,k] = -grid_y_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
 				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
 	return x_dot,y_dot
+
+@njit(parallel=True)
 def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
 	output = np.zeros_like(x_dot)
-	for i in range(output.shape[0]):
-		for j in range(output.shape[1]):
-			for k in range(output.shape[2]):
+	for i in prange(output.shape[0]):
+		for j in prange(output.shape[1]):
+			for k in prange(output.shape[2]):
 				output[i,j,k] = - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( grid_x_gradient(x_dot,i,j,k) + grid_y_gradient(y_dot,i,j,k) )/(287*temperature[i,j,k])
 	return output
+
+
+
+
 def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
 
+	return _project_velocities_north(data, reproj_x_dot, reproj_y_dot, lon);
+
+@njit(parallel=True)
+def _project_velocities_north(data, reproj_x_dot, reproj_y_dot, lon):
 	reproj_u = np.zeros_like(data)
 	reproj_v = np.zeros_like(data)
 
-	for i in range(data.shape[0]):
-		for j in range(data.shape[1]):
-			for k in range(data.shape[2]):
+	for i in prange(data.shape[0]):
+		for j in prange(data.shape[1]):
+			for k in prange(data.shape[2]):
 				reproj_u[i,j,k] = - reproj_x_dot[i,j,k]*np.sin(lon[j]*np.pi/180) - reproj_y_dot[i,j,k]*np.cos(lon[j]*np.pi/180)
 				reproj_v[i,j,k] = reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) - reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
 
 	return reproj_u, reproj_v
+
+
+
+
+
 def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
 
+	return _project_velocities_south(data, reproj_x_dot, reproj_y_dot, lon)
+
+@njit(parallel=True)
+def _project_velocities_south(data, reproj_x_dot, reproj_y_dot, lon):
 	reproj_u = np.zeros_like(data)
 	reproj_v = np.zeros_like(data)
 
-	for i in range(data.shape[0]):
-		for j in range(data.shape[1]):
-			for k in range(data.shape[2]):
+	for i in prange(data.shape[0]):
+		for j in prange(data.shape[1]):
+			for k in prange(data.shape[2]):
 				reproj_u[i,j,k] = reproj_x_dot[i,j,k]*np.sin(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.cos(lon[j]*np.pi/180)
 				reproj_v[i,j,k] = - reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
 
 	return reproj_u, reproj_v
+
+@njit(parallel=True)
 def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
 	output = np.zeros_like(data)
 	data_x_dot = data*x_dot
 	data_y_dot = data*y_dot
 	data_z_dot = data*z_dot
-	for i in range(data.shape[0]):
-		for j in range(data.shape[1]):
-			for k in range(data.shape[2]):
+	for i in prange(data.shape[0]):
+		for j in prange(data.shape[1]):
+			for k in prange(data.shape[2]):
 				output[i,j,k] = grid_x_gradient(data_x_dot,i,j,k) + grid_y_gradient(data_y_dot,i,j,k) + grid_p_gradient(data_z_dot,i,j,k,pressure_levels)
 	return output
 
@@ -343,14 +388,16 @@ def init_plot():
 	return q
 
 def update_plot():
+	if not DROP_FRAMES or Q.qsize() < 2:
+		uvw = u, v, w
+		data = potential_temperature, pressure_levels, atmosp_addition, temperature_world, t, north_temperature_data, north_temperature_resample, north_polar_plane_temperature, south_temperature_data, south_temperature_resample, south_polar_plane_temperature
 
-	uvw = u, v, w
-	data = potential_temperature, pressure_levels, atmosp_addition, temperature_world, t, north_temperature_data, north_temperature_resample, north_polar_plane_temperature, south_temperature_data, south_temperature_resample, south_polar_plane_temperature
 
+		reprojections = reproj_u_N, reproj_u_S, reproj_v_N, reproj_v_S
 
-	reprojections = reproj_u_N, reproj_u_S, reproj_v_N, reproj_v_S
-
-	Q.put([uvw, data, reprojections, velocity]);
+		Q.put([uvw, data, reprojections, velocity]);
+	else:
+		print("[NOTE] Skipping Drawing to prevent backlog")
 
 def kill_plot():
 	Q.put('stop');
@@ -382,8 +429,9 @@ if load:
 	potential_temperature,temperature_world,u,v,w,t,albedo = pickle.load(open("save_file.p","rb"))
 
 Q = init_plot()
-
+print("[NOTE] The Numba compiler will spend the first 20-30 seconds compiling. You'll notice when it's done.")
 while True:
+# while t/day < 2.5:
 
 	initial_time = time.time()
 
@@ -402,6 +450,8 @@ while True:
 	before_radiation = time.time()
 	temperature_world, potential_temperature = top_level.radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, day, year, axial_tilt)
 	potential_temperature = top_level.smoothing_3D(potential_temperature,smoothing_parameter_t)
+	
+
 	time_taken = float(round(time.time() - before_radiation,3))
 	print('Radiation: ',str(time_taken),'s')
 
@@ -545,3 +595,4 @@ while True:
 	if np.isnan(u.max()):
 		Q.put('STOP');
 		sys.exit()
+Q.put('STOP')
