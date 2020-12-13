@@ -42,3 +42,5 @@ TODO: Add LICENSE
 
 ### THIS FORK
 The purpose of this fork is to determine what backend/system allows for the easiest speedup.
+
+The current winner is a threaded queue for matplotlib drawing, and a Numba-accelerated top/low library, which is a very light re-skinning.
