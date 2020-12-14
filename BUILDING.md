@@ -36,6 +36,40 @@ If you choose to use MinGW, follow the instructions in the [cython documentation
 If you choose to use Microsoft Visual C/C++, follow the instructions on the [Python website](https://wiki.python.org/moin/WindowsCompilers).
 
 ### 3. Use pip to install python libraries
+#### Automated installation with pipenv (recommended)
+This is the easiest way to get everything running. Pipenv is a tool that specifies the exact version of every library to 
+make sure that you're python environment is exactly the the same. For this reason **it requires the same python version
+(currently 3.9)**. Pipenv also creates a virtual python environment which means all the libraries are not installed 
+globally which prevents version mismatch issues.
+ 
+Once you have python 3.9 installed install pipenv:
+```
+pip install pipenv
+```
+
+Navigate to the claude folder and setup the environment.
+```
+pipenv install
+```
+
+Pipenv creates a virtual python environment, this means that you have to be in this environment to use the libaries
+that pipenv just downloaded. One way of doing this is the following. You will need to run this before running the
+commands in step 4. You will need to do this everytime you open a new terminal.
+```
+pipenv shell
+```
+
+Now you can run all python calls as normal
+```
+python toy_model.py
+```
+ 
+You can also prefix every command with `pipenv run` instead. Eg
+```
+pipenv run python toy_model.py
+```
+
+#### Manual installation
 Using command prompt, install the pip packages [cython](https://pypi.org/project/Cython/), [numpy](https://pypi.org/project/numpy/), and [matplotlib](https://pypi.org/project/matplotlib/), as well as [setuptools](https://pypi.org/project/setuptools/), if for some reason it is not already installed.
 The syntax to install a package with pip is
 ```
@@ -49,6 +83,11 @@ Simply open command prompt, navigate to directory containing this file, and run:
 python claude_setup.py build_ext --inplace
 ```
 This will convert the `.pyx` files in the repository to C files, then compile them.
+
+If you used pipenv you can also run the following shortcut:
+```
+pipenv run compile
+```
 
 ### 5. Run the model
 Simply run this in your command prompt, while in the directory containing this file.
