@@ -78,6 +78,7 @@ def plotter_thread(q, plots, uvw, latlon, data, misc, flags, pole_indices, grid_
 		if not diagnostic:
 			ax[0].cla()
 			ax[1].cla()
+			cbar_ax.cla()
 			if level_plots:
 				for k in range(nplots):
 					bx[k].cla()		
