@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import claude_low_level_library as low_level
+import claude_low_level_library_numba as low_level
 import numpy as np
 import time
 
