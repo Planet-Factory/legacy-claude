@@ -11,11 +11,29 @@ import claude_top_level_library_numba as top_level
 from scipy.interpolate import interp2d, RectBivariateSpline
 # from twitch import prime_sub
 
-import atexit
+######## OPTIMIZATIONS ########
+
+import atexit # No matter if we exit gracefully or disasterously, do every function we called atexit.register on. Essentially, atexit.register(cleanup_function)
+#					calls cleanup_function() once the program would stop.
+
 from multiprocessing import Process, Queue
 from plotting_utils import plotter_thread
+# The slowest task by far is matplotlib, so we move the plotter_thread function to a separate Process, and we Queue up new data timesteps for it to draw.
 
-from numba import jit, njit, prange, vectorize, guvectorize, float64, int64
+# Set DROP_FRAMES = True to prevent a backup/queue of frames to draw, drawing the soonest available data next and skipping in between.
+# Set DROP_FRAMES = False to allow a backlog and ensure that every timestep gets drawn.
+DROP_FRAMES = True
+
+
+from numba import jit, njit, prange
+# Numba is replacing cython because it includes support for both byte-level and core-level optimization.
+# byte-level: adding 2+3 and 4+8 is a lot like adding 24+38 and unpacking. If our packing (eg (2,4)->24) and unpacking are faster than our addition,
+#			  then it's worth it to pack multiple operations together in what's called 'vectorization'.
+# core-level: taking advantage of CPU architecture (eg multiple cores and threads) to evaluate independant tasks at the same time.
+
+# jit: tell the numba compiler to pay attention to this
+# njit: tell the numba compiler to rebuild this with optimization
+# prange: a replacement for 'range' that lets numba know that the loops are safe to do in parallel
 
 ######## CONTROL ########
 
@@ -58,15 +76,7 @@ nplots = 3						# how many levels you want to see plots of (evenly distributed t
 pole_lower_latitude_limit = -60
 pole_higher_latitude_limit = -75
 
-#######################################
-# Chattercube/FractalMachinist
 
-# At this point, the main math is tens of times too fast for matplotlib to update
-# Set DROP_FRAMES = True to prevent a backup/queue of frames to draw
-# Set DROP_FRAMES = False to allow a backlog and ensure that every timestep gets drawn
-DROP_FRAMES = True
-
-###########################
 
 # define coordinate arrays
 lat = np.arange(-90,91,resolution)
@@ -195,6 +205,9 @@ for i in np.arange(pole_low_index_N,nlat):
 print(pole_low_index_S,pole_high_index_S)
 print(pole_low_index_N,pole_high_index_N)
 
+# Q. Why aren't the beam_me_up functions wrapped in numba?
+# A. numba is actually limited to numpy functions, and RectBivariateSpline is a scipy function.
+#		This is a solvable problem, but not an efficient use of human time.
 def beam_me_up_2D(lats,lon,data,pole_low_index,grid_size,grid_lat_coords,grid_lon_coords):
 	'''Projects data on lat-lon grid to x-y polar grid'''
 	f = RectBivariateSpline(lats, lon, data)
@@ -215,14 +228,15 @@ def beam_me_down(lon,data,pole_low_index,grid_x_values,grid_y_values,polar_x_coo
 		resample[:,:,k] = f(polar_x_coords,polar_y_coords,grid=False).reshape((int(len(polar_x_coords)/len(lon)),len(lon)))
 	return resample
 
-@jit(parallel=True)
+
+@njit(parallel=True)
 def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data): 
 	output = np.zeros_like(polar_data)
 	overlap = abs(pole_low_index - pole_high_index)
 
 	if lat[pole_low_index] < 0:
-		for k in range(output.shape[2]):
-			for i in range(pole_low_index):
+		for k in prange(output.shape[2]):
+			for i in prange(pole_low_index):
 				
 				if i < pole_high_index:
 					scale_polar_data = 0.0
@@ -232,8 +246,8 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data):
 					scale_reprojected_data = 1 - (i-pole_high_index)/overlap
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 	else:	# PROBLEM APPEARS TO BE HERE IN NORTH POLE BOUNDARY
-		for k in range(output.shape[2]):
-			for i in range(nlat-pole_low_index):
+		for k in prange(output.shape[2]):
+			for i in prange(nlat-pole_low_index):
 				
 				if i + pole_low_index + 1 > pole_high_index:
 					scale_polar_data = 0.0
