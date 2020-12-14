@@ -66,8 +66,9 @@ The following programs and libraries are required to build CLAuDE:
  - cython
  - numpy
  - matplotlib
+ - scipy
 
-If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib`.
+If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib` `python-scipy`.
 
 ### 1. Clone the repository.
 Using the git command line, and cloning via https, this command will do it:
@@ -146,7 +147,7 @@ git clone https://github.com/Planet-Factory/claude.git
 ```
 
 ### 3. Install dependencies
-To build the project, you require `python`, as well as the python libraries `setuptools`, `cython`, `numpy`, and `matplotlib`.
+To build the project, you require `python`, as well as the python libraries `setuptools`, `cython`, `numpy`, `matplotlib` and `scipy`.
 First, use brew to install python:
 ```
 brew install python
@@ -157,6 +158,7 @@ Then, use `pip`, a python package manager that is installed with python to insta
 pip install cython
 pip install numpy
 pip install matplotlib
+pip install scipy
 ```
 
 ### 4. Using Cython, compile `claude_low_level_library` and `claude_top_level_library`
