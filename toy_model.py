@@ -97,13 +97,10 @@ for i in range(len(sigma)):
 
 ###########################
 
-albedo = np.zeros_like(temperature_world) + 0.2
 heat_capacity_earth = np.zeros_like(temperature_world) + 1E6
 
 albedo_variance = 0.001
-for i in range(nlat):
-	for j in range(nlon):
-		albedo[i,j] += np.random.uniform(-albedo_variance,albedo_variance)
+albedo = np.random.uniform(-albedo_variance,albedo_variance, (nlat, nlon)) + 0.2
 
 specific_gas = 287
 thermal_diffusivity_roc = 1.5E-6
@@ -138,14 +135,8 @@ grid_xx_S,grid_yy_S = np.meshgrid(grid_x_values_S,grid_y_values_S)
 
 grid_side_length = len(grid_x_values_S)
 
-grid_lat_coords_S = []
-grid_lon_coords_S = []
-for i in range(grid_xx_S.shape[0]):
-	for j in range(grid_xx_S.shape[1]):
-		lat_point = -np.arccos((grid_xx_S[i,j]**2 + grid_yy_S[i,j]**2)**0.5/planet_radius)*180/np.pi
-		lon_point = 180 - np.arctan2(grid_yy_S[i,j],grid_xx_S[i,j])*180/np.pi
-		grid_lat_coords_S.append(lat_point)
-		grid_lon_coords_S.append(lon_point)
+grid_lat_coords_S = (-np.arccos((grid_xx_S**2 + grid_yy_S**2)**0.5/planet_radius)*180/np.pi).flatten()
+grid_lon_coords_S = (180 - np.arctan2(grid_yy_S,grid_xx_S)*180/np.pi).flatten()
 
 polar_x_coords_S = []
 polar_y_coords_S = []
@@ -162,14 +153,8 @@ grid_x_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
 grid_y_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
 grid_xx_N,grid_yy_N = np.meshgrid(grid_x_values_N,grid_y_values_N)
 
-grid_lat_coords_N = []
-grid_lon_coords_N = []
-for i in range(grid_xx_N.shape[0]):
-	for j in range(grid_xx_N.shape[1]):
-		lat_point = np.arccos((grid_xx_N[i,j]**2 + grid_yy_N[i,j]**2)**0.5/planet_radius)*180/np.pi
-		lon_point = 180 - np.arctan2(grid_yy_N[i,j],grid_xx_N[i,j])*180/np.pi
-		grid_lat_coords_N.append(lat_point)
-		grid_lon_coords_N.append(lon_point)
+grid_lat_coords_N = (np.arccos((grid_xx_N**2 + grid_yy_N**2)**0.5/planet_radius)*180/np.pi).flatten()
+grid_lon_coords_N = (180 - np.arctan2(grid_yy_N,grid_xx_N)*180/np.pi).flatten()
 
 polar_x_coords_N = []
 polar_y_coords_N = []
@@ -450,19 +435,19 @@ while True:
 
 		before_velocity = time.time()
 		u,v = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
-
+		print('1:', time.time() - before_velocity)
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
-
+		print('2:', time.time() - before_velocity)
 		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
 		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
-
+		print('3:', time.time() - before_velocity)
 		u[:,:,-1] *= 0.1
 		v[:,:,-1] *= 0.1
 
 		for k in range(nlevels):
 			w[:,:,k] *= pressure_levels[k]/pressure_levels[0]
-		
+		print('4:', time.time() - before_velocity)
 		w[:,:,0] = -w[:,:,1]
 		# w[:,:,2] *= 0.1
 		# w[:,:,3] *= 0.5
