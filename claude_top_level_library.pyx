@@ -107,26 +107,15 @@ cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_t
 	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
 cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
-	
-	# introduce temporary arrays to update velocity in the atmosphere
-	cdef np.ndarray u_temp = np.zeros_like(u)
-	cdef np.ndarray v_temp = np.zeros_like(v)
-	cdef np.ndarray w_temp = np.zeros_like(u)
-	cdef np.ndarray temperature_atmos
-
-	cdef np.int_t nlat,nlon,nlevels,i,j,k
-
-	nlat = geopotential.shape[0]
-	nlon = geopotential.shape[1]
-	nlevels = len(pressure_levels)
 
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
-	for i in np.arange(2,nlat-2).tolist():
-		for j in range(nlon):
-			for k in range(nlevels):
-				
-				u_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(u,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(u,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(u[i,j,:],pressure_levels,k) + coriolis[i]*v[i,j,k] - low_level.scalar_gradient_x(geopotential,dx,nlon,i,j,k) - 1E-4*u[i,j,k])
-				v_temp[i,j,k] += dt*( -u[i,j,k]*low_level.scalar_gradient_x(v,dx,nlon,i,j,k) - v[i,j,k]*low_level.scalar_gradient_y(v,dy,nlat,i,j,k) - w[i,j,k]*low_level.scalar_gradient_z_1D(v[i,j,:],pressure_levels,k) - coriolis[i]*u[i,j,k] - low_level.scalar_gradient_y(geopotential,dy,nlat,i,j,k) - 1E-4*v[i,j,k])
+	cdef np.ndarray u_temp = dt*(-u*low_level.scalar_gradient_x_matrix(u, dx) - v*low_level.scalar_gradient_y_matrix(u, dy) - w*low_level.scalar_gradient_z_matrix(u, pressure_levels) + coriolis[:, None, None]*v - low_level.scalar_gradient_x_matrix(geopotential, dx) - 1E-4*u)
+	cdef np.ndarray v_temp = dt*(-u*low_level.scalar_gradient_x_matrix(v, dx) - v*low_level.scalar_gradient_y_matrix(v, dy) - w*low_level.scalar_gradient_z_matrix(v, pressure_levels) - coriolis[:, None, None]*u - low_level.scalar_gradient_y_matrix(geopotential, dy) - 1E-4*v)
+	u_temp[-2:,:,:] = 0
+	v_temp[-2:,:,:] = 0
+	u_temp[:2,:,:] = 0
+	v_temp[:2:,:] = 0
+
 	u += u_temp
 	v += v_temp
 	

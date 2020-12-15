@@ -14,6 +14,9 @@ cdef DTYPE_f sigma = 5.67E-8
 cpdef scalar_gradient_x(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j,np.int_t k):
 	return (a[i,(j+1)%nlon,k]-a[i,(j-1)%nlon,k])/dx[i]
 
+cpdef scalar_gradient_x_matrix(np.ndarray a,np.ndarray dx):
+	return (np.roll(a, -1, axis=1) - np.roll(a, 1, axis=1)) / dx[:, None, None]
+
 cpdef scalar_gradient_x_2D(np.ndarray a,np.ndarray dx,np.int_t nlon,np.int_t i,np.int_t j):
 	return (a[i,(j+1)%nlon]-a[i,(j-1)%nlon])/dx[i]
 
@@ -25,6 +28,11 @@ cpdef scalar_gradient_y(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_
 		return 2*(a[i,j,k]-a[i-1,j,k])/dy
 	else:
 		return (a[i+1,j,k]-a[i-1,j,k])/dy
+	
+cpdef scalar_gradient_y_matrix(np.ndarray a,DTYPE_f dy):
+	shift_south = np.pad(a, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:]
+	shift_north = np.pad(a, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:]
+	return (shift_north - shift_south)/dy
 
 cpdef scalar_gradient_y_2D(np.ndarray a,DTYPE_f dy,np.int_t nlat,np.int_t i,np.int_t j):
 	if i == 0:
@@ -42,6 +50,13 @@ cpdef scalar_gradient_z_1D(np.ndarray a,np.ndarray pressure_levels,np.int_t k):
 		return -(a[k]-a[k-1])/(pressure_levels[k]-pressure_levels[k-1])
 	else:
 		return -(a[k+1]-a[k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
+
+cpdef scalar_gradient_z_matrix(np.ndarray a, np.ndarray pressure_levels):
+	shift_up = np.pad(a, ((0,0), (0,0), (1,0)), 'edge')[:,:,:-1]
+	shift_down = np.pad(a, ((0,0), (0,0), (0,1)), 'edge')[:,:,1:]
+	shift_pressure_up = np.pad(pressure_levels, (1,0), 'edge')[:-1]
+	shift_pressure_down = np.pad(pressure_levels, (0,1), 'edge')[1:]
+	return - (shift_down - shift_up) / (shift_pressure_down - shift_pressure_up)
 
 cpdef surface_optical_depth(DTYPE_f lat):
 	return 4# + np.cos(lat*inv_90)*2

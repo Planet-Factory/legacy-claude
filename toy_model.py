@@ -435,19 +435,17 @@ while True:
 
 		before_velocity = time.time()
 		u,v = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
-		print('1:', time.time() - before_velocity)
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
-		print('2:', time.time() - before_velocity)
+		print('velo 1:', time.time() - before_velocity)
 		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
 		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
-		print('3:', time.time() - before_velocity)
+		print('velo 2:', time.time() - before_velocity)
 		u[:,:,-1] *= 0.1
 		v[:,:,-1] *= 0.1
 
 		for k in range(nlevels):
 			w[:,:,k] *= pressure_levels[k]/pressure_levels[0]
-		print('4:', time.time() - before_velocity)
 		w[:,:,0] = -w[:,:,1]
 		# w[:,:,2] *= 0.1
 		# w[:,:,3] *= 0.5
