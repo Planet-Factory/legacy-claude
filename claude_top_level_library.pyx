@@ -38,23 +38,13 @@ cpdef laplacian_3D(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
 
 # divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field
 cpdef divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_levels):
-	cdef np.ndarray output = np.zeros_like(a)
 	cdef np.ndarray au, av, aw
-	cdef np.int_t nlat, nlon, nlevels, i, j, k 
-
-	nlat = output.shape[0]
-	nlon = output.shape[1]
-	nlevels = output.shape[2]
-
 	au = a*u
 	av = a*v
 	aw = a*w
 
-	for i in range(nlat):
-		for j in range(nlon):
-			for k in range(nlevels):
-				output[i,j,k] = low_level.scalar_gradient_x(au,dx,nlon,i,j,k) + low_level.scalar_gradient_y(av,dy,nlat,i,j,k) + low_level.scalar_gradient_z_1D(aw[i,j,:],pressure_levels,k)
-				
+	cdef np.ndarray output = low_level.scalar_gradient_x_matrix(au,dx) + low_level.scalar_gradient_y_matrix(av,dy) + low_level.scalar_gradient_z_matrix(aw, pressure_levels)
+
 	return output
 
 cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_temperature, np.ndarray pressure_levels, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
@@ -129,16 +119,13 @@ cpdef w_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_l
 	cdef np.ndarray w_temp = np.zeros_like(u)
 	cdef np.ndarray temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels) 
 	
-	cdef np.int_t nlat,nlon,nlevels,i,j,k
-
-	nlat = geopotential.shape[0]
-	nlon = geopotential.shape[1]
+	cdef np.int_t nlevels, k
 	nlevels = len(pressure_levels)
 	
-	for i in np.arange(2,nlat-2).tolist():
-		for j in range(nlon):
-			for k in np.arange(1,nlevels).tolist():
-				w_temp[i,j,k] = w_temp[i,j,k-1] - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( low_level.scalar_gradient_x(u,dx,nlon,i,j,k) + low_level.scalar_gradient_y(v,dy,nlat,i,j,k) )/(287*temperature_atmos[i,j,k])
+	for k in np.arange(1,nlevels).tolist():
+		w_temp[:,:,k] = w_temp[:,:,k-1] - (pressure_levels[k] - pressure_levels[k-1]) * pressure_levels[k] * gravity * ( low_level.scalar_gradient_x_matrix(u, dx)[:,:,k] + low_level.scalar_gradient_y_matrix(v, dy)[:,:,k] )/(287*temperature_atmos[:,:,k])
+	w_temp[-2:,:,:] = 0
+	w_temp[:2,:,:] = 0
 
 	w += w_temp
 

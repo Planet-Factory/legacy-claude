@@ -437,10 +437,8 @@ while True:
 		u,v = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
-		print('velo 1:', time.time() - before_velocity)
 		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
 		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
-		print('velo 2:', time.time() - before_velocity)
 		u[:,:,-1] *= 0.1
 		v[:,:,-1] *= 0.1
 
@@ -513,7 +511,7 @@ while True:
 			south_temperature_data = potential_temperature[:pole_low_index_S,:,:]
 			south_polar_plane_temperature = beam_me_up(lat[:pole_low_index_S],lon,south_temperature_data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
 			south_polar_plane_actual_temperature = low_level.theta_to_t(south_polar_plane_temperature,pressure_levels)
-
+			
 			south_geopotential_data = geopotential[:pole_low_index_S,:,:]
 			south_polar_plane_geopotential = beam_me_up(lat[:pole_low_index_S],lon,south_geopotential_data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
 			

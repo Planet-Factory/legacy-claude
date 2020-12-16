@@ -104,12 +104,7 @@ cpdef t_to_theta(np.ndarray temperature_atmos, np.ndarray pressure_levels):
 	return output
 
 cpdef theta_to_t(np.ndarray theta, np.ndarray pressure_levels):
-	cdef np.ndarray output = np.zeros_like(theta)
-	cdef np.int_t k
-	cdef DTYPE_f inv_p0
-
-	inv_p0 = 1/pressure_levels[0]
-	for k in range(len(pressure_levels)):
-		output[:,:,k] = theta[:,:,k]*(pressure_levels[k]*inv_p0)**(0.286)
+	cdef DTYPE_f inv_p0 = 1/pressure_levels[0]
+	cdef np.ndarray output = theta*(pressure_levels*inv_p0)**(0.286)
 
 	return output
