@@ -49,51 +49,45 @@ cpdef divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w
 
 cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_temperature, np.ndarray pressure_levels, np.ndarray heat_capacity_earth, np.ndarray albedo, DTYPE_f insolation, np.ndarray lat, np.ndarray lon, np.int_t t, np.int_t dt, DTYPE_f day, DTYPE_f year, DTYPE_f axial_tilt):
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
-	cdef np.int_t nlat,nlon,nlevels,i,j,k
+	cdef np.int_t nlat,nlon,nlevels,k
 	cdef DTYPE_f fl = 0.1
-	cdef np.ndarray upward_radiation,downward_radiation,optical_depth,Q,temperature_atmos
-	cdef DTYPE_f sun_lat, inv_day
+	cdef DTYPE_f inv_day = 1/(24*60*60)
 
-	inv_day = 1/(24*60*60)
+	nlat = lat.shape[0]	
+	nlon = lon.shape[0]
+	nlevels = pressure_levels.shape[0]
 
-	temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels)
-	nlat = temperature_atmos.shape[0]	
-	nlon = temperature_atmos.shape[1]
-	nlevels = temperature_atmos.shape[2]
+	cdef np.ndarray temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels)
+	cdef np.ndarray sun_lat = low_level.surface_optical_depth_array(lat)
+	cdef np.ndarray optical_depth = np.outer(sun_lat, (fl*(pressure_levels/pressure_levels[0]) + (1-fl)*(pressure_levels/pressure_levels[0])**4))
 
-	upward_radiation = np.zeros(nlevels)
-	downward_radiation = np.zeros(nlevels)
-	Q = np.zeros(nlevels)
+	# calculate upward longwave flux, bc is thermal radiation at surface
+	cpdef np.ndarray upward_radiation = np.zeros((nlat,nlon,nlevels))
+	upward_radiation[:,:,0] = low_level.thermal_radiation_matrix(temperature_world)
+	for k in np.arange(1,nlevels):
+		upward_radiation[:,:,k] = (upward_radiation[:,:,k-1] - (optical_depth[:,None,k]-optical_depth[:,None,k-1])*(low_level.thermal_radiation_matrix(temperature_atmos[:,:,k])))/(1 + optical_depth[:,None,k-1] - optical_depth[:,None,k])
 
-	for i in range(nlat):
-		
-		sun_lat = low_level.surface_optical_depth(lat[i])
-		optical_depth = sun_lat*(fl*(pressure_levels/pressure_levels[0]) + (1-fl)*(pressure_levels/pressure_levels[0])**4)
-		
-		for j in range(nlon):
-			
-			# calculate upward longwave flux, bc is thermal radiation at surface
-			upward_radiation[0] = low_level.thermal_radiation(temperature_world[i,j])
-			for k in np.arange(1,nlevels):
-				upward_radiation[k] = (upward_radiation[k-1] - (optical_depth[k]-optical_depth[k-1])*(low_level.thermal_radiation(temperature_atmos[i,j,k])))/(1 + optical_depth[k-1] - optical_depth[k])
-
-			# calculate downward longwave flux, bc is zero at TOA (in model)
-			downward_radiation[-1] = 0
-			for k in np.arange(0,nlevels-1)[::-1]:
-				downward_radiation[k] = (downward_radiation[k+1] - low_level.thermal_radiation(temperature_atmos[i,j,k])*(optical_depth[k+1]-optical_depth[k]))/(1 + optical_depth[k] - optical_depth[k+1])
-			
-			# gradient of difference provides heating at each level
-			for k in np.arange(nlevels):
-				Q[k] = -287*temperature_atmos[i,j,k]*low_level.scalar_gradient_z_1D(upward_radiation-downward_radiation,pressure_levels,k)/(1000*pressure_levels[k])
-				# approximate SW heating of ozone
-				if pressure_levels[k] < 400*100:
-					Q[k] += low_level.solar(75,lat[i],lon[j],t,day, year, axial_tilt)*inv_day*(100/pressure_levels[k])
-
-			temperature_atmos[i,j,:] += Q*dt
-
-			# update surface temperature with shortwave radiation flux
-			temperature_world[i,j] += dt*((1-albedo[i,j])*(low_level.solar(insolation,lat[i],lon[j],t, day, year, axial_tilt) + downward_radiation[0]) - upward_radiation[0])/heat_capacity_earth[i,j] 
+	# calculate downward longwave flux, bc is zero at TOA (in model)
+	cpdef np.ndarray downward_radiation = np.zeros((nlat,nlon,nlevels))
+	downward_radiation[:,:,-1] = 0
+	for k in np.arange(0,nlevels-1)[::-1]:
+		downward_radiation[:,:,k] = (downward_radiation[:,:,k+1] - low_level.thermal_radiation_matrix(temperature_atmos[:,:,k])*(optical_depth[:,None,k+1]-optical_depth[:,None,k]))/(1 + optical_depth[:,None,k] - optical_depth[:,None,k+1])
 	
+	# gradient of difference provides heating at each level
+	cpdef np.ndarray Q = np.zeros((nlat,nlon,nlevels))
+	cpdef np.ndarray z_gradient = low_level.scalar_gradient_z_matrix(upward_radiation - downward_radiation, pressure_levels)
+	cpdef np.ndarray solar_matrix = low_level.solar_matrix(75,lat,lon,t,day, year, axial_tilt)
+	for k in np.arange(nlevels):
+		Q[:,:,k] = -287*temperature_atmos[:,:,k]*z_gradient[:,:,k]/(1000*pressure_levels[None,None,k])
+		# approximate SW heating of ozone
+		if pressure_levels[k] < 400*100:
+			Q[:,:,k] += solar_matrix*inv_day*(100/pressure_levels[k])
+
+	temperature_atmos += Q*dt
+
+	# update surface temperature with shortwave radiation flux
+	temperature_world += dt*((1-albedo)*(low_level.solar_matrix(insolation,lat,lon,t, day, year, axial_tilt) + downward_radiation[:,:,0]) - upward_radiation[:,:,0])/heat_capacity_earth 
+
 	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
 cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):

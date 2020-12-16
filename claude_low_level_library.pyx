@@ -61,7 +61,13 @@ cpdef scalar_gradient_z_matrix(np.ndarray a, np.ndarray pressure_levels):
 cpdef surface_optical_depth(DTYPE_f lat):
 	return 4# + np.cos(lat*inv_90)*2
 
+cpdef surface_optical_depth_array(np.ndarray lat):
+	return np.full_like(lat, 4)# + np.cos(lat*inv_90)*2
+
 cpdef thermal_radiation(DTYPE_f a):
+	return sigma*(a**4)
+
+cpdef thermal_radiation_matrix(np.ndarray a):
 	return sigma*(a**4)
 
 # power incident on (lat,lon) at time t
@@ -89,22 +95,38 @@ cpdef solar(DTYPE_f insolation,DTYPE_f  lat,DTYPE_f lon,np.int_t t,DTYPE_f  day,
 		else:
 			return value
 
+cpdef solar_matrix(DTYPE_f insolation, np.ndarray  lat, np.ndarray lon, np.int_t t, DTYPE_f  day, DTYPE_f  year, DTYPE_f  axial_tilt):
+	cdef float sun_longitude = -t % day
+	cdef float sun_latitude = axial_tilt*np.cos(t*2*np.pi/year)
+	cdef np.ndarray values = insolation*np.cos((lat-sun_latitude)*inv_180)
+	cdef np.ndarray lon_diff, cos_lon
+
+	values = np.fmax(values,0)
+
+	sun_longitude *= 360/day
+	lon_diff = lon-sun_longitude
+	cos_lon = np.cos(lon_diff*inv_180) 
+	values = np.outer(values, cos_lon)
+	
+	cdef np.ndarray in_range_mask = np.logical_and((lat + sun_latitude > -90), (lat + sun_latitude < 90))
+	cdef np.ndarray mask1 = np.logical_and(values < 0, np.logical_not(in_range_mask)[:,None])
+	cdef np.ndarray mask2 = np.logical_and(values < 0, in_range_mask[:,None])
+	cdef np.int_t i
+	for i in range(lat.shape[0]):
+		values[i,:][mask1[i,:]] = insolation*np.cos((lat[i]+sun_latitude)*inv_180)*cos_lon[mask1[i,:]]
+		values[i,:][mask2[i,:]] = 0
+
+	return values
+
 cpdef profile(np.ndarray a):
 	return np.mean(np.mean(a,axis=0),axis=0)
 
 cpdef t_to_theta(np.ndarray temperature_atmos, np.ndarray pressure_levels):
-	cdef np.ndarray output = np.zeros_like(temperature_atmos)
-	cdef np.int_t k
-	cdef DTYPE_f inv_p0
+	cdef DTYPE_f inv_p0 = 1/pressure_levels[0]
 
-	inv_p0 = 1/pressure_levels[0]
-	for k in range(len(pressure_levels)):
-		output[:,:,k] = temperature_atmos[:,:,k]*(pressure_levels[k]*inv_p0)**(-0.286)
-
-	return output
+	return temperature_atmos*(pressure_levels*inv_p0)**(-0.286)
 
 cpdef theta_to_t(np.ndarray theta, np.ndarray pressure_levels):
 	cdef DTYPE_f inv_p0 = 1/pressure_levels[0]
-	cdef np.ndarray output = theta*(pressure_levels*inv_p0)**(0.286)
 
-	return output
+	return theta*(pressure_levels*inv_p0)**(0.286)
