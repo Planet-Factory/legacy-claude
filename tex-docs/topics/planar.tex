@@ -76,43 +76,232 @@ in \autoref{eq:polar lambda1}, transform it such that we end up with only $\lamb
 \end{subequations}
 
 \subsection{The Grid Code}
-To start the planar approximation, we first need to create a grid. Now since the project is made in Python, Simon uses a function to generate a grid from two coordinate vectors (lists with a 
-coordinate as elements). Since the documentation is not language specific I instead opt to use words instead of function calls. What that comes down to is use your favourite language and import 
-the libraries that do this for you, or start coding your own after finding out how to do that (your mileage may vary). Currently I will not explain how to do this but perhaps in a future update 
-I will. Maybe. Anyway, the code for the grid can be found in \autoref{alg:polar grid}. For more explanation about interpolation, please refer to \autoref{sec:interpolation}. Note that the $z$ in 
-\autoref{sec:interpolation} refers to $data$, with $x$ and $y$ being $lon$ and $lat$ respectively. The result of the interpolation is a function, and given an $x$ and $y$ coordinate it will give 
-back a value. The only thing we still need to do is to convert $x$ and $y$ coordinates into $lat$ and $lon$ coordinates, were we make use of \autoref{eq:polar theta3} 
-\footnote{Simon and I disagree whether the arcsin or arccos should be used, however the model is not working as of yet and therefore I opt to leave both in. When everything is working the right 
-function will be used. Apologies!} and \autoref{eq:polar lambda3}.
+To start the planar approximation, we first need to create a grid. One for the north pole, and one for the south pole. Now since the project is made in Python, Simon uses a function to generate 
+a grid from two coordinate vectors (lists with a coordinate as elements). Since the documentation is not language specific I instead opt to use words instead of function calls. What that comes 
+down to is use your favourite language and import the libraries that do this for you, or start coding your own after finding out how to do that (your mileage may vary). To implement the grid 
+function in the exact same way as the numpy packages does, please refer to the following two references \cite{meshgridDoc} \cite{meshgridGFG}. Anyway, the code for the grid can be found in 
+\autoref{alg:polar grid south}. To convert $x, y$ coordinates into $lat, lon$ coordinates, we make use of \autoref{eq:polar theta3} and \autoref{eq:polar lambda3}. Keep in mind that the equations 
+themselves assume that the angles are in radians, whereas the model uses the angles in degrees so they need to be converted. To convert from $lat, lon$ back into $x, y$ we need to combine 
+\autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar y}.
 
-\begin{algorithm}\
-    \caption{Generating the grid for polar approximation}
-    \label{alg:polar grid}
-    $coords_x \leftarrow $ array going from $0$ to $grid\_size$ with steps of $pl_r$ \;
-    $coords_u \leftarrow $ array going from $0$ to $grid\_size$ with steps of $pl_r$ \;
-    $grid \leftarrow $ turn the coordinate vectors $coords_x$ and $coords_y$ into a grid \;
-    $polar\_coords \leftarrow $ empty list (filled in the future with coordinates) \;
+\begin{algorithm}[htb]
+    \caption{Generating the grid for polar approximation of the south pole}
+    \label{alg:polar grid south}
+    \SetKwComment{Comment}{//}{}
+    $poleLowIndexS \leftarrow $ find first index where $lat > poleLowerLatLimit$ \;
+    $poleHighIndexS \leftarrow $ find first index where $lat > poleHigherLatLimit$ \;
+    $polarGridResolution \leftarrow dx[-poleLowIndexS] $ \Comment*[l]{Will be reused for the north pole}
+    $gridSize \leftarrow r \cos(lat[-poleLowIndexS] \frac{\pi}{180})$ \Comment*[l]{Will be reused for the north pole}
+    \BlankLine
 
-    \For{$i \leftarrow 0$ \KwTo $grid.x.length$}{
-        \For{$j \leftarrow 0$ \KwTo $grid.x[i].length$}{
-            $lat\_point \leftarrow \arcsin(\frac{\sqrt{x^2 + y^2}}{r})$ \;
-            $lon\_point \leftarrow \arctan(\frac{grid.x[i, j]}{grid.y[i,j]})$ \;
-            $polar\_coords.append(lat\_point, lon\_point)$ \;
+    $gridXAxisS \leftarrow $ array going from $-gridSize$ to $gridSize$ with steps of $polarGridResolution$ \;
+    $gridYAxisS \leftarrow $ array going from $-gridSize$ to $gridSize$ with steps of $polarGridResolution$ \;
+    $gridXValuesS, gridYValuesS \leftarrow $ generate the grid from the two axis vectors $gridXAxissS$ and $gridYAxissS$ \;
+    $gridSideLength \leftarrow gridXValuesS.length $ \Comment*[l]{Is globally available\dots}
+    \BlankLine 
+
+    $gridLatCoordsS \leftarrow $ empty list \;
+    $gridLonCoordsS \leftarrow $ empty list \;
+    \For{$i \leftarrow 0$ \KwTo $gridXValuesS.length$}{
+        \For{$j \leftarrow 0$ \KwTo $gridXValuesS[i].length$}{
+            $x \leftarrow gridXValuesS[i, j]$ \;
+            $y \leftarrow gridYValuesS[i, j]$ \;
+            $latPoint \leftarrow -\arccos(\frac{\sqrt{x^2 + y^2}}{r})\frac{180}{\pi}$ \;
+            $lonPoint \leftarrow 180 - \arctan(\frac{x}{y})\frac{180}{\pi}$ \;
+            $gridLatCoordsS.append(latPoint)$ \;
+            $gridLonCoordsS.append(lonPoint)$ \;
         }
     }
 
-    $data \leftarrow 2D$ array filled with 0's, with $nlon$ arrays of size $pl_l$ \;
-
-    \For{$i \leftarrow 0$ \KwTo $pl_l$}{
-        $data[i, :] \leftarrow lat[nlat - i]$ \;
-    }
-
-    $f \leftarrow$ function resulting from the interpolation of $lon \frac{\pi}{180}$ and $lat \frac{\pi}{180}$ with $data$ as the data points \;
-    $index \leftarrow 0$ \;
-    \For{$i \leftarrow 0$ \KwTo $grid.x.length$}{
-        \For{$j \leftarrow 0$ \KwTo $grid.x[i].length$}{
-            $plane[i, j] \leftarrow f(polar\_coords[index][0], polar\_coords[index][1])$ \;
-            $index \leftarrow index + 1$ \;
+    \BlankLine
+    $polarXCoordsS \leftarrow$ empty list \;
+    $polarYCoordsS \leftarrow$ empty list \;
+    \For{$i \leftarrow 0$ \KwTo $poleLowIndexS$}{
+        \For{$j \leftarrow 0$ \KwTo $nlon$}{
+            $polarXCoordsS.append(r \cos(lat[i] \frac{\pi}{180}) \sin(lon[j]\frac{\pi}{180}))$ \;
+            $polarYCoordsS.append(-r \cos(lat[i] \frac{\pi}{180}) \cos(lon[j]\frac{\pi}{180}))$ \;
         }
     }
+\end{algorithm}
+
+We need to do a similar thing for the north pole and insert a few changes to some of the equations to correct for different angles and similar things. The code can be found in 
+\autoref{alg:polar grid north}. Again, see the references at the south pole explanation on how to generate the grid itself.
+
+\begin{algorithm}[htb]
+    \caption{Generating the grid for polar approximation of the north pole}
+    \label{alg:polar grid north}
+    \SetKwComment{Comment}{//}{}
+    $poleLowIndexN \leftarrow $ find last index where $lat < -poleLowerLatLimit$ \;
+    $poleHighIndexN \leftarrow $ find last index where $lat < -poleHigherLatLimit$ \;
+    \BlankLine
+
+    $gridXAxisN \leftarrow $ array going from $-gridSize$ to $gridSize$ with steps of $polarGridResolution$ \;
+    $gridYAxisN \leftarrow $ array going from $-gridSize$ to $gridSize$ with steps of $polarGridResolution$ \;
+    $gridXValuesN, gridYValuesN \leftarrow $ generate the grid from the two axis vectors $gridXAxisN$ and $gridYAxisN$ \;
+    \BlankLine 
+    
+    $gridLatCoordsN \leftarrow $ empty list \;
+    $gridLonCoordsN \leftarrow $ empty list \;
+    \For{$i \leftarrow 0$ \KwTo $gridXValuesN.length$}{
+        \For{$j \leftarrow 0$ \KwTo $gridXValuesN[i].length$}{
+            $x \leftarrow gridXValuesN[i, j]$ \;
+            $y \leftarrow gridYValuesN[i, j]$ \;
+            $latPoint \leftarrow -\arccos(\frac{\sqrt{x^2 + y^2}}{r})\frac{180}{\pi}$ \;
+            $lonPoint \leftarrow 180 - \arctan(\frac{x}{y})\frac{180}{\pi}$ \;
+            $gridLatCoordsN.append(latPoint)$ \;
+            $gridLonCoordsN.append(lonPoint)$ \;
+        }
+    }
+
+    \BlankLine
+    $polarXCoordsN \leftarrow$ empty list \;
+    $polarYCoordsN \leftarrow$ empty list \;
+    \For{$i \leftarrow 0$ \KwTo $poleLowIndexN$}{
+        \For{$j \leftarrow 0$ \KwTo $nlon$}{
+            $polarXCoordsN.append(r \cos(lat[i] \frac{\pi}{180}) \sin(lon[j]\frac{\pi}{180}))$ \;
+            $polarYCoordsN.append(-r \cos(lat[i] \frac{\pi}{180}) \cos(lon[j]\frac{\pi}{180}))$ \;
+        }
+    }
+\end{algorithm}
+
+In both algorithms it is important to make a distinction between $gridLatCoords$ and $polarXCoords$ and their respective variants. $gridLatCoords$ are the latitudinal coordinates on the 
+$lat, lon$ grid corresponding to the $x$ and $y$ coordinates on the polar grid. Whereas $polarXCoords$ are the $x$ coordinates on the polar grid corresponding to the latitude and longitude on 
+the $lat, lon$ grid. Those are different to the $gridXValues$ as they represent the values on the $x$ axis as integers which may or may not directly correspond to the $polarXCoords$. So we need 
+a way of mapping the $polarXCoords$ to $gridXValues$ and their respective values and vice versa. This is done in the next section.
+
+\subsection{Switching between grids}
+Now that we have defined the polar plane grid, we need code to convert the values from the $lat, lon$ grid to the polar plane grid and vice versa. Let's start with converting to the polar grid. 
+We need 2 versions of the algorithm for that. One that converts in 2 dimensions, and one that converts in 3 dimensions. The code for the 2 dimensional case is shown in \autoref{alg:beam up 2d}.
+Here we use bivariate spline interpolation \cite{bivariatespline} which is a different form of linear interpolation than discussed in \autoref{sec:interpolation} though the same principle 
+applies.
+
+\begin{algorithm}[htb]
+    \caption{Converting from $lat, lon$ grid to polar plane grid in 2 dimensions}
+    \label{alg:beam up 2d}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Latitude coordinates $lat$, Longitude coordinates $lon$, Values of the $lat, lon$ grid $data$, Length of one axis of the polar grid? $gridSize$, Latitude coordinates on the polar grid 
+        $gridLatCoords$, Longitude coordinates on the polar grid $gridLonCoords$}
+    \Output{Double array representing the values of the $lat, lon$ grid on the polar grid}
+    \SetKwComment{Comment}{//}{}
+    $f \leftarrow $ \texttt{BivariateSpline}($lat, lon, data$) \Comment*[l]{Do the interpolation}
+    $polarPlane \leftarrow f(gridLatCoords, gridLonCoords).$\texttt{reshape}(($gridSize$, $gridSize$)) \Comment*[l]{Check the values of the interpolation at the specified coordinates and force 
+    them to align to the polar grid}
+    \Return{$polarPlane$}
+\end{algorithm}
+
+The 3 dimensional algorithm is quite similar to the 2 dimensional algorithm, which can be found in \autoref{alg:beam up 3d}
+
+\begin{algorithm}[htb]
+    \caption{Converting from $lat, lon$ grid to polar plane grid in 3 dimensions}
+    \label{alg:beam up 3d}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Latitude coordinates $lat$, Longitude coordinates $lon$, Values of the $lat, lon$ grid $data$, Length of one axis of the polar grid? $gridSize$, Latitude coordinates on the polar grid 
+        $gridLatCoords$, Longitude coordinates on the polar grid $gridLonCoords$}
+    \Output{Triple array representing the values of the $lat, lon, layer$ grid on the polar grid}
+    \SetKwComment{Comment}{//}{}
+    $polarPlane \leftarrow $ 3 Dimensional array where the $1^{\text{st}}$ and $2^{\text{nd}}$ dimensions have length $gridSize$ and the $3^{\text{rd}}$ dimension has length $data[0][0].length$ \;
+    \For{$k \leftarrow 0$ \KwTo $data[0][0].length$}{
+        $f \leftarrow $ \texttt{BivariateSpline}($lat, lon, data[:, :, k]$) \Comment*[l]{Do the interpolation on this layer}
+        $polarPlane[:, :, k] \leftarrow f(gridLatCoords, gridLonCoords).$\texttt{reshape}(($gridSize$, $gridSize$)) \Comment*[l]{Check the values of the interpolation at the specified 
+        coordinates and force them to align to the polar grid}
+    }
+    \Return{$polarPlane$}
+\end{algorithm}
+
+Having dealt with converting to the polar grid, we now also need to deal with converting from the polar grid. In contrast to converting to the polar griod, this is only done in 3 dimensions so 
+we do not need a 2 dimensional algorithm. How we convert from the polar grid can be found in \autoref{alg:beam down}.
+
+\begin{algorithm}[htb]
+    \caption{Converting from the polar plane grid to the $lat, lon$ grid in 3 dimensions}
+    \label{alg:beam down}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Longitude coordinates $lon$, Values of the $lat, lon$ grid $data$, Polar $x$ value indices $gridXValues$, Polar $y$ value indices $gridYValues$, Polar $x$ coordinates $polarXCoords$, 
+        Polar $y$ coordinates $polarYCoords$}
+    \Output{Triple array representing the values of the polar grid on the $lat, lon, layer$ grid}
+    \SetKwComment{Comment}{//}{}
+    $resample \leftarrow $3 Dimensional array where the $1^{\text{st}}$ dimension has length $\lfloor \frac{polarXCoords}{lon.length} \rfloor$, the $2^{\text{nd}}$ dimension has length 
+    $lon.length$ and the $3^{\text{rd}}$ dimension has length $data[0][0].length$ \;
+    \For{$k \leftarrow 0$ \KwTo $data[0][0].length$}{
+        $f \leftarrow $ \texttt{BivariateSpline})($gridXValues, gridYValues, data[:, :, k]$) \Comment*[l]{Do the interpolation on this layer}
+        $resample[:, :, k] \leftarrow f(polarXCoords, polarYCoords).$\texttt{reshape}(($\lfloor \frac{polarXCoords}{lon.length} \rfloor, lon.length$)) \Comment*[l]{Check the values of the 
+        interpolation at the specified coordinates and force them to align to the polar grid}
+    }
+    \Return{$resample$}
+\end{algorithm}
+
+\subsection{Gradually changing grids}
+Now that we can convert between grids we also need a way to do so gradually. Otherwise we would move the hard border we had previously around the poles further down the $lat, lon$ grid. Instead 
+we have to do some interpolation between the two grids in order to ensure a smooth transition in the final output, so that there are no hard borders. This interpolation is done in , using the 
+linear interpolation technique as discussed in \autoref{sec:interpolation}.
+
+\begin{algorithm}[htb]
+    \caption{Gradually transition from the $lat, lon$ grid to the polar grid}
+    \label{alg:polar interpolation}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Index when to start using the polar grid $poleLowIndex$, Index when to only use the polar grid $poleHighIndex$, Polar data $polarData$, $lat, lon$ data $sphericalData$}
+    \Output{3 Dimensional array representing the values on the polar grid with the part that gradually transitions to the $lat, lon$ grid}
+    \SetKwComment{Comment}{//}{}
+    $output \leftarrow$ 3 Dimensional array with the exact same structure as $polarData$ \;
+    $overlap \leftarrow $ $|poleLowIndex - poleHighIndex|$ \;
+    
+    \BlankLine
+    \uIf(\Comment*[h]{Determine whether we are talking about the north or south pole}){$lat[poleLowIndex] < 0$}{
+        \DontPrintSemicolon
+        \Comment*[l]{South pole}
+        \PrintSemicolon
+        \For{$k \leftarrow 0$ \KwTo $output[0][0].length$}{
+            \For{$i \leftarrow 0$ \KwTo $poleLowIndex$}{
+                \uIf{$i < poleHighIndex$}{
+                    $\lambda \leftarrow 0$ \;
+                } \uElse{
+                    $\lambda \leftarrow \frac{i - poleHighIndex}{overlap}$ \;
+                }
+                $output[i, :, k] \leftarrow (1 - \lambda) sphericalData[i, :, k] + \lambda polarData[i, :, k]$ \;
+            }
+        }
+    } \uElse{
+        \DontPrintSemicolon
+        \Comment*[l]{North pole}
+        \PrintSemicolon
+        \For{$k \leftarrow 0$ \KwTo $output[0][0].length$}{
+            \For{$i \leftarrow 0$ \KwTo $nlat - poleLowIndex$}{
+                \uIf{$i + poleLowIndex + 1 > poleHighIndex$}{
+                    $\lambda \leftarrow 0$ \;
+                } \uElse{
+                    $\lambda \leftarrow \frac{i}{overlap}$ \;
+                }
+                $output[i, :, k] \leftarrow (1 - \lambda) sphericalData[i, :, k] + \lambda polarData[i, :, k]$ \;
+            }
+        }
+    }
+
+    \BlankLine
+    \Return{$output$}
+\end{algorithm}
+
+\subsection{Gradients on the grid}
+With our new found ability to convert to and from the polar grid, while also gradually transitioning, we now get to the part we are doing it all for. Calculations on the polar grid. In order for
+that to work, we need some utility functions specifically for the polar grid first. We will need gradients in all 3 dimensions, those being the $x$ dimension, the $y$ dimension and the $p$ 
+dimension (pressure). All of the gradients will be quite similar to \autoref{alg:gradient x}, \autoref{alg:gradient y} and \autoref{alg:gradient z} though some small tweaks are required as we 
+are not differentiating over a spehere but over a plane. These changes are reflected in \autoref{alg:polar gradient x}, <Y> and <Z>.
+
+\begin{algorithm}
+    \caption{Gradient in the $x$ dimension on the polar grid}
+    \label{alg:polar gradient x}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Triple array of data $data$, first index $i$, second index $j$ and third index $k$}
+    \Output{Gradient in the $x$ dimension for the value of the grid point at the specified coordinates}
+    \uIf{$p = 0$}{
+        $value \leftarrow \frac{data[i, j + 1, k] - data[i, j, k]}{polarGridResolution}$ \;
+    } \uElseIf{$y = gridSideLength - 1$}{
+        $value \leftarrow \frac{data[i, j, k] - data[i, j - 1, k]}{polarGridResolution}$ \;
+    } \uElse{
+        $vale \leftarrow \frac{data[i, j + 1, k] - data[i, j - 1, k]}{2 polarGridResolution}$ \; 
+    }
+    \Return{$value$}
 \end{algorithm}
