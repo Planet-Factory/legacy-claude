@@ -10,7 +10,7 @@ from numba import jit, njit, prange
 # ctypedef np.float64_t DTYPE_f
 
 # laplacian of scalar field a
-@njit
+@njit(cache=True, parallel=True)
 def laplacian_2d(a, dx, dy):
 	output = np.zeros_like(a)
 	nlat = nlong = i = j = 0;
@@ -25,7 +25,7 @@ def laplacian_2d(a, dx, dy):
 			output[i,j] = (low_level.scalar_gradient_x_2D(a,dx,nlon,i,j) - low_level.scalar_gradient_x_2D(a,dx,nlon,i,j))*inv_dx + (low_level.scalar_gradient_y_2D(a,dy,nlat,i+1,j) - low_level.scalar_gradient_y_2D(a,dy,nlat,i-1,j))*inv_dy
 	return output
 
-@njit
+@njit(cache=True, parallel=True)
 def laplacian_3d(a, dx, dy, dz):
 	output = np.zeros_like(a)
 	nlat = nlon = nlevels = i = j = k = 0;
@@ -43,7 +43,7 @@ def laplacian_3d(a, dx, dy, dz):
 	return output				
 
 # divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field
-@njit
+@njit(cache=True, parallel=True)
 def divergence_with_scalar(a, u, v, w, dx, dy, pressure_levels):
 	output = np.zeros_like(a)
 	au = a*u
@@ -61,7 +61,7 @@ def divergence_with_scalar(a, u, v, w, dx, dy, pressure_levels):
 				
 	return output				
 
-@njit
+@njit(cache=True, parallel=True)
 def radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, day, year, axial_tilt):
 	# calculate change in temperature of ground and atmosphere due to radiative imbalance
 	nlat = nlon = nlevels = i = j = k = 0
@@ -114,7 +114,7 @@ def radiation_calculation(temperature_world, potential_temperature, pressure_lev
 	
 	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
-@njit
+@njit(cache=True, parallel=True)
 def velocity_calculation(u, v, w, pressure_levels, geopotential, potential_temperature, coriolis, gravity, dx, dy, dt):
 	# introduce temporary arrays to update velocity in the atmosphere
 	u_temp = np.zeros_like(u)
@@ -143,7 +143,7 @@ def velocity_calculation(u, v, w, pressure_levels, geopotential, potential_tempe
 
 	return u,v
 
-@njit
+@njit(cache=True, parallel=True)
 def w_calculation(u, v, w, pressure_levels, geopotential, potential_temperature, coriolis, gravity, dx, dy, dt):
 	w_temp = np.zeros_like(u)
 	temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels) 
@@ -156,7 +156,8 @@ def w_calculation(u, v, w, pressure_levels, geopotential, potential_temperature,
 	
 	for i in prange(2,nlat-2):
 		for j in prange(nlon):
-			for k in prange(1,nlevels):
+			# Not prange for k, because w_{k} depends on w_{k-1}
+			for k in range(1,nlevels):
 				w_temp[i,j,k] = w_temp[i,j,k-1] - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( low_level.scalar_gradient_x(u,dx,nlon,i,j,k) + low_level.scalar_gradient_y(v,dy,nlat,i,j,k) )/(287*temperature_atmos[i,j,k])
 
 	w += w_temp

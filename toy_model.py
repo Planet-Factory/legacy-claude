@@ -22,7 +22,7 @@ from plotting_utils import plotter_thread
 
 # Set DROP_FRAMES = True to prevent a backup/queue of frames to draw, drawing the soonest available data next and skipping in between.
 # Set DROP_FRAMES = False to allow a backlog and ensure that every timestep gets drawn.
-DROP_FRAMES = True
+DROP_FRAMES = False
 
 
 from numba import jit, njit, prange
@@ -229,7 +229,7 @@ def beam_me_down(lon,data,pole_low_index,grid_x_values,grid_y_values,polar_x_coo
 	return resample
 
 
-@njit(parallel=True)
+@njit(cache=True,parallel=True)
 def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data): 
 	output = np.zeros_like(polar_data)
 	overlap = abs(pole_low_index - pole_high_index)
@@ -259,7 +259,7 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data):
 
 	return output
 
-@jit
+@jit(cache=True)
 def grid_x_gradient(data,i,j,k):
 	if j == 0:
 		value = (data[i,j+1,k] - data[i,j,k])/(polar_grid_resolution)
@@ -270,7 +270,7 @@ def grid_x_gradient(data,i,j,k):
 	return value
 
 
-@jit
+@jit(cache=True)
 def grid_y_gradient(data,i,j,k):
 	if i == 0:
 		value = (data[i+1,j,k] - data[i,j,k])/(polar_grid_resolution)
@@ -280,7 +280,7 @@ def grid_y_gradient(data,i,j,k):
 		value = (data[i+1,j,k] - data[i-1,j,k])/(2*polar_grid_resolution)
 	return value
 
-@jit
+@jit(cache=True)
 def grid_p_gradient(data,i,j,k,pressure_levels):
 	if k == 0:
 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
@@ -290,7 +290,7 @@ def grid_p_gradient(data,i,j,k,pressure_levels):
 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
 	return value
 
-@jit
+@jit(cache=True)
 def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
@@ -299,12 +299,17 @@ def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 			for k in prange(polar_plane.shape[2]):
 				# x_dot[i,j,k] = -grid_y_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
-				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
-				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+
+				# Strictly resolve circular dependencies
+				n_x_dot = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
+				n_y_dot = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+				
+				x_dot[i,j,k] = n_x_dot
+				y_dot[i,j,k] = n_y_dot
 	return x_dot,y_dot
 
 
-@njit(parallel=True)
+@njit(cache=True,parallel=True)
 def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
@@ -313,11 +318,18 @@ def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 			for k in prange(polar_plane.shape[2]):
 				# x_dot[i,j,k] = -grid_y_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
-				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
-				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+
+				# Strictly resolve circular dependencies
+				n_x_dot = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
+				n_y_dot = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+		
+				x_dot[i,j,k] = n_x_dot
+				y_dot[i,j,k] = n_y_dot
+
+
 	return x_dot,y_dot
 
-@njit(parallel=True)
+@njit(cache=True,parallel=True)
 def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
 	output = np.zeros_like(x_dot)
 	for i in prange(output.shape[0]):
@@ -327,7 +339,9 @@ def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
 	return output
 
 
-
+# Q. Why the weird layotu with project_velocities_-o-th?
+# A. beam_me_down uses scipy's rect bivariate spline, which numba can't handle. But, numba can handle everything else, so we
+#		wrap 'everything else' in a different function and let numba do what it can.
 
 def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
@@ -335,7 +349,7 @@ def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,
 
 	return _project_velocities_north(data, reproj_x_dot, reproj_y_dot, lon);
 
-@njit(parallel=True)
+@njit(cache=True,parallel=True)
 def _project_velocities_north(data, reproj_x_dot, reproj_y_dot, lon):
 	reproj_u = np.zeros_like(data)
 	reproj_v = np.zeros_like(data)
@@ -349,16 +363,13 @@ def _project_velocities_north(data, reproj_x_dot, reproj_y_dot, lon):
 	return reproj_u, reproj_v
 
 
-
-
-
 def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
 
 	return _project_velocities_south(data, reproj_x_dot, reproj_y_dot, lon)
 
-@njit(parallel=True)
+@njit(cache=True,parallel=True)
 def _project_velocities_south(data, reproj_x_dot, reproj_y_dot, lon):
 	reproj_u = np.zeros_like(data)
 	reproj_v = np.zeros_like(data)
@@ -371,7 +382,8 @@ def _project_velocities_south(data, reproj_x_dot, reproj_y_dot, lon):
 
 	return reproj_u, reproj_v
 
-@njit(parallel=True)
+
+@njit(cache=True,parallel=True)
 def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
 	output = np.zeros_like(data)
 	data_x_dot = data*x_dot
@@ -384,6 +396,9 @@ def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
 	return output
 
 def init_plot():
+	# Q. This looks really weird. What's going on?
+	# A. Fair question! This is just for readability. Obviously, a data display is going to be wrapped up in a bunch of data. So,
+	#		to help keep things organized (rather than being a two-page line of variable names), I grouped them into vague categories.
 	plots = lon_plot, lat_plot, heights_plot, lat_z_plot, nplots
 	uvw = u, v, w
 	latlon = lat, lon
@@ -409,6 +424,7 @@ def update_plot():
 
 		reprojections = reproj_u_N, reproj_u_S, reproj_v_N, reproj_v_S
 
+		# This makes up a 'timestep' to draw. This goes into a Queue ('Q') and gets picked up in plotting_utils.py
 		Q.put([uvw, data, reprojections, velocity]);
 	else:
 		print("[NOTE] Skipping Drawing to prevent backlog")
@@ -443,7 +459,7 @@ if load:
 	potential_temperature,temperature_world,u,v,w,t,albedo = pickle.load(open("save_file.p","rb"))
 
 Q = init_plot()
-print("[NOTE] The Numba compiler will spend the first 20-30 seconds compiling. You'll notice when it's done.")
+print("[NOTE] The Numba compiler may spend the first 20 seconds compiling. You'll notice when it's done.\nIt should only do this once per function, each time that function's content gets changed.")
 while True:
 # while t/day < 2.5:
 

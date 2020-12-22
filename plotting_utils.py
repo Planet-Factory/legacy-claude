@@ -98,9 +98,9 @@ def plotter_thread(q, plots, uvw, latlon, data, misc, flags, pole_indices, grid_
 
 
 
-	def update_plot(uvw, data, reprojections, velocity):
+	def plot_next_queued_timestep(uvw, data, reprojections, velocity):
 		
-
+		# This is the reverse of toy_model.py's 'update_plot'. We just want to move a tonne of parameters in an easily-readable way.
 		u, v, w = uvw
 		potential_temperature, pressure_levels, atmosp_addition, temperature_world, t, north_temperature_data, north_temperature_resample, north_polar_plane_temperature, south_temperature_data, south_temperature_resample, south_polar_plane_temperature = data
 
@@ -146,6 +146,7 @@ def plotter_thread(q, plots, uvw, latlon, data, misc, flags, pole_indices, grid_
 					bx[k].set_ylim((lat.min(),lat.max()))				
 				bx[-1].set_xlabel('Longitude')		
 		else:
+			# Diagnostic isn't tested in the threaded plotting, but AFAIK it's correct
 			ax[0,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], cmap='seismic')
 			ax[0,0].set_title('u')
 			ax[0,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:], cmap='seismic')
@@ -184,13 +185,11 @@ def plotter_thread(q, plots, uvw, latlon, data, misc, flags, pole_indices, grid_
 		
 
 	
-	for uvw, data, reprojections, velocity in iter(q.get, 'STOP'):
+	for queue_arguments in iter(q.get, 'STOP'):
 		before_plot = time.time()
 		print(f"[QUEUE] Len: {q.qsize()}")
-
-		# clear plots
-		# if plot or above:
-			# plt.pause(0.01)
+		# We know it's possible that the simulation is running faster than we can draw. Help the user keep tabs on whether they're seeing something from the front
+		#  of a long waiting line, or something relatively recent.
 
 		if plot:
 			if not diagnostic:
@@ -210,9 +209,13 @@ def plotter_thread(q, plots, uvw, latlon, data, misc, flags, pole_indices, grid_
 			gx[1].cla()
 			gx[2].cla()
 
-		update_plot(uvw, data, reprojections, velocity);
+		plot_next_queued_timestep(*queue_arguments);
+		# This just says 'hey, whatever you put in to the queue, put it here'. So, if toy_model.py's 'update_plot' said `Q.put([apple, banana, celery])`, then put apple as the first argument to plotting_util's `plot_next_queued_timestep`, banana as the second, etc.
+		#																													   [apple, banana, celery] would constitute one timestep's data.
+		
 		f.canvas.draw()
 		f.canvas.flush_events()
+		# Essentially plt.pause, but without actually pausing
 
 		time_taken = float(round(time.time() - before_plot,3))
 		print('Threaded Plotting: ',str(time_taken),'s')	
