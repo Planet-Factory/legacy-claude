@@ -81,6 +81,8 @@ all the relevant variables that are unique to a planet, or well not necessarily 
     $ins \leftarrow 1370$ \Comment*[l]{Amount of energy from the star that reaches the planet per unit area (\si{Jm^{-2}})}
     $\epsilon \leftarrow 0.75$ \Comment*[l]{Absorbtivity of the atmosphere, fraction of how much of the total energy is absorbed (unitless)}
     $r \leftarrow 6.4*10^6$ \Comment*[l]{The radius of the planet in meters (\si{m})}
+    $p_z \leftarrow [100000, 95000, 90000, 80000, 70000, 60000, 50000, 55000, 40000, 5000, 30000, 25000, 20000, 15000, 10000, 7500, 5000, 2500, 1000, 500, 200, 100]$ \Comment*[l]{The pressure 
+    of the different levels (\si{Pa}) noted in an array}
 \end{algorithm}
 
 \subsubsection{Model Specific Parameters}
@@ -122,6 +124,15 @@ definitions can be found in \autoref{alg:model constants}. What the $adv$ boolea
     }
 
     \For{$k \in [0, nlevels - 1]$}{
-        $\delta z[k] \leftarrow heights[k + 1] - heights$ \Comment*[l]{How far apart the gridpoints in the z direction are (\si{m})}
+        $\delta z[k] \leftarrow p_z[k + 1] - p_z[k]$ \Comment*[l]{How far apart the gridpoints in the z direction are (\si{Pa})}
     }
+
+    $\Pi \leftarrow$ Array with the same amount of elements as $p_z$ \Comment*[l]{Dimensionless pressure that is used to easily convert from potential temperature to absolute temperature and 
+    vice versa}
+    $\kappa \leftarrow \frac{R}{C_p}$ \;
+    \For{$i \leftarrow 0$ \KwTo $\Pi.length$}{
+        $\Pi[i] \leftarrow C_p(\frac{p_z[i]}{p_z[0]})^{\kappa}$ \;
+    }
+    $poleLowerLatLimit \leftarrow 4$ \Comment*[l]{Polar Plane Approximation Lower Grid Limit}
+    $poleHigherLatLimit \leftarrow 4$ \Comment*[l]{Polar Plane Approximation Upper Grid Limit}
 \end{algorithm}

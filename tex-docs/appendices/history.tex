@@ -2,8 +2,77 @@
 Back when I was a young naive programmer, I made a thing. Now a few years down the line I made the thing again, but infinitely better. So I have no use for the old thing anymore. But fear not,
 old algorithms (used by CLAuDE) will be collected here. This is just for historical purposes.
 
+\subsection{Radiation}
+\subsubsection{Adding Layers}
+Remember \autoref{eq:atmos change}? We need this equation for every layer in the atmosphere. This also means that we have to adjust the main calculation of the code, which is described  in 
+\autoref{alg:temperature with density}. The $T_a$ needs to change, we need to either add a dimension (to indicate which layer of the atmosphere we are talking about) or we need to add different
+matrices for each atmosphere layer. We opt for adding a dimension as that costs less memory than defining new arrays 
+\footnote{This has to do with pointers, creating a new object always costs a bit more space than adding a dimension as we need a pointer to the object and what type of object it is whereas with 
+adding a dimension we do not need this additional information as it has already been defined}. So $T_a$, and all other matrices that have to do with the atmosphere (so not $T_p$ for instance) 
+are no longer indexed by $lat, lon$ but are indexed by $lat, lon, layer$. We need to account for one more thing, the absorbtion of energy from another layer. The new equation is shown in 
+\autoref{eq:atmos change layer}. Here $k$ is the layer of the atmosphere, $k = -1$ means that you use $T_p$ and $k = nlevels$ means that $T_{a_{nlevels}} = 0$ as that is space. Also, let us
+rewrite the equation a bit such that the variables that are repeated are only written once and stuff that is divided out is removed, which is done in \autoref{eq:atmos change layer improved}.
+Let us also clean up the equation for the change in the surface temperature (\autoref{eq:surface change}) in \autoref{eq:surface change improved}.
+
+\begin{subequations}
+    \begin{equation}
+        \label{eq:atmos change layer}
+        \Delta T_{a_k} = \frac{\delta t (\sigma \epsilon_{k - 1}T_{a_{k - 1}}^4 + \sigma \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_k\sigma T_{a_k}^4)}{C_a}
+    \end{equation}
+    \begin{equation}
+        \label{eq:atmos change layer improved}
+        \Delta T_{a_k} = \frac{\delta t \sigma (\epsilon_{k - 1}T_{a_{k - 1}}^4 + \epsilon_{k + 1}T_{a_{k + 1}}^4 - 2\epsilon_kT_{a_k}^4)}{C_a}
+    \end{equation}
+    \begin{equation}
+        \label{eq:surface change improved}
+        \Delta T_p = \frac{\delta t (S + \sigma(4\epsilon_pT_a^4 - 4T_p^4))}{4C_p}
+    \end{equation}
+\end{subequations}
+
+With the changes made to the equation, we need to make those changes in the code as well. We need to add the new dimension to all matrices except $T_p$ and $a$ as they are unaffected (with 
+regards to the storage of the values) by the addition of multiple atmospheric layers. Every other matrix is affected. The new code can be found in \autoref{alg:temperature layer}. $\delta z$
+
+\begin{algorithm}[hbt]
+    \caption{The main function for the temperature calculations}
+    \label{alg:temperature layer}
+    \SetAlgoLined
+    \SetKwInput{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{amount of energy that hits the planet $S$}
+    \Output{Temperature of the planet $T_p$, temperature of the atmosphere $T_a$}
+    \For{$lat \leftarrow -nlat$ \KwTo $nlat$}{
+        \For{$lon \leftarrow 0$ \KwTo $nlot$}{
+            \For{$layer \leftarrow 0$ \KwTo $nlevels$}{
+                $T_p[lat, lon] \leftarrow T_p[lat, lon] + \frac{\delta t ((1 - a[lat, lon])S + \sigma(4\epsilon[0](T_a[lat, lon, 0])^4 - 4(T_p[lat, lon])^4))}
+                {4C_p[lat, lon]}$ \;
+                \uIf{$layer = 0$}{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma((T_p[lat, lon])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
+                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }\uElseIf{$layer = nlevels - 1$}{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 - 2\epsilon[layer](T_a[lat, lon, layer])^4)}
+                    {\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }\uElse{
+                    $T_a[lat, lon, layer] \leftarrow T_a[lat, lon, layer] + \frac{\delta t \sigma(\epsilon[layer - 1](T_a[lat, lon, layer - 1])^4 + \epsilon[layer + 1]T_a[lat, lon, layer + 1] 
+                    - 2\epsilon[layer](T_a[lat, lon, layer])^4)}{\rho[lat, lon, layer]C_a\delta z[layer]}$ \;
+                }
+            }
+        }
+    }
+\end{algorithm}
+
+We also need to initialise the $\epsilon$ value for each layer. We do that in \autoref{alg:epsilon}.
+
+\begin{algorithm}
+    \caption{Intialisation of the insulation of each layer (also known as $\epsilon$)}
+    \label{alg:epsilon}
+    $\epsilon[0] \leftarrow 0.75$ \;
+    \For{$i \leftarrow 1$ \KwTo $nlevels$}{
+        $\epsilon[i] \leftarrow 0.5\epsilon[i - 1]$
+    }
+\end{algorithm}
+
 \subsection{Velocity}
-\subsubsection{The Primitive Equations and Geostrophy}
+\subsubsection{The Primitive Equations and Geostrophy} \label{sec:primitive}
 The primitive equations (also known as the momentum equations) is what makes the air move. It is actually kind of an injoke between physicists as they are called the primitive equations but 
 actually look quite complicated (and it says $fu$ at the end! \cite{simon}). The primitive equations are a set of equations dictating the direction in the $u$ and $v$ directions as shown in 
 \autoref{eq:primitive u} and \autoref{eq:primitive v}. We can make the equations simpler by using and approximation called geostrophy which means that we have no vertical motion, such that the
@@ -12,21 +81,20 @@ whole middle part of the equations are $0$. Hence we are left with \autoref{eq:p
 
 \begin{subequations}
     \begin{equation}
-        \frac{du}{dt} = \frac{\delta u}{\delta t} + u\frac{\delta u}{ \delta x} + v\frac{\delta u}{\delta v} + \omega\frac{\delta u}{\delta p} = -\frac{\delta \Phi}{\delta x} + fv
         \label{eq:primitive u}
+        \frac{du}{dt} = \frac{\delta u}{\delta t} + u\frac{\delta u}{ \delta x} + v\frac{\delta u}{\delta v} + \omega\frac{\delta u}{\delta p} = -\frac{\delta \Phi}{\delta x} + fv
     \end{equation}
     \begin{equation}
-        \frac{dv}{dt} = \frac{\delta v}{\delta t} + u\frac{\delta v}{ \delta x} + v\frac{\delta v}{\delta v} + \omega\frac{\delta v}{\delta p} = -\frac{\delta \Phi}{\delta y} - fu
         \label{eq:primitive v}
+        \frac{dv}{dt} = \frac{\delta v}{\delta t} + u\frac{\delta v}{ \delta x} + v\frac{\delta v}{\delta v} + \omega\frac{\delta v}{\delta p} = -\frac{\delta \Phi}{\delta y} - fu
     \end{equation}
-
     \begin{equation}
-        0 = -\frac{\delta \Phi}{\delta x} + fv
         \label{eq:primitive u final}
+        0 = -\frac{\delta \Phi}{\delta x} + fv
     \end{equation}
     \begin{equation}
-        0 = -\frac{\delta \Phi}{\delta y} - fu
         \label{eq:primitive v final}
+        0 = -\frac{\delta \Phi}{\delta y} - fu
     \end{equation}
 \end{subequations}
 
@@ -46,24 +114,24 @@ these equations are:
 
 \begin{subequations}
     \begin{equation}
-        f = 2\Omega\sin(\theta)
         \label{eq:coriolis}
+        f = 2\Omega\sin(\theta)
     \end{equation}
     \begin{equation}
-        \frac{\delta \Phi}{\delta x} = fv
         \label{eq:pu simple}
+        \frac{\delta \Phi}{\delta x} = fv
     \end{equation}
     \begin{equation}
-        \frac{\delta \Phi}{\delta y} = -fu
         \label{eq:pv simple}
+        \frac{\delta \Phi}{\delta y} = -fu
     \end{equation}
     \begin{equation}
-        \frac{\delta p}{\rho \delta x} = fv
         \label{eq:pu simple final}
+        \frac{\delta p}{\rho \delta x} = fv
     \end{equation}
     \begin{equation}
-        \frac{\delta p}{\rho \delta y} = -fu
         \label{eq:pv simple final}
+        \frac{\delta p}{\rho \delta y} = -fu
     \end{equation}
 \end{subequations}
 
@@ -76,6 +144,8 @@ that we need a second double for loop to ensure that we always use the new tempe
 is still defined and can still be used, but since we want to focus on the new code, we leave out the old code to keep it concise and to prevent clutter. 
 
 \begin{algorithm}[hbt]
+    \caption{The main loop of the velocity of the atmosphere calculations}
+    \label{alg:stream2}
     \SetAlgoLined
     \For{$lat \in [-nlat, nlat]$}{
         \For{$lon \in [0, nlon]$}{
@@ -83,8 +153,6 @@ is still defined and can still be used, but since we want to focus on the new co
             $v[lat, lon] \leftarrow \frac{p[lat, lon + 1] - p[lat, lon - 1]}{\delta x[lat]} \cdot \frac{1}{f[lat]\rho}$ \;
         }
     }
-    \caption{The main loop of the velocity of the atmosphere calculations}
-    \label{alg:stream2}
 \end{algorithm}
 
 The gradient calculation is done in \autoref{alg:gradient}. For this to work, we need the circumference of the planet. Herefore we need to assume that the planet is a sphere. While that is not 
@@ -93,11 +161,13 @@ where $r$ is the radius of the planet. Here we also use the f-plane approximatio
 \cite{fplane}.
 
 \begin{equation}
-    2 \pi r
     \label{eq:circumference}
+    2 \pi r
 \end{equation}
 
 \begin{algorithm}
+    \caption{Calculating the gradient $\delta x$ (note that this algorithm is obsolete)}
+    \label{alg:gradient}
     \SetAlgoLined
     $C \leftarrow 2\pi R$ \;
     $\delta y \leftarrow \frac{C}{nlat}$ \;
@@ -111,8 +181,6 @@ where $r$ is the radius of the planet. Here we also use the f-plane approximatio
             $f[lat] \leftarrow 10^{-4}$ \;
         }
     }
-    \caption{Calculating the gradient $\delta x$ (note that this algorithm is obsolete)}
-    \label{alg:gradient}
 \end{algorithm}
 
 Because of the geometry of the planet and the construction of the longitude latitude grid, we run into some problems when calculating the gradient. Since the planet is not flat ("controversial 
@@ -122,6 +190,8 @@ As the latitude grows closer to the poles, they are converging on the center poi
 point in the main loop. The changed algorithm can be found in \autoref{alg:stream2v2}
 
 \begin{algorithm}[hbt]
+    \caption{The main loop of the velocity of the atmosphere calculations}
+    \label{alg:stream2v2}
     \SetAlgoLined
     \For{$lat \in [-nlat + 1, nlat - 1]$}{
         \For{$lon \in [0, nlon]$}{
@@ -129,8 +199,6 @@ point in the main loop. The changed algorithm can be found in \autoref{alg:strea
             $v[lat, lon] \leftarrow \frac{p[lat, (lon + 1) \text{ mod } nlon] - p[lat, (lon -1) \text{ mod } nlon]}{\delta x[lat]} \cdot \frac{1}{f[lat]\rho}$ \;
         }
     }
-    \caption{The main loop of the velocity of the atmosphere calculations}
-    \label{alg:stream2v2}
 \end{algorithm}
 
 Do note that the pressure calculation is done between the temperature calculation in \autoref{alg:stream1v2} and the $u, v$ calculations in \autoref{alg:stream2v2}. At this point our model shows
