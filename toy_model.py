@@ -196,29 +196,27 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data):
 	overlap = abs(pole_low_index - pole_high_index)
 
 	if lat[pole_low_index] < 0:		# SOUTH POLE
-		for k in range(output.shape[2]):
-			for i in range(pole_low_index):
-				
-				if i < pole_high_index:
-					scale_polar_data = 0.0
-					scale_reprojected_data = 1.0
-				else:
-					scale_polar_data = (i-pole_high_index)/overlap
-					scale_reprojected_data = 1 - (i-pole_high_index)/overlap
-				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
+		for i in range(pole_low_index):
+			
+			if i < pole_high_index:
+				scale_polar_data = 0.0
+				scale_reprojected_data = 1.0
+			else:
+				scale_polar_data = (i-pole_high_index)/overlap
+				scale_reprojected_data = 1 - (i-pole_high_index)/overlap
+			output[i,:,:] = scale_reprojected_data*reprojected_data[i,:,:] + scale_polar_data*polar_data[i,:,:]
 	
 	else:							# NORTH POLE
-		for k in range(output.shape[2]):
-			for i in range(nlat-pole_low_index):
-				
-				if i + pole_low_index + 1 > pole_high_index:
-					scale_polar_data = 0.0
-					scale_reprojected_data = 1.0
-				else:
-					scale_polar_data = 1-(i/overlap)
-					scale_reprojected_data = (i/overlap)
+		for i in range(nlat-pole_low_index):
+			
+			if i + pole_low_index + 1 > pole_high_index:
+				scale_polar_data = 0.0
+				scale_reprojected_data = 1.0
+			else:
+				scale_polar_data = 1-(i/overlap)
+				scale_reprojected_data = (i/overlap)
 
-				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
+			output[i,:,:] = scale_reprojected_data*reprojected_data[i,:,:] + scale_polar_data*polar_data[i,:,:]
 	return output
 
 def grid_x_gradient(data,i,j,k):
@@ -263,22 +261,12 @@ def grid_p_gradient_matrix(data, pressure_levels):
 	return (shift_down - shift_up)/(shift_pressures_down - shift_pressures_up)
 
 def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane,x_dot,y_dot):
-	x_dot_add = np.zeros_like(polar_plane)
-	y_dot_add = np.zeros_like(polar_plane)
-	for i in range(grid_side_length):
-		for j in range(grid_side_length):
-			for k in range(polar_plane.shape[2]):
-				x_dot_add[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
-				y_dot_add[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+	x_dot_add = dt_main*(- x_dot*grid_x_gradient_matrix(x_dot) - y_dot*grid_y_gradient_matrix(x_dot) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane) - 1E-4*x_dot)
+	y_dot_add = dt_main*(- x_dot*grid_x_gradient_matrix(y_dot) - y_dot*grid_y_gradient_matrix(y_dot) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane) - 1E-4*y_dot)
 	return x_dot_add,y_dot_add
 def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane,x_dot,y_dot):
-	x_dot_add = np.zeros_like(polar_plane)
-	y_dot_add = np.zeros_like(polar_plane)
-	for i in range(grid_side_length):
-		for j in range(grid_side_length):
-			for k in range(polar_plane.shape[2]):
-				x_dot_add[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
-				y_dot_add[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+	x_dot_add = dt_main*(- x_dot*grid_x_gradient_matrix(x_dot) - y_dot*grid_y_gradient_matrix(x_dot) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane) - 1E-4*x_dot)
+	y_dot_add = dt_main*(- x_dot*grid_x_gradient_matrix(y_dot) - y_dot*grid_y_gradient_matrix(y_dot) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane) - 1E-4*y_dot)
 	return x_dot_add,y_dot_add
 
 def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
