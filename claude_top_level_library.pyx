@@ -95,6 +95,7 @@ cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pre
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
 	cdef np.ndarray u_temp = dt*(-u*low_level.scalar_gradient_x_matrix(u, dx) - v*low_level.scalar_gradient_y_matrix(u, dy) - w*low_level.scalar_gradient_z_matrix(u, pressure_levels) + coriolis[:, None, None]*v - low_level.scalar_gradient_x_matrix(geopotential, dx) - 1E-4*u)
 	cdef np.ndarray v_temp = dt*(-u*low_level.scalar_gradient_x_matrix(v, dx) - v*low_level.scalar_gradient_y_matrix(v, dy) - w*low_level.scalar_gradient_z_matrix(v, pressure_levels) - coriolis[:, None, None]*u - low_level.scalar_gradient_y_matrix(geopotential, dy) - 1E-4*v)
+	
 	u_temp[-2:,:,:] = 0
 	v_temp[-2:,:,:] = 0
 	u_temp[:2,:,:] = 0
