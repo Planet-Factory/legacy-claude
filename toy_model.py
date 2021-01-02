@@ -97,13 +97,10 @@ for i in range(len(sigma)):
 
 ###########################
 
-albedo = np.zeros_like(temperature_world) + 0.2
 heat_capacity_earth = np.zeros_like(temperature_world) + 1E6
 
 albedo_variance = 0.001
-for i in range(nlat):
-	for j in range(nlon):
-		albedo[i,j] += np.random.uniform(-albedo_variance,albedo_variance)
+albedo = np.random.uniform(-albedo_variance,albedo_variance, (nlat, nlon)) + 0.2
 
 specific_gas = 287
 thermal_diffusivity_roc = 1.5E-6
@@ -138,14 +135,8 @@ grid_xx_S,grid_yy_S = np.meshgrid(grid_x_values_S,grid_y_values_S)
 
 grid_side_length = len(grid_x_values_S)
 
-grid_lat_coords_S = []
-grid_lon_coords_S = []
-for i in range(grid_xx_S.shape[0]):
-	for j in range(grid_xx_S.shape[1]):
-		lat_point = -np.arccos((grid_xx_S[i,j]**2 + grid_yy_S[i,j]**2)**0.5/planet_radius)*180/np.pi
-		lon_point = 180 - np.arctan2(grid_yy_S[i,j],grid_xx_S[i,j])*180/np.pi
-		grid_lat_coords_S.append(lat_point)
-		grid_lon_coords_S.append(lon_point)
+grid_lat_coords_S = (-np.arccos((grid_xx_S**2 + grid_yy_S**2)**0.5/planet_radius)*180/np.pi).flatten()
+grid_lon_coords_S = (180 - np.arctan2(grid_yy_S,grid_xx_S)*180/np.pi).flatten()
 
 polar_x_coords_S = []
 polar_y_coords_S = []
@@ -162,14 +153,8 @@ grid_x_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
 grid_y_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
 grid_xx_N,grid_yy_N = np.meshgrid(grid_x_values_N,grid_y_values_N)
 
-grid_lat_coords_N = []
-grid_lon_coords_N = []
-for i in range(grid_xx_N.shape[0]):
-	for j in range(grid_xx_N.shape[1]):
-		lat_point = np.arccos((grid_xx_N[i,j]**2 + grid_yy_N[i,j]**2)**0.5/planet_radius)*180/np.pi
-		lon_point = 180 - np.arctan2(grid_yy_N[i,j],grid_xx_N[i,j])*180/np.pi
-		grid_lat_coords_N.append(lat_point)
-		grid_lon_coords_N.append(lon_point)
+grid_lat_coords_N = (np.arccos((grid_xx_N**2 + grid_yy_N**2)**0.5/planet_radius)*180/np.pi).flatten()
+grid_lon_coords_N = (180 - np.arctan2(grid_yy_N,grid_xx_N)*180/np.pi).flatten()
 
 polar_x_coords_N = []
 polar_y_coords_N = []
@@ -228,6 +213,7 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data):
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 
 	return output
+
 def grid_x_gradient(data,i,j,k):
 	if j == 0:
 		value = (data[i,j+1,k] - data[i,j,k])/(polar_grid_resolution)
@@ -236,6 +222,12 @@ def grid_x_gradient(data,i,j,k):
 	else:
 		value = (data[i,j+1,k] - data[i,j-1,k])/(2*polar_grid_resolution)
 	return value
+
+def grid_x_gradient_matrix(data):
+	shift_east = np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:]
+	shift_west = np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:]
+	return (shift_west - shift_east) / (2 * polar_grid_resolution)
+
 def grid_y_gradient(data,i,j,k):
 	if i == 0:
 		value = (data[i+1,j,k] - data[i,j,k])/(polar_grid_resolution)
@@ -244,6 +236,12 @@ def grid_y_gradient(data,i,j,k):
 	else:
 		value = (data[i+1,j,k] - data[i-1,j,k])/(2*polar_grid_resolution)
 	return value
+
+def grid_y_gradient_matrix(data):
+	shift_south = np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:]
+	shift_north = np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:]
+	return (shift_north - shift_south) / (2 * polar_grid_resolution)
+
 def grid_p_gradient(data,i,j,k,pressure_levels):
 	if k == 0:
 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
@@ -252,6 +250,15 @@ def grid_p_gradient(data,i,j,k,pressure_levels):
 	else:
 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
 	return value
+
+def grid_p_gradient_matrix(data, pressure_levels):
+	shift_up = np.pad(data, ((0,0), (0,0), (1,0)), 'edge')[:,:,:-1]
+	shift_down = np.pad(data, ((0,0), (0,0), (0,1)), 'edge')[:,:,1:]
+	shift_pressures_up = np.pad(pressure_levels, (1,0), 'edge')[:-1]
+	shift_pressures_down = np.pad(pressure_levels, (0,1), 'edge')[1:]
+
+	return (shift_down - shift_up)/(shift_pressures_down - shift_pressures_up)
+
 def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
@@ -262,7 +269,9 @@ def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane):
 				# y_dot[i,j,k] = grid_x_gradient(polar_plane,i,j,k)/coriolis_plane[i,j]
 				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
 				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
+
 	return x_dot,y_dot
+
 def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 	x_dot = np.zeros_like(polar_plane)
 	y_dot = np.zeros_like(polar_plane)
@@ -274,51 +283,35 @@ def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane):
 				x_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(x_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(x_dot,i,j,k) + coriolis_plane[i,j]*y_dot[i,j,k] - grid_x_gradient(polar_plane,i,j,k) - 1E-4*x_dot[i,j,k])
 				y_dot[i,j,k] = dt_main*(- x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - coriolis_plane[i,j]*x_dot[i,j,k] - grid_y_gradient(polar_plane,i,j,k) - 1E-4*y_dot[i,j,k])
 	return x_dot,y_dot
+
 def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature):
-	output = np.zeros_like(x_dot)
-	for i in range(output.shape[0]):
-		for j in range(output.shape[1]):
-			for k in range(output.shape[2]):
-				output[i,j,k] = - (pressure_levels[k]-pressure_levels[k-1])*pressure_levels[k]*gravity*( grid_x_gradient(x_dot,i,j,k) + grid_y_gradient(y_dot,i,j,k) )/(287*temperature[i,j,k])
-	return output
+	shift_pressures_up = np.pad(pressure_levels, (1,0), 'edge')[:-1]
+
+	return - (pressure_levels - shift_pressures_up) * pressure_levels * gravity * (grid_x_gradient_matrix(x_dot) + grid_y_gradient_matrix(y_dot)) / (287*temperature)
+
 def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
 
-	reproj_u = np.zeros_like(data)
-	reproj_v = np.zeros_like(data)
-
-	for i in range(data.shape[0]):
-		for j in range(data.shape[1]):
-			for k in range(data.shape[2]):
-				reproj_u[i,j,k] = - reproj_x_dot[i,j,k]*np.sin(lon[j]*np.pi/180) - reproj_y_dot[i,j,k]*np.cos(lon[j]*np.pi/180)
-				reproj_v[i,j,k] = reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) - reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
+	reproj_u = - reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
+	reproj_v = reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
 	return reproj_u, reproj_v
+
 def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
 
-	reproj_u = np.zeros_like(data)
-	reproj_v = np.zeros_like(data)
-
-	for i in range(data.shape[0]):
-		for j in range(data.shape[1]):
-			for k in range(data.shape[2]):
-				reproj_u[i,j,k] = reproj_x_dot[i,j,k]*np.sin(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.cos(lon[j]*np.pi/180)
-				reproj_v[i,j,k] = - reproj_x_dot[i,j,k]*np.cos(lon[j]*np.pi/180) + reproj_y_dot[i,j,k]*np.sin(lon[j]*np.pi/180)
+	reproj_u = reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
+	reproj_v = - reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
 	return reproj_u, reproj_v
+
 def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
-	output = np.zeros_like(data)
 	data_x_dot = data*x_dot
 	data_y_dot = data*y_dot
 	data_z_dot = data*z_dot
-	for i in range(data.shape[0]):
-		for j in range(data.shape[1]):
-			for k in range(data.shape[2]):
-				output[i,j,k] = grid_x_gradient(data_x_dot,i,j,k) + grid_y_gradient(data_y_dot,i,j,k) + grid_p_gradient(data_z_dot,i,j,k,pressure_levels)
-	return output
+	return grid_x_gradient_matrix(data_x_dot) + grid_y_gradient_matrix(data_y_dot) + grid_p_gradient_matrix(data_z_dot, pressure_levels)
 
 # create Coriolis data on north and south planes
 data = np.zeros((nlat-pole_low_index_N,nlon))
@@ -450,19 +443,15 @@ while True:
 
 		before_velocity = time.time()
 		u,v = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
-
 		u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		v = top_level.smoothing_3D(v,smoothing_parameter_v)
-
 		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
 		w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
-
 		u[:,:,-1] *= 0.1
 		v[:,:,-1] *= 0.1
 
 		for k in range(nlevels):
 			w[:,:,k] *= pressure_levels[k]/pressure_levels[0]
-		
 		w[:,:,0] = -w[:,:,1]
 		# w[:,:,2] *= 0.1
 		# w[:,:,3] *= 0.5
@@ -530,7 +519,7 @@ while True:
 			south_temperature_data = potential_temperature[:pole_low_index_S,:,:]
 			south_polar_plane_temperature = beam_me_up(lat[:pole_low_index_S],lon,south_temperature_data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
 			south_polar_plane_actual_temperature = low_level.theta_to_t(south_polar_plane_temperature,pressure_levels)
-
+			
 			south_geopotential_data = geopotential[:pole_low_index_S,:,:]
 			south_polar_plane_geopotential = beam_me_up(lat[:pole_low_index_S],lon,south_geopotential_data,pole_low_index_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
 			
