@@ -39,7 +39,7 @@ If you choose to use Microsoft Visual C/C++, follow the instructions on the [Pyt
 Using command prompt, install the pip packages [cython](https://pypi.org/project/Cython/), [numpy](https://pypi.org/project/numpy/), and [matplotlib](https://pypi.org/project/matplotlib/), as well as [setuptools](https://pypi.org/project/setuptools/), if for some reason it is not already installed.
 The syntax to install a package with pip is
 ```
-pip install PACKAGE
+pip install -r requirements.txt
 ```
 Where `PACKAGE` is replaced with the name of the package.
 
