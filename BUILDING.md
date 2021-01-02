@@ -39,7 +39,7 @@ If you choose to use Microsoft Visual C/C++, follow the instructions on the [Pyt
 Using command prompt, install the pip packages [cython](https://pypi.org/project/Cython/), [numpy](https://pypi.org/project/numpy/), and [matplotlib](https://pypi.org/project/matplotlib/), as well as [setuptools](https://pypi.org/project/setuptools/), if for some reason it is not already installed.
 The syntax to install a package with pip is
 ```
-pip install PACKAGE
+pip install -r requirements.txt
 ```
 Where `PACKAGE` is replaced with the name of the package.
 
@@ -66,8 +66,11 @@ The following programs and libraries are required to build CLAuDE:
  - cython
  - numpy
  - matplotlib
+ - scipy
 
-If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib`.
+If you're using apt as your package manager, these correspond to the packages `git` `python3` `python3-setuptools` `cython3` `python3-numpy` `python3-matplotlib` `python-scipy`.
+
+Depending upon your system you may also need to install `tkinter` to view the graphics, which corresponds to the package `python3-tk`.
 
 ### 1. Clone the repository.
 Using the git command line, and cloning via https, this command will do it:
@@ -146,7 +149,7 @@ git clone https://github.com/Planet-Factory/claude.git
 ```
 
 ### 3. Install dependencies
-To build the project, you require `python`, as well as the python libraries `setuptools`, `cython`, `numpy`, and `matplotlib`.
+To build the project, you require `python`, as well as the python libraries `setuptools`, `cython`, `numpy`, `matplotlib` and `scipy`.
 First, use brew to install python:
 ```
 brew install python
@@ -157,6 +160,7 @@ Then, use `pip`, a python package manager that is installed with python to insta
 pip install cython
 pip install numpy
 pip install matplotlib
+pip install scipy
 ```
 
 ### 4. Using Cython, compile `claude_low_level_library` and `claude_top_level_library`

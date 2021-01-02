@@ -19,6 +19,8 @@ indicates that something special is going on. So here we use it in the special c
 calculations we will do later on.
 
 \begin{algorithm}[hbt]
+    \caption{Calculating the gradient in the $x$ direction}
+    \label{alg:gradient x}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
@@ -28,12 +30,12 @@ calculations we will do later on.
     }{
         $grad \leftarrow \frac{a[i, (j + 1)\text{ mod } nlon, k] - a[i, (j - 1) \text{ mod } nlon, k]}{\delta x[i]}$ \;
     }
-    \Return{$grad$} \;
-    \caption{Calculating the gradient in the $x$ direction}
-    \label{alg:gradient x}
+    \Return{$grad$} \; 
 \end{algorithm}
 
 \begin{algorithm}[hbt]
+    \caption{Calculating the gradient in the $y$ direction}
+    \label{alg:gradient y}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$ with default value \texttt{NULL}}
@@ -56,36 +58,25 @@ calculations we will do later on.
         }
     }
     \Return $grad$ \;
-    \caption{Calculating the gradient in the $y$ direction}
-    \label{alg:gradient y}
 \end{algorithm}
 
 \begin{algorithm}[hbt]
-    \SetKwInOut{Input}{Input}
-    \SetKwInOut{Output}{Output}
-    \Input{Matrix (double array) $a$, first index $i$, second index $j$, third index $k$}
-    \Output{Gradient in the $z$ direction}
-    \uIf{$a.dimensions = 1$}{
-        \uIf{$k = 0$}{
-            $grad \leftarrow \frac{a[k + 1] - a[k]}{\delta z[k]}$ \;
-        }\uElseIf{$k = nlevels - 1$}{
-            $grad \leftarrow \frac{a[k] - a[k - 1]}{\delta z[k]}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{2\delta z[k]}$ \;
-        }
-    } \uElse {
-        \uIf{$k = 0$}{
-            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k]}{\delta z[k]}$ \;
-        }\uElseIf{$k = nlevels - 1$}{
-            $grad \leftarrow \frac{a[i, j, k] - a[i, j, k - 1]}{\delta z[k]}$ \;
-        }\uElse{
-            $grad \leftarrow \frac{a[i, j, k + 1] - a[i, j, k - 1]}{2\delta z[k]}$ \;
-        }
-    }
-    
-    \Return $grad$ \;
     \caption{Calculating the gradient in the $z$ direction}
     \label{alg:gradient z}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Array $a$, array $p_z$, index $k$}
+    \Output{Gradient in the $z$ direction}
+    $nlevels \leftarrow p_z.length$ \;
+    \uIf{$k = 0$}{
+        $grad \leftarrow \frac{a[k + 1] - a[k]}{p_z[k + 1] - p_z[k]}$ \;
+    }\uElseIf{$k = nlevels - 1$}{
+        $grad \leftarrow \frac{a[k] - a[k - 1]}{p_z[k] - p_z[k - 1]}$ \;
+    }\uElse{
+        $grad \leftarrow \frac{a[k + 1] - a[k - 1]}{p_z[k + 1] - p_z[k - 1]}$ \;
+    }
+    
+    \Return $-grad$ \;  
 \end{algorithm}
 
 \subsection{Laplacian Operator} \label{sec:laplace}
@@ -102,16 +93,16 @@ respectively. If we then combine the two we get the Laplacian operator, as in \a
 
 \begin{subequations}
     \begin{equation}
-        \text{grad } \phi = \nabla \phi = \frac{\delta \phi}{\delta x}i + \frac{\delta \phi}{\delta y}j + \frac{\delta \phi}{\delta z}k
         \label{eq:gradient}
+        \text{grad } \phi = \nabla \phi = \frac{\delta \phi}{\delta x}i + \frac{\delta \phi}{\delta y}j + \frac{\delta \phi}{\delta z}k      
     \end{equation}
     \begin{equation}
-        \text{div} \Phi = \nabla \cdot \Phi = \frac{\delta \Phi_1}{\delta x} + \frac{\delta \Phi_2}{\delta y} + \frac{\delta \Phi_3}{\delta z}
         \label{eq:divergence}
+        \text{div} \Phi = \nabla \cdot \Phi = \frac{\delta \Phi_1}{\delta x} + \frac{\delta \Phi_2}{\delta y} + \frac{\delta \Phi_3}{\delta z} 
     \end{equation}
     \begin{equation}
-        \nabla^2 \phi = \nabla \cdot \nabla \phi = \frac{\delta^2 \phi}{\delta x^2} + \frac{\delta^2 \phi}{\delta y^2} + \frac{\delta^2 \phi}{\delta z^2}
         \label{eq:laplacian scalar}
+        \nabla^2 \phi = \nabla \cdot \nabla \phi = \frac{\delta^2 \phi}{\delta x^2} + \frac{\delta^2 \phi}{\delta y^2} + \frac{\delta^2 \phi}{\delta z^2}
     \end{equation}
 \end{subequations}
 
@@ -119,14 +110,16 @@ For a vector field $\Phi$ the Laplacian operator is defined as in \autoref{eq:la
 the basis vector.
 
 \begin{equation}
-    \nabla^2 \Phi = (\nabla^2 \Phi_1)i + (\nabla^2 \Phi_2)j + (\nabla^2 \Phi_3)k
     \label{eq:laplacian vector}
+    \nabla^2 \Phi = (\nabla^2 \Phi_1)i + (\nabla^2 \Phi_2)j + (\nabla^2 \Phi_3)k
 \end{equation}
 
 The code can be found in \autoref{alg:laplacian}. $\Delta_x$ and $\Delta_y$ in \autoref{alg:laplacian} represents the calls to \autoref{alg:gradient x} and \autoref{alg:gradient y} 
 respectively.
 
 \begin{algorithm}[hbt]
+    \caption{Calculate the laplacian operator over a matrix a}
+    \label{alg:laplacian}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{A matrix (double array) a}
@@ -149,9 +142,7 @@ respectively.
         }
     }
     
-    \Return{$ouput$} \;
-    \caption{Calculate the laplacian operator over a matrix a}
-    \label{alg:laplacian}
+    \Return{$ouput$} \;  
 \end{algorithm}
 
 \subsection{Divergence}
@@ -160,20 +151,20 @@ As we expect to use the divergence operator more often throughout our model, let
 as we expect that we might use it in combination with the divergence operator more frequently. What those vectors are and represent we will discuss in \autoref{sec:momentum}.
 
 \begin{algorithm}[!hbt]
+    \caption{Calculate the result of the divergence operator on a vector}
+    \label{alg:divergence}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{A matrix (double array) $a$}
-    \Output{A matrix (double array) containing the result of the divergence operator taken over that element}
+    \Input{A matrix (triple array) $a$, pressure field $p_z$}
+    \Output{A matrix (triple array) containing the result of the divergence operator taken over that element}
     \For{$i \leftarrow 0$ \KwTo $a.length$}{
         \For{$j \leftarrow 0$ \KwTo $a[i].length$}{
             \For{$k \leftarrow 0$ \KwTo $a[i, j].length$}{
-                $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw, i, j, k)$ \;
+                $output[i, j, k] \leftarrow \Delta_x(au, i, j, k) + \Delta_y(av, i, j, k) + \Delta_z(aw[i, j, :], p_z, k)$ \;
             }
         }
     }
-    \Return{$output$} \;
-    \caption{Calculate the result of the divergence operator on a vector}
-    \label{alg:divergence}
+    \Return{$output$} \;  
 \end{algorithm}
 
 \subsection{Interpolation} \label{sec:interpolation}
@@ -184,8 +175,8 @@ $\lambda$ is the factor that tells us how close $z$ is to $y$ in the interval $[
 Whereas if $z$ is close to $x$ then $\lambda$ will have a value on the lower end of the interval, like 0.1.
 
 \begin{equation}
-    z = (1 - \lambda)x + \lambda y
     \label{eq:interpolation}
+    z = (1 - \lambda)x + \lambda y
 \end{equation}
 
 \subsection{3D smoothing} \label{sec:3dsmooth}
@@ -214,28 +205,28 @@ Fourier Transform. The final equation is given in \autoref{eq:ft}.
 
 \begin{subequations}
     \begin{equation}
-        e^{ix} = \cos(x) + i\sin(x)
         \label{eq:euler}
+        e^{ix} = \cos(x) + i\sin(x)
     \end{equation}
     \begin{equation}
-        e^{2\pi it}
         \label{eq:euler rotate}
+        e^{2\pi it}
     \end{equation}
     \begin{equation}
-        e^{-2\pi ift}
         \label{eq:euler freq}
+        e^{-2\pi ift}
     \end{equation}
     \begin{equation}
-        g(t)e^{-2\pi ift}
         \label{eq:euler wave}
+        g(t)e^{-2\pi ift}
     \end{equation}
     \begin{equation}
-        \frac{1}{t_2 - t_1}\int^{t_2}_{t_1}g(t)e^{-2\pi ift}
         \label{eq:euler int}
+        \frac{1}{t_2 - t_1}\int^{t_2}_{t_1}g(t)e^{-2\pi ift}
     \end{equation}
     \begin{equation}
-        \hat{g}(f) = \int^{t_2}_{t_1}g(t)e^{-2\pi ift}
         \label{eq:ft}
+        \hat{g}(f) = \int^{t_2}_{t_1}g(t)e^{-2\pi ift}
     \end{equation}
 \end{subequations}
 
@@ -265,6 +256,8 @@ Now with the DFT out of the way we can discuss the algorithm. Before we do, we a
 integer $k$.
 
 \begin{algorithm}
+    \caption{One dimensional Fast Fourier Transformation}
+    \label{alg:FFT}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{array $A$}
@@ -284,9 +277,7 @@ integer $k$.
         $B[k + \frac{n}{2}] \leftarrow y^0[k] - \omega y^1[k]$ \;
         $\omega \leftarrow \omega \omega_n$ \;
     }
-    \Return{B}
-    \caption{One dimensional Fast Fourier Transformation}
-    \label{alg:FFT}
+    \Return{B} 
 \end{algorithm}
 
 There is just this one problem we have, the algorithm in \autoref{alg:FFT} can only handle one dimension, and we need to support multidimensional arrays. So let us define a multidimensional FFT 
@@ -294,8 +285,8 @@ first in \autoref{eq:NFFT}. Here $N$ and $M$ are the amount of indices for the d
 second dimension. This can of course be extended in the same way for a $p$-dimensional array.
 
 \begin{equation}
-    X_{k,l} = \sum_{m = 0}^{M - 1}\sum_{n = 0}^{N - 1} x_{m, n}e^{-2i\pi(\frac{mk}{M} + \frac{nl}{N})}
     \label{eq:NFFT}
+    X_{k,l} = \sum_{m = 0}^{M - 1}\sum_{n = 0}^{N - 1} x_{m, n}e^{-2i\pi(\frac{mk}{M} + \frac{nl}{N})}
 \end{equation}
 
 It is at this point that the algorithm becomes very complicated. Therefore I would like to invite you to use a library for these kinds of calculations, like Numpy \cite{numpy} for Python. If you
@@ -313,6 +304,8 @@ function ensures that the number in brackets is an integer. Also note that the i
 take the real part and return that. $v$ is an optional parameter with default value $0.5$ which does absolutely nothing in this algorithm.
 
 \begin{algorithm}
+    \caption{Smoothing function}
+    \label{alg:smooth}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
     \Input{Array $a$, smoothing factor $s$, vertical smoothing factor $v \leftarrow 0.5$}
@@ -325,6 +318,4 @@ take the real part and return that. $v$ is an optional parameter with default va
     $temp[:,int(nlon s):int(nlon(1 - s)),:] \leftarrow 0$ \;
     $temp[:,:,int(nlevels v):int(nlevels(1 - v))] \leftarrow 0$ \;
     \Return $\texttt{IFFT}(temp).real$ \;
-    \caption{Smoothing function}
-    \label{alg:smooth}
 \end{algorithm}

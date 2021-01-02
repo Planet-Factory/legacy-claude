@@ -12,6 +12,7 @@
 \usepackage[normalem]{ulem}
 \usepackage{graphicx}
 \usepackage{siunitx}
+\usepackage[section]{placeins}
 
 \setcounter{section}{-1}
 \newtheorem{lemma}{Lemma}
@@ -63,58 +64,47 @@ particular stream is missing in the version on the Planet Factory repository, ch
 patient, or you can start writing a part of the manual yourself! Don't forget to ping me in the Discord to notify me of any additions (GitHub refuses to send me emails so I have no other way of 
 knowing).
 
+\FloatBarrier
+\newpage
 \input{topics/control_panel.tex}
 
+\FloatBarrier
+\newpage
 \input{topics/util_funcs.tex}
 
+\FloatBarrier
+\newpage
 \input{topics/radiation.tex}
 
+\FloatBarrier
+\newpage
 \input{topics/velocity.tex}
 
+\FloatBarrier
+\newpage
 \input{topics/advection.tex}
 
+\FloatBarrier
+\newpage
+\input{topics/planar.tex}
+
+\FloatBarrier
+\newpage
 \input{topics/master.tex}
 
+\FloatBarrier
 \newpage
 \input{appendices/TTNMETAF.tex}
 
+\FloatBarrier
+\newpage
 \input{appendices/history.tex}
 
+\FloatBarrier
+\newpage
 \input{appendices/vars.tex}
 
 \newpage
 \bibliography{references}
 \bibliographystyle{plain}
-
-\begin{comment}
-\subsection{Hydrostatic balance}
-Hydrostatic balance is the relation between the pressure at the surface of the planet and the pressure higher up in the atmosphere \cite{hydrostatic}. This all works under the assumption that 
-the vertical acceleration is relatively small in magnitude compared to the gravity of the planet, which it almost always is when looking at the atmosphere or the ocean. The corresponding 
-formula is described in \autoref{eq:hydrostatic}. The symbols here represent:
-
-\begin{itemize}
-    \item $\delta p$: The change in the atmospheric pressure ($Pa$).
-    \item $\delta z$: The change in altitude or height ($m$).
-    \item $\rho$: The density of the atmosphere ($kgm^{-3}$).
-    \item $g$: The gravitational acceleration, on Earth this is $9.81$ ($ms^{-2}$).
-\end{itemize}
-
-\begin{equation}
-    \frac{\delta p}{\delta z} = -\rho g
-    \label{eq:hydrostatic}
-\end{equation}
-
-Now we need to translate this into code, luckily this is quite easy as shown in \autoref{alg:hydrostatic}. We first calculate the difference between the current mean pressure and the mean 
-pressure we get from \autoref{eq:hydrostatic}. Then we add the difference to the pressure, effectively correcting the average pressure for the current atmospheric layer to what it is supposed to 
-be. By correcting it with the mean difference we still have the local variation in pressure while on average we are closer to the true value we calculate in \autoref{eq:hydrostatic}.
-
-\begin{algorithm}
-    \For{$alt \in [1, nlevels]$}{
-        $correction \leftarrow mean(p[:, :, alt - 1]) - mean(\rho[:, :, alt])(heights[alt] - heights[alt - 1])g$ \;
-        $p[:, :, alt] \leftarrow \rho[:, :, alt] + correction$ \;
-    }
-    \caption{Calculating the effects of Hydrostatic Balance on the average pressure}
-    \label{alg:hydrostatic}
-\end{algorithm}
-\end{comment}
 \end{document}
