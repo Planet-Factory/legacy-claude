@@ -37,13 +37,18 @@ cpdef laplacian_3D(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray dz):
 	return output
 
 # divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field
-cpdef divergence_with_scalar(np.ndarray a,np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_levels):
+cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarray w, np.ndarray dx, DTYPE_f dy, np.ndarray pressure_levels):
 	cdef np.ndarray au, av, aw
-	au = a*u
-	av = a*v
-	aw = a*w
+	
+	au = np.multiply(a,u)
+	av = np.multiply(a,v)
+	aw = np.multiply(a,w)
 
-	cdef np.ndarray output = low_level.scalar_gradient_x_matrix(au,dx) + low_level.scalar_gradient_y_matrix(av,dy) + low_level.scalar_gradient_z_matrix(aw, pressure_levels)
+	cdef np.ndarray output = low_level.scalar_gradient_x_matrix(au,dx) + low_level.scalar_gradient_y_matrix(av,dy) + low_level.scalar_gradient_z_matrix_primitive(aw, pressure_levels)
+	# cdef np.ndarray output = low_level.scalar_gradient_x_matrix_primitive(au,dx) + low_level.scalar_gradient_y_matrix(av,dy)
+	# cdef np.ndarray output = low_level.scalar_gradient_y_matrix(av,dy) + low_level.scalar_gradient_z_matrix_primitive(aw, pressure_levels)
+	# cdef np.ndarray output = low_level.scalar_gradient_z_matrix_primitive(aw, pressure_levels)
+	# cdef np.ndarray output = low_level.scalar_gradient_y_matrix(av,dy)
 
 	return output
 
@@ -93,20 +98,32 @@ cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_t
 cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt):
 
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
-	cdef np.ndarray u_temp = dt*(-u*low_level.scalar_gradient_x_matrix(u, dx) - v*low_level.scalar_gradient_y_matrix(u, dy) - w*low_level.scalar_gradient_z_matrix(u, pressure_levels) + coriolis[:, None, None]*v - low_level.scalar_gradient_x_matrix(geopotential, dx) - 1E-4*u)
-	cdef np.ndarray v_temp = dt*(-u*low_level.scalar_gradient_x_matrix(v, dx) - v*low_level.scalar_gradient_y_matrix(v, dy) - w*low_level.scalar_gradient_z_matrix(v, pressure_levels) - coriolis[:, None, None]*u - low_level.scalar_gradient_y_matrix(geopotential, dy) - 1E-4*v)
-	
-	u_temp[-2:,:,:] = 0
-	v_temp[-2:,:,:] = 0
-	u_temp[:2,:,:] = 0
-	v_temp[:2:,:] = 0
+	cdef np.ndarray u_temp = dt*(-u*low_level.scalar_gradient_x_matrix(u, dx) - v*low_level.scalar_gradient_y_matrix(u, dy) - w*low_level.scalar_gradient_z_matrix_primitive(u, pressure_levels) + coriolis[:, None, None]*v - low_level.scalar_gradient_x_matrix(geopotential, dx) - 1E-5*u)
+	cdef np.ndarray v_temp = dt*(-u*low_level.scalar_gradient_x_matrix(v, dx) - v*low_level.scalar_gradient_y_matrix(v, dy) - w*low_level.scalar_gradient_z_matrix_primitive(v, pressure_levels) - coriolis[:, None, None]*u - low_level.scalar_gradient_y_matrix(geopotential, dy) - 1E-5*v)
 
-	u += u_temp
-	v += v_temp
+	cdef np.ndarray u_temp_sponge = dt*(-u*low_level.scalar_gradient_x_matrix(u, dx) - v*low_level.scalar_gradient_y_matrix(u, dy) - w*low_level.scalar_gradient_z_matrix_primitive(u, pressure_levels) - 1E-3*u)
+	cdef np.ndarray v_temp_sponge = dt*(-u*low_level.scalar_gradient_x_matrix(v, dx) - v*low_level.scalar_gradient_y_matrix(v, dy) - w*low_level.scalar_gradient_z_matrix_primitive(v, pressure_levels) - 1E-3*v)
+
+
+	u[4:-4,:,:17] += u_temp[4:-4,:,:17]
+	v[4:-4,:,:17] += v_temp[4:-4,:,:17]
 	
-	# approximate surface friction
-	u[:,:,0] *= 0.8
-	v[:,:,0] *= 0.8
+	###
+	
+	u[:3,:,:17] += u_temp_sponge[:3,:,:17]
+	v[:3,:,:17] += v_temp_sponge[:3,:,:17]
+
+	u[-3:,:,:17] += u_temp_sponge[-3:,:,:17]
+	v[-3:,:,:17] += v_temp_sponge[-3:,:,:17]
+
+
+	u[:,:,17:] += u_temp_sponge[:,:,17:]
+	v[:,:,17:] += v_temp_sponge[:,:,17:]	
+
+	u[:2,:,:] *= 0
+	u[-2:,:,:] *= 0
+	v[:2,:,:] *= 0
+	v[-2:,:,:] *= 0
 
 	return u,v
 
@@ -119,12 +136,13 @@ cpdef w_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_l
 	
 	for k in np.arange(1,nlevels).tolist():
 		w_temp[:,:,k] = w_temp[:,:,k-1] - (pressure_levels[k] - pressure_levels[k-1]) * pressure_levels[k] * gravity * ( low_level.scalar_gradient_x_matrix(u, dx)[:,:,k] + low_level.scalar_gradient_y_matrix(v, dy)[:,:,k] )/(287*temperature_atmos[:,:,k])
-	w_temp[-2:,:,:] = 0
-	w_temp[:2,:,:] = 0
+	
+	w_temp[-3:,:,:] = 0
+	w_temp[:3,:,:] = 0
 
 	w += w_temp
 
-	return w
+	return w_temp
 
 cpdef smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter, DTYPE_f vert_smooth_parameter=0.5):
 	cdef np.int_t nlat = a.shape[0]
