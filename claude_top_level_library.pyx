@@ -155,7 +155,7 @@ cpdef smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter, DTYPE_f vert_smooth_pa
 	test[:,:,int(nlevels*vert_smooth_parameter):int(nlevels*(1-vert_smooth_parameter))] = 0
 	return np.fft.ifftn(test).real
 
-cpdef polar_planes(u,v,potential_temperature,geopotential,grid_velocities,indices,grids,coords,coriolis_plane_N,coriolis_plane_S,grid_side_length,pressure_levels,lat,lon,dt,polar_grid_resolution,gravity):
+cpdef polar_planes(np.ndarray u,np.ndarray v,np.ndarray potential_temperature,np.ndarray geopotential,tuple grid_velocities,tuple indices,tuple grids,tuple coords,np.ndarray coriolis_plane_N,np.ndarray coriolis_plane_S,DTYPE_f grid_side_length,np.ndarray pressure_levels,np.ndarray lat,np.ndarray lon,DTYPE_f dt,DTYPE_f polar_grid_resolution,DTYPE_f gravity):
 
 	x_dot_N,y_dot_N,x_dot_S,y_dot_S = grid_velocities[:]
 	pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S = indices[:]

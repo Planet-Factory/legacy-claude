@@ -25,7 +25,7 @@ nlevels = len(pressure_levels)
 
 dt_spinup = 60*7.2
 dt_main = 60*1.65
-spinup_length = 10*day
+spinup_length = 0*day
 
 ###
 
@@ -39,7 +39,7 @@ smoothing_parameter_add = 0.3
 ###
 
 save = False 			# save current state to file?
-load = True  			# load initial state from file?
+load = False  			# load initial state from file?
 
 ###
 
@@ -53,7 +53,7 @@ level_plots = False					# display plots of output on vertical levels?
 nplots = 3							# how many levels you want to see plots of (evenly distributed through column)
 top = -1							# top pressure level to display (i.e. trim off sponge layer)
 
-verbose = True						# print times taken to calculate specific processes each timestep
+verbose = False						# print times taken to calculate specific processes each timestep
 
 ###
 
@@ -130,67 +130,69 @@ for i in range(nlat):
 
 #################### SHOW TIME ####################
 
-pole_low_index_S = np.where(lat > pole_lower_latitude_limit)[0][0]
-pole_high_index_S = np.where(lat > pole_higher_latitude_limit)[0][0]
+setup_grids = True
+if setup_grids:
+	pole_low_index_S = np.where(lat > pole_lower_latitude_limit)[0][0]
+	pole_high_index_S = np.where(lat > pole_higher_latitude_limit)[0][0]
 
-# initialise grid
-polar_grid_resolution = dx[-pole_low_index_S]
-size_of_grid = planet_radius*np.cos(lat[-pole_low_index_S]*np.pi/180)
+	# initialise grid
+	polar_grid_resolution = dx[-pole_low_index_S]
+	size_of_grid = planet_radius*np.cos(lat[-pole_low_index_S]*np.pi/180)
 
-### south pole ###
-grid_x_values_S = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-grid_y_values_S = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-grid_xx_S,grid_yy_S = np.meshgrid(grid_x_values_S,grid_y_values_S)
+	### south pole ###
+	grid_x_values_S = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+	grid_y_values_S = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+	grid_xx_S,grid_yy_S = np.meshgrid(grid_x_values_S,grid_y_values_S)
 
-grid_side_length = len(grid_x_values_S)
+	grid_side_length = len(grid_x_values_S)
 
-grid_lat_coords_S = (-np.arccos((grid_xx_S**2 + grid_yy_S**2)**0.5/planet_radius)*180/np.pi).flatten()
-grid_lon_coords_S = (180 - np.arctan2(grid_yy_S,grid_xx_S)*180/np.pi).flatten()
+	grid_lat_coords_S = (-np.arccos((grid_xx_S**2 + grid_yy_S**2)**0.5/planet_radius)*180/np.pi).flatten()
+	grid_lon_coords_S = (180 - np.arctan2(grid_yy_S,grid_xx_S)*180/np.pi).flatten()
 
-polar_x_coords_S = []
-polar_y_coords_S = []
-for i in range(pole_low_index_S):
-	for j in range(nlon):
-		polar_x_coords_S.append( planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
-		polar_y_coords_S.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
+	polar_x_coords_S = []
+	polar_y_coords_S = []
+	for i in range(pole_low_index_S):
+		for j in range(nlon):
+			polar_x_coords_S.append( planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
+			polar_y_coords_S.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
 
-### north pole ###
-pole_low_index_N = np.where(lat < -pole_lower_latitude_limit)[0][-1]
-pole_high_index_N = np.where(lat < -pole_higher_latitude_limit)[0][-1]
+	### north pole ###
+	pole_low_index_N = np.where(lat < -pole_lower_latitude_limit)[0][-1]
+	pole_high_index_N = np.where(lat < -pole_higher_latitude_limit)[0][-1]
 
-grid_x_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-grid_y_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
-grid_xx_N,grid_yy_N = np.meshgrid(grid_x_values_N,grid_y_values_N)
+	grid_x_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+	grid_y_values_N = np.arange(-size_of_grid,size_of_grid,polar_grid_resolution)
+	grid_xx_N,grid_yy_N = np.meshgrid(grid_x_values_N,grid_y_values_N)
 
-grid_lat_coords_N = (np.arccos((grid_xx_N**2 + grid_yy_N**2)**0.5/planet_radius)*180/np.pi).flatten()
-grid_lon_coords_N = (180 - np.arctan2(grid_yy_N,grid_xx_N)*180/np.pi).flatten()
+	grid_lat_coords_N = (np.arccos((grid_xx_N**2 + grid_yy_N**2)**0.5/planet_radius)*180/np.pi).flatten()
+	grid_lon_coords_N = (180 - np.arctan2(grid_yy_N,grid_xx_N)*180/np.pi).flatten()
 
-polar_x_coords_N = []
-polar_y_coords_N = []
-for i in np.arange(pole_low_index_N,nlat):
-	for j in range(nlon):
-		polar_x_coords_N.append( planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
-		polar_y_coords_N.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
+	polar_x_coords_N = []
+	polar_y_coords_N = []
+	for i in np.arange(pole_low_index_N,nlat):
+		for j in range(nlon):
+			polar_x_coords_N.append( planet_radius*np.cos(lat[i]*np.pi/180)*np.sin(lon[j]*np.pi/180) )
+			polar_y_coords_N.append( -planet_radius*np.cos(lat[i]*np.pi/180)*np.cos(lon[j]*np.pi/180) )
 
-indices = pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S
-grids   = grid_xx_N.shape[0],grid_xx_S.shape[0]
+	indices = pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S
+	grids   = grid_xx_N.shape[0],grid_xx_S.shape[0]
 
-# create Coriolis data on north and south planes
-data = np.zeros((nlat-pole_low_index_N,nlon))
-for i in np.arange(pole_low_index_N,nlat):
-	data[i-pole_low_index_N,:] = coriolis[i]
-coriolis_plane_N = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,data,grids[0],grid_lat_coords_N,grid_lon_coords_N)
-data = np.zeros((pole_low_index_S,nlon))
-for i in range(pole_low_index_S):
-	data[i,:] = coriolis[i]
-coriolis_plane_S = low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,data,grids[1],grid_lat_coords_S,grid_lon_coords_S)
+	# create Coriolis data on north and south planes
+	data = np.zeros((nlat-pole_low_index_N,nlon))
+	for i in np.arange(pole_low_index_N,nlat):
+		data[i-pole_low_index_N,:] = coriolis[i]
+	coriolis_plane_N = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,data,grids[0],grid_lat_coords_N,grid_lon_coords_N)
+	data = np.zeros((pole_low_index_S,nlon))
+	for i in range(pole_low_index_S):
+		data[i,:] = coriolis[i]
+	coriolis_plane_S = low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,data,grids[1],grid_lat_coords_S,grid_lon_coords_S)
 
-x_dot_N = np.zeros((grid_side_length,grid_side_length,nlevels))
-y_dot_N = np.zeros((grid_side_length,grid_side_length,nlevels))
-x_dot_S = np.zeros((grid_side_length,grid_side_length,nlevels))
-y_dot_S = np.zeros((grid_side_length,grid_side_length,nlevels))
+	x_dot_N = np.zeros((grid_side_length,grid_side_length,nlevels))
+	y_dot_N = np.zeros((grid_side_length,grid_side_length,nlevels))
+	x_dot_S = np.zeros((grid_side_length,grid_side_length,nlevels))
+	y_dot_S = np.zeros((grid_side_length,grid_side_length,nlevels))
 
-coords  = grid_lat_coords_N,grid_lon_coords_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,grid_lat_coords_S,grid_lon_coords_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S
+	coords  = grid_lat_coords_N,grid_lon_coords_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,grid_lat_coords_S,grid_lon_coords_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S
 
 #######################################################################################################################################################################################################################
 
@@ -353,8 +355,10 @@ while True:
 		atmosp_addition[pole_low_index_N:,:,:] = north_addition_smoothed
 		# atmosp_addition[pole_low_index_N:,:,:] *= 0
 
-		for i in np.arange(pole_low_index_N,nlat):
+		for i in range(pole_high_index_S+1):
 			atmosp_addition[i,:,:] = np.zeros((nlon,nlevels)) + np.mean(atmosp_addition[i,:,:],axis=0)
+			atmosp_addition[-i,:,:] = np.zeros((nlon,nlevels)) + np.mean(atmosp_addition[-i,:,:],axis=0)
+		atmosp_addition[-i+1,:,:] = np.zeros((nlon,nlevels)) + np.mean(atmosp_addition[-i+1,:,:],axis=0)
 		
 		south_addition_smoothed = low_level.combine_data(pole_low_index_S,pole_high_index_S,atmosp_addition[:pole_low_index_S,:,:],south_reprojected_addition,lat)
 		atmosp_addition[:pole_low_index_S,:,:] = south_addition_smoothed	
@@ -381,7 +385,7 @@ while True:
 			
 			sample_level = 5
 			
-			test = np.copy(atmosp_addition)[:,:,sample_level]
+			test = np.copy(u)[:,:,sample_level]
 			ax[0].contourf(lon_plot, lat_plot, test, cmap='seismic',levels=15)
 			
 			# if velocity:	ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=0.75)

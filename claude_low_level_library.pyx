@@ -172,30 +172,33 @@ cpdef theta_to_t(np.ndarray theta, np.ndarray pressure_levels):
 
 ########################################################################################################
 
-def beam_me_up_2D(lats,lon,data,grid_size,grid_lat_coords,grid_lon_coords):
+cpdef beam_me_up_2D(np.ndarray lats,np.ndarray lon,np.ndarray data,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords):
 	'''Projects data on lat-lon grid to x-y polar grid'''
 	f = RectBivariateSpline(lats, lon, data)
-	polar_plane = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
+	cdef np.ndarray polar_plane = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
 	return polar_plane
-def beam_me_up(lats,lon,data,grid_size,grid_lat_coords,grid_lon_coords):
+cpdef beam_me_up(np.ndarray lats,np.ndarray lon,np.ndarray data,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords):
 	'''Projects data on lat-lon grid to x-y polar grid'''
-	polar_plane = np.zeros((grid_size,grid_size,data.shape[2]))
+	cdef np.ndarray polar_plane = np.zeros((grid_size,grid_size,data.shape[2]))
+	cdef np.int_t k
 	for k in range(data.shape[2]):
 		f = RectBivariateSpline(lats, lon, data[:,:,k])
 		polar_plane[:,:,k] = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
 	return polar_plane
-def beam_me_down(lon,data,pole_low_index,grid_x_values,grid_y_values,polar_x_coords,polar_y_coords):
+cpdef beam_me_down(lon,data,np.int_t pole_low_index, grid_x_values, grid_y_values,polar_x_coords, polar_y_coords):
 	'''projects data from x-y polar grid onto lat-lon grid'''
-	resample = np.zeros((int(len(polar_x_coords)/len(lon)),len(lon),data.shape[2]))
+	cdef np.ndarray resample = np.zeros((int(len(polar_x_coords)/len(lon)),len(lon),data.shape[2]))
+	cdef np.int_t k
 	for k in range(data.shape[2]):
 		f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data[:,:,k])
 		resample[:,:,k] = f(polar_x_coords,polar_y_coords,grid=False).reshape((int(len(polar_x_coords)/len(lon)),len(lon)))
 	return resample
-def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data,lat): 
-	output = np.zeros_like(polar_data)
-	overlap = abs(pole_low_index - pole_high_index)
-
-	nlat = len(lat)
+cpdef combine_data(np.int_t pole_low_index,np.int_t pole_high_index,np.ndarray polar_data,np.ndarray reprojected_data,np.ndarray lat): 
+	cdef np.ndarray output = np.zeros_like(polar_data)
+	cdef np.int_t overlap = abs(pole_low_index - pole_high_index)
+	cdef DTYPE_f scale_reprojected_data, scale_polar_data
+	cdef np.int_t nlat = len(lat)
+	cdef np.int_t k,i
 
 	if lat[pole_low_index] < 0:		# SOUTH POLE
 		for k in range(output.shape[2]):
@@ -211,6 +214,7 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data,lat)
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 	
 	else:							# NORTH POLE
+		polar_data = np.roll(polar_data,int(polar_data.shape[1]/2),axis=1)
 		for k in range(output.shape[2]):
 			for i in range(nlat-pole_low_index):
 				
@@ -224,32 +228,13 @@ def combine_data(pole_low_index,pole_high_index,polar_data,reprojected_data,lat)
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 	return output
 
-# def grid_x_gradient(data,i,j,k):
-# 	if j == 0:
-# 		value = (data[i,j+1,k] - data[i,j,k])/(polar_grid_resolution)
-# 	elif j == grid_side_length-1:
-# 		value = (data[i,j,k] - data[i,j-1,k])/(polar_grid_resolution)
-# 	else:
-# 		value = (data[i,j+1,k] - data[i,j-1,k])/(2*polar_grid_resolution)
-# 	return value
-
-def grid_x_gradient_matrix(data,polar_grid_resolution):
-	shift_east = np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:]
-	shift_west = np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:]
+cpdef grid_x_gradient_matrix(np.ndarray data,DTYPE_f polar_grid_resolution):
+	cdef np.ndarray shift_east = np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:]
+	cdef np.ndarray shift_west = np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:]
 	return (shift_west - shift_east) / (2 * polar_grid_resolution)
-
-# def grid_y_gradient(data,i,j,k):
-# 	if i == 0:
-# 		value = (data[i+1,j,k] - data[i,j,k])/(polar_grid_resolution)
-# 	elif i == grid_side_length-1:
-# 		value = (data[i,j,k] - data[i-1,j,k])/(polar_grid_resolution)
-# 	else:
-# 		value = (data[i+1,j,k] - data[i-1,j,k])/(2*polar_grid_resolution)
-# 	return value
-
-def grid_y_gradient_matrix(data,polar_grid_resolution):
-	shift_south = np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:]
-	shift_north = np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:]
+cpdef grid_y_gradient_matrix(np.ndarray data,DTYPE_f polar_grid_resolution):
+	cdef np.ndarray shift_south = np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:]
+	cdef np.ndarray shift_north = np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:]
 	return (shift_north - shift_south) / (2 * polar_grid_resolution)
 
 # def grid_p_gradient(data,i,j,k,pressure_levels):
@@ -268,10 +253,10 @@ def grid_y_gradient_matrix(data,polar_grid_resolution):
 
 # 	return (shift_down - shift_up)/(shift_pressures_down - shift_pressures_up)
 
-def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane,x_dot,y_dot,polar_grid_resolution):
+cpdef grid_velocities_north(np.ndarray polar_plane,np.int_t grid_side_length,np.ndarray coriolis_plane,np.ndarray x_dot,np.ndarray y_dot,DTYPE_f polar_grid_resolution):
 	
-	x_dot_add = - x_dot*grid_x_gradient_matrix(x_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(x_dot,polar_grid_resolution) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
-	y_dot_add = - x_dot*grid_x_gradient_matrix(y_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(y_dot,polar_grid_resolution) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
+	cpdef np.ndarray x_dot_add = - x_dot*grid_x_gradient_matrix(x_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(x_dot,polar_grid_resolution) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
+	cpdef np.ndarray y_dot_add = - x_dot*grid_x_gradient_matrix(y_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(y_dot,polar_grid_resolution) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
 
 	x_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(x_dot[:,:,17:],polar_grid_resolution) - y_dot[:,:,17:]*grid_y_gradient_matrix(x_dot[:,:,17:],polar_grid_resolution) - 1E-3*x_dot[:,:,17:]
 	y_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(y_dot[:,:,17:],polar_grid_resolution) - y_dot[:,:,17:]*grid_y_gradient_matrix(y_dot[:,:,17:],polar_grid_resolution) - 1E-3*y_dot[:,:,17:]
@@ -287,10 +272,10 @@ def grid_velocities_north(polar_plane,grid_side_length,coriolis_plane,x_dot,y_do
 	# 				y_dot_add[i,j,k] = - x_dot[i,j,k]*grid_x_gradient(y_dot,i,j,k) - y_dot[i,j,k]*grid_y_gradient(y_dot,i,j,k) - 1E-3*y_dot[i,j,k]
 
 	return x_dot_add,y_dot_add
-def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane,x_dot,y_dot,polar_grid_resolution):
+cpdef grid_velocities_south(np.ndarray polar_plane,np.int_t grid_side_length,np.ndarray coriolis_plane,np.ndarray x_dot,np.ndarray y_dot,DTYPE_f polar_grid_resolution):
 	
-	x_dot_add = - x_dot*grid_x_gradient_matrix(x_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(x_dot,polar_grid_resolution) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
-	y_dot_add = - x_dot*grid_x_gradient_matrix(y_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(y_dot,polar_grid_resolution) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
+	cdef np.ndarray x_dot_add = - x_dot*grid_x_gradient_matrix(x_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(x_dot,polar_grid_resolution) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
+	cdef np.ndarray y_dot_add = - x_dot*grid_x_gradient_matrix(y_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(y_dot,polar_grid_resolution) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
 	
 	x_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(x_dot[:,:,17:],polar_grid_resolution) - y_dot[:,:,17:]*grid_y_gradient_matrix(x_dot[:,:,17:],polar_grid_resolution) - 1E-3*x_dot[:,:,17:]
 	y_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(y_dot[:,:,17:],polar_grid_resolution) - y_dot[:,:,17:]*grid_y_gradient_matrix(y_dot[:,:,17:],polar_grid_resolution) - 1E-3*y_dot[:,:,17:]
@@ -309,12 +294,11 @@ def grid_velocities_south(polar_plane,grid_side_length,coriolis_plane,x_dot,y_do
 	
 	return x_dot_add,y_dot_add
 
-def grid_vertical_velocity(x_dot,y_dot,pressure_levels,gravity,temperature,polar_grid_resolution):
-	shift_pressures_up = np.pad(pressure_levels, (1,0), 'edge')[:-1]
+cpdef grid_vertical_velocity(np.ndarray x_dot,np.ndarray y_dot,np.ndarray pressure_levels,DTYPE_f gravity,np.ndarray temperature,DTYPE_f polar_grid_resolution):
+	cdef np.ndarray shift_pressures_up = np.pad(pressure_levels, (1,0), 'edge')[:-1]
 	return - (pressure_levels - shift_pressures_up) * pressure_levels * gravity * (grid_x_gradient_matrix(x_dot,polar_grid_resolution) + grid_y_gradient_matrix(y_dot,polar_grid_resolution)) / (287*temperature)
 
-####
-def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,data):
+cpdef project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,data):
 
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
@@ -322,10 +306,9 @@ def project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,
 	reproj_u = - reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
 	reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
-	return np.roll(-reproj_u,int(len(lon)/2),axis=1), reproj_v
-####
-
-def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,data):
+	# return np.roll(-reproj_u,int(len(lon)/2),axis=1), reproj_v
+	return reproj_u, reproj_v
+cpdef project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,data):
 	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
 	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
 
@@ -333,10 +316,10 @@ def project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,
 	reproj_v = - reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
 	return reproj_u, reproj_v
-def polar_plane_advect(data,x_dot,y_dot,z_dot,pressure_levels):
-	data_x_dot = data*x_dot
-	data_y_dot = data*y_dot
-	data_z_dot = data*z_dot
+cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot,np.ndarray z_dot,np.ndarray pressure_levels):
+	cpdef np.ndarray data_x_dot = data*x_dot
+	cpdef np.ndarray data_y_dot = data*y_dot
+	cpdef np.ndarray data_z_dot = data*z_dot
 	return np.zeros_like(x_dot)#(grid_x_gradient_matrix(data_x_dot) + grid_y_gradient_matrix(data_y_dot) + grid_p_gradient_matrix(data_z_dot, pressure_levels))
 
 # def upload_velocities(lat,lon,reproj_u,reproj_v,grid_size,grid_lat_coords,grid_lon_coords):
