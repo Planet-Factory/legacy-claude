@@ -154,3 +154,83 @@ cpdef smoothing_3D(np.ndarray a,DTYPE_f smooth_parameter, DTYPE_f vert_smooth_pa
 	test[:,int(nlon*smooth_parameter):int(nlon*(1-smooth_parameter)),:] = 0
 	test[:,:,int(nlevels*vert_smooth_parameter):int(nlevels*(1-vert_smooth_parameter))] = 0
 	return np.fft.ifftn(test).real
+
+cpdef polar_planes(u,v,potential_temperature,geopotential,grid_velocities,indices,grids,coords,coriolis_plane_N,coriolis_plane_S,grid_side_length,pressure_levels,lat,lon,dt,polar_grid_resolution,gravity):
+
+	x_dot_N,y_dot_N,x_dot_S,y_dot_S = grid_velocities[:]
+	pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S = indices[:]
+	grid_length_N,grid_length_S = grids[:]
+	grid_lat_coords_N,grid_lon_coords_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,grid_lat_coords_S,grid_lon_coords_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S = coords[:]
+	
+	### north pole ###
+	north_temperature_data = potential_temperature[pole_low_index_N:,:,:]
+	north_polar_plane_temperature = low_level.beam_me_up(lat[pole_low_index_N:],lon,north_temperature_data,grid_length_N,grid_lat_coords_N,grid_lon_coords_N)
+	north_polar_plane_actual_temperature = low_level.theta_to_t(north_polar_plane_temperature,pressure_levels)
+	
+	north_geopotential_data = geopotential[pole_low_index_N:,:,:]
+	north_polar_plane_geopotential = low_level.beam_me_up(lat[pole_low_index_N:],lon,north_geopotential_data,grid_length_N,grid_lat_coords_N,grid_lon_coords_N)
+	
+	# calculate local velocity on Cartesian grid (CARTESIAN)
+	x_dot_add,y_dot_add = low_level.grid_velocities_north(north_polar_plane_geopotential,grid_side_length,coriolis_plane_N,x_dot_N,y_dot_N,polar_grid_resolution)
+
+	x_dot_N += dt*x_dot_add
+	y_dot_N += dt*y_dot_add
+
+	z_dot = low_level.grid_vertical_velocity(x_dot_N,y_dot_N,pressure_levels,gravity,north_polar_plane_actual_temperature,polar_grid_resolution)
+
+	# advect temperature field, isolate field to subtract from existing temperature field (CARTESIAN)
+	north_polar_plane_addition = low_level.polar_plane_advect(north_polar_plane_temperature,x_dot_N,y_dot_N,z_dot,pressure_levels)
+	
+	# project velocities onto polar grid (POLAR)
+	reproj_u_N, reproj_v_N = low_level.project_velocities_north(lon,x_dot_N,y_dot_N,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,north_temperature_data)
+
+	# combine velocities with those calculated on polar grid (POLAR)
+	reproj_u_N = low_level.combine_data(pole_low_index_N,pole_high_index_N,u[pole_low_index_N:,:,:],-reproj_u_N,lat)
+	reproj_v_N = low_level.combine_data(pole_low_index_N,pole_high_index_N,v[pole_low_index_N:,:,:],reproj_v_N,lat)
+	
+	# reproj_u_N_new = np.roll(reproj_u_N,int(nlon/2),axis=1)
+
+	# add the combined velocities to the global velocity arrays
+	u[pole_low_index_N:,:,:] = reproj_u_N
+	v[pole_low_index_N:,:,:] = reproj_v_N
+
+	# re-project combined velocites to polar plane (prevent discontinuity at the boundary)
+	# x_dot_N,y_dot_N = upload_velocities(lat[pole_low_index_N:],lon,reproj_u_N,reproj_v_N,grid_xx_N.shape[0],grid_lat_coords_N,grid_lon_coords_N)
+
+	# north_temperature_resample = combine_data(pole_low_index_N,pole_high_index_N,north_temperature_data,beam_me_down(lon,north_polar_plane_temperature,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N))
+
+	# project addition to temperature field onto polar grid (POLAR)
+	north_reprojected_addition = low_level.beam_me_down(lon,north_polar_plane_addition,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
+
+	###################################################################
+
+	### south pole ###
+	south_temperature_data = potential_temperature[:pole_low_index_S,:,:]
+	south_polar_plane_temperature = low_level.beam_me_up(lat[:pole_low_index_S],lon,south_temperature_data,grid_length_S,grid_lat_coords_S,grid_lon_coords_S)
+	south_polar_plane_actual_temperature = low_level.theta_to_t(south_polar_plane_temperature,pressure_levels)
+	
+	south_geopotential_data = geopotential[:pole_low_index_S,:,:]
+	south_polar_plane_geopotential = low_level.beam_me_up(lat[:pole_low_index_S],lon,south_geopotential_data,grid_length_S,grid_lat_coords_S,grid_lon_coords_S)
+	
+	x_dot_add,y_dot_add = low_level.grid_velocities_south(south_polar_plane_geopotential,grid_side_length,coriolis_plane_S,x_dot_S,y_dot_S,polar_grid_resolution)
+	x_dot_S += dt*x_dot_add
+	y_dot_S += dt*y_dot_add
+	z_dot = low_level.grid_vertical_velocity(x_dot_S,y_dot_S,pressure_levels,gravity,south_polar_plane_actual_temperature,polar_grid_resolution)
+
+	south_polar_plane_addition = low_level.polar_plane_advect(south_polar_plane_temperature,x_dot_S,y_dot_S,z_dot,pressure_levels)
+
+	reproj_u_S, reproj_v_S = low_level.project_velocities_south(lon,x_dot_S,y_dot_S,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S,south_temperature_data)
+	
+	reproj_u_S = low_level.combine_data(pole_low_index_S,pole_high_index_S,u[:pole_low_index_S,:,:],reproj_u_S,lat)
+	reproj_v_S = low_level.combine_data(pole_low_index_S,pole_high_index_S,v[:pole_low_index_S,:,:],reproj_v_S,lat)
+
+	# south_temperature_resample = combine_data(pole_low_index_S,pole_high_index_S,south_temperature_data,beam_me_down(lon,south_polar_plane_temperature,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S))
+	
+	south_reprojected_addition = low_level.beam_me_down(lon,south_polar_plane_addition,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
+
+	u[:pole_low_index_S,:,:] = reproj_u_S
+	v[:pole_low_index_S,:,:] = reproj_v_S
+
+	# x_dot_S,y_dot_S = upload_velocities(lat[:pole_low_index_S],lon,reproj_u_S,reproj_v_S,grid_xx_S.shape[0],grid_lat_coords_S,grid_lon_coords_S)
+
+	return u,v,north_reprojected_addition,south_reprojected_addition,x_dot_N,y_dot_N,x_dot_S,y_dot_S
