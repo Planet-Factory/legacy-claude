@@ -77,12 +77,12 @@ in \autoref{eq:polar lambda1}, transform it such that we end up with only $\lamb
 
 \subsection{The Grid Code}
 To start the planar approximation, we first need to create a grid. One for the north pole, and one for the south pole. Now since the project is made in Python, Simon uses a function to generate 
-a grid from two coordinate vectors (lists with a coordinate as elements). Since the documentation is not language specific I instead opt to use words instead of function calls. What that comes 
-down to is use your favourite language and import the libraries that do this for you, or start coding your own after finding out how to do that (your mileage may vary). To implement the grid 
-function in the exact same way as the numpy packages does, please refer to the following two references \cite{meshgridDoc} \cite{meshgridGFG}. Anyway, the code for the grid can be found in 
-\autoref{alg:polar grid south}. To convert $x, y$ coordinates into $lat, lon$ coordinates, we make use of \autoref{eq:polar theta3} and \autoref{eq:polar lambda3}. Keep in mind that the equations 
-themselves assume that the angles are in radians, whereas the model uses the angles in degrees so they need to be converted. To convert from $lat, lon$ back into $x, y$ we need to combine 
-\autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar y}.
+a grid from two coordinate vectors (lists with a coordinate as elements). Since the documentation tries to not be language specific, I instead opt to use words instead of function calls. What 
+that comes down to is use your favourite language and import the libraries that do this for you, or start coding your own after finding out how to do that (your mileage may vary). To implement 
+the grid function in the exact same way as the numpy packages does, please refer to the following two references \cite{meshgridDoc} \cite{meshgridGFG}. Anyway, the code for the grid can be found 
+in \autoref{alg:polar grid south}. To convert $x, y$ coordinates into $lat, lon$ coordinates, we make use of \autoref{eq:polar theta3} and \autoref{eq:polar lambda3}. Keep in mind that the 
+equations themselves assume that the angles are in radians, whereas the model uses the angles in degrees so they need to be converted. To convert from $lat, lon$ back into $x, y$ we need to 
+combine \autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar y}.
 
 \begin{algorithm}[htb]
     \caption{Generating the grid for polar approximation of the south pole}
@@ -124,6 +124,18 @@ themselves assume that the angles are in radians, whereas the model uses the ang
     }
 \end{algorithm}
 
+To make the process of generating the grid faster, we can vectorise the first for loop as shown in \autoref{alg:polar grid south vectorised}. Here instead of going over each value one by one 
+(and because Python is an interpreter based language, the interpreter cannot optimise it out as it does not know what is coming next) we treat everything as a vector or a scalar. By treating the 
+arrays as a vector, Python can efficiently (and most likely in parallel) perform the same calculations as it would do by using the classic for loop. We include the \texttt{flatten()} method as 
+it forces everything to be a one dimensional array (vector).
+
+\begin{algorithm}[htb]
+    \caption{Snippet for generating the grid for polar approximation of the south pole}
+    \label{alg:polar grid south vectorised}
+    $gridLatCoordsS \leftarrow (-\arccos(\frac{\sqrt{gridXValuesS^2 + gridYValuesS^2}}{r})\frac{180}{\pi}).$\texttt{flatten()} \;
+    $gridLonCoordsS \leftarrow (180 - \arctan(\frac{gridXValuesS}{gridYValuesS})\frac{180}{\pi}).$\texttt{flatten()} \;
+\end{algorithm}
+
 We need to do a similar thing for the north pole and insert a few changes to some of the equations to correct for different angles and similar things. The code can be found in 
 \autoref{alg:polar grid north}. Again, see the references at the south pole explanation on how to generate the grid itself.
 
@@ -146,7 +158,7 @@ We need to do a similar thing for the north pole and insert a few changes to som
         \For{$j \leftarrow 0$ \KwTo $gridXValuesN[i].length$}{
             $x \leftarrow gridXValuesN[i, j]$ \;
             $y \leftarrow gridYValuesN[i, j]$ \;
-            $latPoint \leftarrow -\arccos(\frac{\sqrt{x^2 + y^2}}{r})\frac{180}{\pi}$ \;
+            $latPoint \leftarrow \arccos(\frac{\sqrt{x^2 + y^2}}{r})\frac{180}{\pi}$ \;
             $lonPoint \leftarrow 180 - \arctan(\frac{x}{y})\frac{180}{\pi}$ \;
             $gridLatCoordsN.append(latPoint)$ \;
             $gridLonCoordsN.append(lonPoint)$ \;
@@ -162,6 +174,16 @@ We need to do a similar thing for the north pole and insert a few changes to som
             $polarYCoordsN.append(-r \cos(lat[i] \frac{\pi}{180}) \cos(lon[j]\frac{\pi}{180}))$ \;
         }
     }
+\end{algorithm}
+
+As was the case with the south pole, we can optimise the first for loop by vectorising it. A similar snippet to \autoref{alg:polar grid south vectorised} is the result, though there are small 
+changes. These changes can be found in \autoref{alg:polar grid north vectorised}.
+
+\begin{algorithm}[htb]
+    \caption{Snippet for generating the grid for polar approximation of the north pole}
+    \label{alg:polar grid north vectorised}
+    $gridLatCoordsS \leftarrow (\arccos(\frac{\sqrt{gridXValuesN^2 + gridYValuesN^2}}{r})\frac{180}{\pi}).$\texttt{flatten()} \;
+    $gridLonCoordsS \leftarrow (180 - \arctan(\frac{gridXValuesN}{gridYValuesN})\frac{180}{\pi}).$\texttt{flatten()} \;
 \end{algorithm}
 
 In both algorithms it is important to make a distinction between $gridLatCoords$ and $polarXCoords$ and their respective variants. $gridLatCoords$ are the latitudinal coordinates on the 
@@ -287,21 +309,97 @@ linear interpolation technique as discussed in \autoref{sec:interpolation}.
 With our new found ability to convert to and from the polar grid, while also gradually transitioning, we now get to the part we are doing it all for. Calculations on the polar grid. In order for
 that to work, we need some utility functions specifically for the polar grid first. We will need gradients in all 3 dimensions, those being the $x$ dimension, the $y$ dimension and the $p$ 
 dimension (pressure). All of the gradients will be quite similar to \autoref{alg:gradient x}, \autoref{alg:gradient y} and \autoref{alg:gradient z} though some small tweaks are required as we 
-are not differentiating over a spehere but over a plane. These changes are reflected in \autoref{alg:polar gradient x}, <Y> and <Z>.
+are not differentiating over a spehere but over a plane. These changes are reflected in \autoref{alg:polar gradient x}, \autoref{alg:polar gradient y} and \autoref{alg:polar gradient p}.
 
-\begin{algorithm}
+\begin{algorithm}[htb]
     \caption{Gradient in the $x$ dimension on the polar grid}
     \label{alg:polar gradient x}
     \SetKwInOut{Input}{Input}
     \SetKwInOut{Output}{Output}
-    \Input{Triple array of data $data$, first index $i$, second index $j$ and third index $k$}
+    \Input{Triple array of data $data$, first index $i$, second index $j$ and third index $k$, resolution of the polar grid $polarGridResolution$}
     \Output{Gradient in the $x$ dimension for the value of the grid point at the specified coordinates}
-    \uIf{$p = 0$}{
+    \uIf{$i = 0$}{
         $value \leftarrow \frac{data[i, j + 1, k] - data[i, j, k]}{polarGridResolution}$ \;
-    } \uElseIf{$y = gridSideLength - 1$}{
+    } \uElseIf{$j = gridSideLength - 1$}{
         $value \leftarrow \frac{data[i, j, k] - data[i, j - 1, k]}{polarGridResolution}$ \;
     } \uElse{
         $vale \leftarrow \frac{data[i, j + 1, k] - data[i, j - 1, k]}{2 polarGridResolution}$ \; 
     }
     \Return{$value$}
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Gradient in the $y$ dimension on the polar grid}
+    \label{alg:polar gradient y}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Triple array of data $data$, first index $i$, second index $j$ and third index $k$, resolution of the polar grid $polarGridResolution$}
+    \Output{Gradient in the $y$ dimension for the value of the grid point at the specified coordinates}
+    \uIf{$i = 0$}{
+        $value \leftarrow \frac{data[i + 1, j, k] - data[i, j, k]}{polarGridResolution}$ \;
+    } \uElseIf{$i = gridSideLength - 1$}{
+        $value \leftarrow \frac{data[i, j, k] - data[i - 1, j, k]}{polarGridResolution}$ \;
+    } \uElse{
+        $vale \leftarrow \frac{data[i + 1, j, k] - data[i - 1, j, k]}{2 polarGridResolution}$ \; 
+    }
+    \Return{$value$}
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Gradient in the $p$ dimension on the polar grid}
+    \label{alg:polar gradient p}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Triple array of data $data$, first index $i$, second index $j$ and third index $k$, pressure levels $pressureLevels$}
+    \Output{Gradient in the $p$ dimension for the value of the grid point at the specified coordinates}
+    \uIf{$i = 0$}{
+        $value \leftarrow \frac{data[i, j, k + 1] - data[i, j, k]}{pressureLevels[k + 1] - pressureLevels[k]}$ \;
+    } \uElseIf{$k = nlevels - 1$}{
+        $value \leftarrow \frac{data[i, j, k] - data[i, j, k - 1]}{pressureLevels[k] - pressureLevels[k - 1]}$ \;
+    } \uElse{
+        $vale \leftarrow \frac{data[i, j, k + 1] - data[i, j, k - 1]}{pressureLevels[k + 1] - pressureLevels[k - 1]}$ \; 
+    }
+    \Return{$value$}
+\end{algorithm}
+
+Now that we have seen the normal versions, let us vectorise them for optimal performance. The vectorised versions do exactly the same, however instead of returning a single value (and the method
+needing to be called for each and every element) we return a matrix of gradients. By using a matrix, we can apply the gradient to multiple elements at once and efficiently. The vectorised 
+versions can be found in \autoref{alg:polar gradient x vectorised}, \autoref{alg:polar gradient y vectorised} and \autoref{alg:polar gradient p vectorised} respectively.
+
+\begin{algorithm}[htb]
+    \caption{Gradient in the $x$ dimension on the polar grid}
+    \label{alg:polar gradient x vectorised}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Triple array of data $data$, resolution of the polar grid $polarGridResolution$}
+    \Output{Triple array containing the gradients for each cell on the polar grid}
+    $shiftEast \leftarrow $ shift all $x$ coordinates in $data$ one cell to the east (positive $x$) \;
+    $shiftWest \leftarrow $ shift all $x$ coordinates in $data$ one cell to the west (negative $x$) \;
+    \Return{$\frac{shiftWest - shiftEast}{2 polarGridResolution}$}
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Gradient in the $y$ dimension on the polar grid}
+    \label{alg:polar gradient y vectorised}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Triple array of data $data$, resolution of the polar grid $polarGridResolution$}
+    \Output{Triple array containing the gradients for each cell on the polar grid}
+    $shiftSouth \leftarrow $ shift all $y$ coordinates in $data$ one cell to the south (negative $y$) \;
+    $shiftNorth \leftarrow $ shift all $y$ coordinates in $data$ one cell to the north (positive $y$) \;
+    \Return{$\frac{shiftNorth - shiftSouth}{2 polarGridResolution}$}
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Gradient in the $p$ dimension on the polar grid}
+    \label{alg:polar gradient p vectorised}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Triple array of data $data$, pressure levels $pressureLevels$}
+    \Output{Triple array containing the gradients for each cell on the polar grid}
+    $shiftUp\leftarrow $ shift all $p$ coordinates in $data$ one cell upwards (positive $p$) \;
+    $shiftDown \leftarrow $ shift all $p$ coordinates in $data$ one cell downwards (negative $p$) \;
+    $shiftPressureUp \leftarrow$ shift the pressure in $pressureLevels$ up by one cell \;
+    $shiftPressureDown \leftarrow$ shift the pressure in $pressureLevels$ down by one cell \;
+    \Return{$\frac{shiftDown - shiftUp}{shiftPressureDown - shiftPressureUp}$}
 \end{algorithm}
