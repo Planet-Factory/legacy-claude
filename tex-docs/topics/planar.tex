@@ -254,10 +254,10 @@ we do not need a 2 dimensional algorithm. How we convert from the polar grid can
     \Return{$resample$}
 \end{algorithm}
 
-\subsection{Gradually changing grids}
+\subsection{Gradually Changing Grids}
 Now that we can convert between grids we also need a way to do so gradually. Otherwise we would move the hard border we had previously around the poles further down the $lat, lon$ grid. Instead 
-we have to do some interpolation between the two grids in order to ensure a smooth transition in the final output, so that there are no hard borders. This interpolation is done in , using the 
-linear interpolation technique as discussed in \autoref{sec:interpolation}.
+we have to do some interpolation between the two grids in order to ensure a smooth transition in the final output, so that there are no hard borders. This interpolation is done in 
+\autoref{alg:polar interpolation}, using the linear interpolation technique as discussed in \autoref{sec:interpolation}.
 
 \begin{algorithm}[htb]
     \caption{Gradually transition from the $lat, lon$ grid to the polar grid}
@@ -305,7 +305,7 @@ linear interpolation technique as discussed in \autoref{sec:interpolation}.
     \Return{$output$}
 \end{algorithm}
 
-\subsection{Gradients on the grid}
+\subsection{Gradients on the Grid}
 With our new found ability to convert to and from the polar grid, while also gradually transitioning, we now get to the part we are doing it all for. Calculations on the polar grid. In order for
 that to work, we need some utility functions specifically for the polar grid first. We will need gradients in all 3 dimensions, those being the $x$ dimension, the $y$ dimension and the $p$ 
 dimension (pressure). All of the gradients will be quite similar to \autoref{alg:gradient x}, \autoref{alg:gradient y} and \autoref{alg:gradient z} though some small tweaks are required as we 
@@ -402,4 +402,155 @@ versions can be found in \autoref{alg:polar gradient x vectorised}, \autoref{alg
     $shiftPressureUp \leftarrow$ shift the pressure in $pressureLevels$ up by one cell \;
     $shiftPressureDown \leftarrow$ shift the pressure in $pressureLevels$ down by one cell \;
     \Return{$\frac{shiftDown - shiftUp}{shiftPressureDown - shiftPressureUp}$}
+\end{algorithm}
+
+\subsection{Calculating Velocities on the Polar Grid}
+With all the utility functions out of the way, we now come to the physics of it. Let us start with the velocity calculations on the polar grid. These work very similarly to the ones on the lat, 
+lon grid, though not exactly. For the explanation of the equations, please refer to \autoref{sec:velocity}. The algorithm is given (in its non-vectorised form) in 
+\autoref{alg:polar velocity north} for the north pole plane, and in \autoref{alg:polar velocity south} for the south pole plane. An important thing to note is that these algorithms do not 
+calculate the new velocities, but rather what needs to be changed with regards to the velocities. The \texttt{gridXGradient} refers to \autoref{alg:polar gradient x} and \texttt{gridYGradient} 
+refers to \autoref{alg:polar gradient y}.
+
+\begin{algorithm}[htb]
+    \caption{Velocity calculations on the north polar plane}
+    \label{alg:polar velocity north}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Polar plane $polarPlane$, Length of one axis of the grid $polarGridLength$, Coriolis force on the plane (with the same size and resolution as the $polarPlane$) $coriolisPlane$, 
+            East-west velocity vector on the polar plane $\dot{x}$, North-south velocity vector on the polar plane $\dot{y}$, Resolution of the polar grid $polarGridResolution$}
+    \Output{Additions to the east-west velocity vector on the polar plane $\dot{x}_{add}$, Additions to the north-south velocity vector on the polar plane $\dot{y}_{add}$}
+    \For{$i \leftarrow 0$ \KwTo $polarGridLength$}{
+        \For{$j \leftarrow 0$ \KwTo $polarGridLength$}{
+            \For{$k \leftarrow 0$ \KwTo $polarPlane[0, 0].length$}{
+                \uIf{$k \geq 17$}{
+                    $\dot{x}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{x}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{x}, i, j, k) +$ 
+                    $coriolisPlane[i, j] \dot{y}[i, j, k] - \texttt{gridXGradient}(polarPlane, i, j, k) - \dot{x}[i, j, k] \cdot 10^{-5}$ \;
+                    $\dot{y}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{y}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{y}, i, j, k) -$ 
+                    $coriolisPlane[i, j] \dot{x}[i, j, k] - \texttt{gridXGradient}(polarPlane, i, j, k) - \dot{y}[i, j, k] \cdot 10^{-5}$ \;
+                } \uElse{
+                    $\dot{x}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{x}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{x}, i, j, k) -$
+                    $\dot{x}[i, j, k] \cdot 10^{-3}$ \; 
+                    $\dot{y}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{y}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{y}, i, j, k) -$
+                    $\dot{y}[i, j, k] \cdot 10^{-3}$ \; 
+                }
+                
+            }
+        }
+    }
+
+    \Return{$\dot{x}_{add}, \dot{y}_{add}$}  
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Velocity calculations on the south polar plane}
+    \label{alg:polar velocity south}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Polar plane $polarPlane$, Length of one axis of the grid $polarGridLength$, Coriolis force on the plane (with the same size and resolution as the $polarPlane$) $coriolisPlane$, 
+            East-west velocity vector on the polar plane $\dot{x}$, North-south velocity vector on the polar plane $\dot{y}$, Resolution of the polar grid $polarGridResolution$}
+    \Output{Additions to the east-west velocity vector on the polar plane $\dot{x}_{add}$, Additions to the north-south velocity vector on the polar plane $\dot{y}_{add}$}
+    \For{$i \leftarrow 0$ \KwTo $polarGridLength$}{
+        \For{$j \leftarrow 0$ \KwTo $polarGridLength$}{
+            \For{$k \leftarrow 0$ \KwTo $polarPlane[0, 0].length$}{
+                \uIf{$k \geq 17$}{
+                    $\dot{x}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{x}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{x}, i, j, k) +$ 
+                    $coriolisPlane[i, j] \dot{y}[i, j, k] - \texttt{gridXGradient}(polarPlane, i, j, k) - \dot{x}[i, j, k] \cdot 10^{-5}$ \;
+                    $\dot{y}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{y}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{y}, i, j, k) -$ 
+                    $coriolisPlane[i, j] \dot{x}[i, j, k] - \texttt{gridXGradient}(polarPlane, i, j, k) - \dot{y}[i, j, k] \cdot 10^{-5}$ \;
+                } \uElse{
+                    $\dot{x}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{x}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{x}, i, j, k) -$
+                    $\dot{x}[i, j, k] \cdot 10^{-3}$ \; 
+                    $\dot{y}_{add}[i, j, k] \leftarrow - \dot{x}[i, j, k] \texttt{gridXGradient}(\dot{y}, i, j, k) - \dot{y}[i, j, k] \texttt{gridYGradient}(\dot{y}, i, j, k) -$
+                    $\dot{y}[i, j, k] \cdot 10^{-3}$ \; 
+                }
+                
+            }
+        }
+    }
+
+    \Return{$\dot{x}_{add}, \dot{y}_{add}$}
+\end{algorithm}
+
+A sharp eye would have noticed that both the north and south velocity functions do exactly the same. And you are correct. But Simon opted to duplicate code (I urge you not to do this in your 
+personal coding projects, duplicated code is never fun. Especially if you forget to change things in all duplicated instances, stuff gets funky) so I must comply. But one velocity calculation is 
+still missing. That one being the vertical velocity, which is described in \autoref{alg:polar velocity vert}.
+
+\begin{algorithm}[htb]
+    \caption{Vertical velocity calculations for the polar plane}
+    \label{alg:polar velocity vert}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{East-west velocity vector on the polar plane $\dot{x}$, North-south velocity vector on the polar plane $\dot{y}$, Pressure levels $pressureLevels$, Temperature on the polar plane 
+            $temp$, Resolution of the polar grid $polarGridResolution$}
+    \Output{Vertical velocity on the polar plane}
+    $output \leftarrow$ array like $\dot{x}$ \;
+    \For{$i \leftarrow 0$ \KwTo $output.length$}{
+		\For{$j \leftarrow 0$ \KwTo $output[i].length$}{
+			\For{$k \leftarrow 0$ \KwTo $output[i, j].length$}{
+                $output[i,j,k] = - \frac{(pressureLevels[k] - pressureLevels[k-1]) * pressureLevels[k] * g * (\texttt{gridXGradient}(\dot{x}, i, j, k) + \texttt{gridYGradient}(\dot{y}, i, j, k))}
+                    {287 * temp[i, j, k]}$ \;
+            }
+        }
+    }
+    \Return{$output$}
+\end{algorithm}
+
+Now it is time to optimise (and thus vectorise)! The new versions of the algorithms can be found in \autoref{alg:polar velocity north vectorised}, \autoref{alg:polar velocity south vectorised}, 
+\autoref{alg:polar velocity vert vectorised}. Here, \texttt{gridXGradient} refers to \autoref{alg:polar gradient x vectorised} and \texttt{gridYGradient} refers to 
+\autoref{alg:polar gradient y vectorised}.
+
+\begin{algorithm}[htb]
+    \caption{Velocity calculations on the north polar plane}
+    \label{alg:polar velocity north vectorised}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Polar plane $polarPlane$, Length of one axis of the grid $polarGridLength$, Coriolis force on the plane (with the same size and resolution as the $polarPlane$) $coriolisPlane$, 
+            East-west velocity vector on the polar plane $\dot{x}$, North-south velocity vector on the polar plane $\dot{y}$, Resolution of the polar grid $polarGridResolution$}
+    \Output{Additions to the east-west velocity vector on the polar plane $\dot{x}_{add}$, Additions to the north-south velocity vector on the polar plane $\dot{y}_{add}$}
+    $\dot{x}_{add} \leftarrow - \dot{x} \texttt{gridXGradient}(\dot{x}, polarGridResolution) - \dot{y} \texttt{gridYGradient}(\dot{x}, polarGridResolution) + coriolisPlane[:, :, None] \dot{y} -$ 
+        $\texttt{gridXGradient}(polarPlane, polarGridResolution) - \dot{x} \cdot 10^{-5}$ \;
+    $\dot{y}_{add} \leftarrow - \dot{x} \texttt{gridXGradient}(\dot{y}, polarGridResolution) - \dot{y} \texttt{gridYGradient}(\dot{y}, polarGridResolution) - coriolisPlane[:, :, None] \dot{x} -$ 
+        $\texttt{gridXGradient}(polarPlane, polarGridResolution) - \dot{y} \cdot 10^{-5}$ \;
+
+    $\dot{x}_{add}[:,:,17:] \leftarrow - \dot{x}[:,:,17:] \texttt{gridXGradient}(\dot{x}, polarGridResolution) - \dot{y}[:,:,17:] \texttt{gridYGradient}(\dot{x}, polarGridResolution) - $ 
+        $\dot{x}[:,:,17:] \cdot 10^{-3}$ \; 
+    $\dot{y}_{add}[:,:,17:] \leftarrow - \dot{x}[:,:,17:] \texttt{gridXGradient}(\dot{y}, polarGridResolution) - \dot{y}[:,:,17:] \texttt{gridYGradient}(\dot{y}, polarGridResolution) -$
+        $\dot{y}[:,:,17:] \cdot 10^{-3}$ \; 
+
+
+    \Return{$\dot{x}_{add}, \dot{y}_{add}$}  
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Velocity calculations on the south polar plane}
+    \label{alg:polar velocity south vectorised}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{Polar plane $polarPlane$, Length of one axis of the grid $polarGridLength$, Coriolis force on the plane (with the same size and resolution as the $polarPlane$) $coriolisPlane$, 
+            East-west velocity vector on the polar plane $\dot{x}$, North-south velocity vector on the polar plane $\dot{y}$, Resolution of the polar grid $polarGridResolution$}
+    \Output{Additions to the east-west velocity vector on the polar plane $\dot{x}_{add}$, Additions to the north-south velocity vector on the polar plane $\dot{y}_{add}$}
+    $\dot{x}_{add} \leftarrow - \dot{x} \texttt{gridXGradient}(\dot{x}, polarGridResolution) - \dot{y} \texttt{gridYGradient}(\dot{x}, polarGridResolution) + coriolisPlane[:, :, None] \dot{y} -$ 
+        $\texttt{gridXGradient}(polarPlane, polarGridResolution) - \dot{x} \cdot 10^{-5}$ \;
+    $\dot{y}_{add} \leftarrow - \dot{x} \texttt{gridXGradient}(\dot{y}, polarGridResolution) - \dot{y} \texttt{gridYGradient}(\dot{y}, polarGridResolution) - coriolisPlane[:, :, None] \dot{x} -$ 
+        $\texttt{gridXGradient}(polarPlane, polarGridResolution) - \dot{y} \cdot 10^{-5}$ \;
+
+    $\dot{x}_{add}[:,:,17:] \leftarrow - \dot{x}[:,:,17:] \texttt{gridXGradient}(\dot{x}, polarGridResolution) - \dot{y}[:,:,17:] \texttt{gridYGradient}(\dot{x}, polarGridResolution) - $ 
+        $\dot{x}[:,:,17:] \cdot 10^{-3}$ \; 
+    $\dot{y}_{add}[:,:,17:] \leftarrow - \dot{x}[:,:,17:] \texttt{gridXGradient}(\dot{y}, polarGridResolution) - \dot{y}[:,:,17:] \texttt{gridYGradient}(\dot{y}, polarGridResolution) -$
+        $\dot{y}[:,:,17:] \cdot 10^{-3}$ \; 
+
+
+    \Return{$\dot{x}_{add}, \dot{y}_{add}$}  
+\end{algorithm}
+
+\begin{algorithm}[htb]
+    \caption{Vertical velocity calculations for the polar plane}
+    \label{alg:polar velocity vert vectorised}
+    \SetKwInOut{Input}{Input}
+    \SetKwInOut{Output}{Output}
+    \Input{East-west velocity vector on the polar plane $\dot{x}$, North-south velocity vector on the polar plane $\dot{y}$, Pressure levels $pressureLevels$, Temperature on the polar plane 
+            $temp$, Resolution of the polar grid $polarGridResolution$}
+    \Output{Vertical velocity on the polar plane}
+    $shiftUp \leftarrow$ shift all cells in pressureLevels up by one cell (wrap around if needed) \;
+    \Return{$-\frac{(pressureLevels - shiftUp) * pressureLevels * g * (\texttt{gridXGradient}(\dot{x}, polarGridResolution) + \texttt{gridYGradient}(\dot{y}, polarGridResolution))}{287 * temp}$}
 \end{algorithm}
