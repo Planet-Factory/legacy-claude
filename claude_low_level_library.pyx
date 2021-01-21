@@ -223,8 +223,8 @@ cpdef combine_data(np.int_t pole_low_index,np.int_t pole_high_index,np.ndarray p
 					scale_polar_data = 0.0
 					scale_reprojected_data = 1.0
 				else:
-					scale_polar_data = 1 - ((i)/overlap)
-					scale_reprojected_data = ((i)/overlap)
+					scale_polar_data = 1 - i/overlap
+					scale_reprojected_data = i/overlap
 
 				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
 	return output
@@ -288,19 +288,23 @@ cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, DTYP
 	
 	cpdef np.ndarray output = np.zeros_like(data)
 
-	# output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
-	# output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
+	# output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
+	# output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
 	
 	for i in np.arange(1,x_dot.shape[0]-1):
+
+		j = 0
+		output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
+		output[i,j,:] += 0.5*(x_dot[i,j,:] - abs(x_dot[i,j,:]))*(data[i,j+1,:] - data[i,j,:])/polar_grid_resolution
+
 		for j in np.arange(1,x_dot.shape[1]-1):
 			output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
 			output[i,j,:] += 0.5*(x_dot[i,j,:] + abs(x_dot[i,j,:]))*(data[i,j,:] - data[i,j-1,:])/polar_grid_resolution + 0.5*(x_dot[i,j,:] - abs(x_dot[i,j,:]))*(data[i,j+1,:] - data[i,j,:])/polar_grid_resolution
 
-			# output[i,j,:] += 0.5*(x_dot[i,j,:] + abs(x_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(x_dot[i,j,:] - abs(x_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
-			# output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i,j-1,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i,j+1,:] - data[i,j,:])/polar_grid_resolution
+		j = x_dot.shape[1]-1
+		output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
+		output[i,j,:] += 0.5*(x_dot[i,j,:] + abs(x_dot[i,j,:]))*(data[i,j,:] - data[i,j-1,:])/polar_grid_resolution
 
-			# output[i,j,:] += 0.5*(data[i,j,:] + abs(data[i,j,:]))*(y_dot[i,j,:] - y_dot[i-1,j,:])/polar_grid_resolution + 0.5*(data[i,j,:] - abs(data[i,j,:]))*(y_dot[i+1,j,:] - y_dot[i,j,:])/polar_grid_resolution
-			# output[i,j,:] += 0.5*(data[i,j,:] + abs(data[i,j,:]))*(x_dot[i,j,:] - x_dot[i,j-1,:])/polar_grid_resolution + 0.5*(data[i,j,:] - abs(data[i,j,:]))*(x_dot[i,j+1,:] - x_dot[i,j,:])/polar_grid_resolution
 
 	return output
 
