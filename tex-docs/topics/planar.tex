@@ -82,7 +82,9 @@ that comes down to is use your favourite language and import the libraries that 
 the grid function in the exact same way as the numpy packages does, please refer to the following two references \cite{meshgridDoc} \cite{meshgridGFG}. Anyway, the code for the grid can be found 
 in \autoref{alg:polar grid south}. To convert $x, y$ coordinates into $lat, lon$ coordinates, we make use of \autoref{eq:polar theta3} and \autoref{eq:polar lambda3}. Keep in mind that the 
 equations themselves assume that the angles are in radians, whereas the model uses the angles in degrees so they need to be converted. To convert from $lat, lon$ back into $x, y$ we need to 
-combine \autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar y}.
+combine \autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar y}. $gridPad$ refers to how many cells for padding we add to the grid. We add padding so that the calculations 
+later on all go smoothly and don't require complex and specific code to deal with them. The more general an algorithm is, the better, as you can reuse it for other things while not adjusting
+the algorithm for that particular problem. That way, it is easier and better to adjust the input then to alter the algorithm.
 
 \begin{algorithm}[htb]
     \caption{Generating the grid for polar approximation of the south pole}
@@ -90,8 +92,8 @@ combine \autoref{eq:polar distance}, \autoref{eq:polar x} and \autoref{eq:polar 
     \SetKwComment{Comment}{//}{}
     $poleLowIndexS \leftarrow $ find first index where $lat > poleLowerLatLimit$ \;
     $poleHighIndexS \leftarrow $ find first index where $lat > poleHigherLatLimit$ \;
-    $polarGridResolution \leftarrow dx[-poleLowIndexS] $ \Comment*[l]{Will be reused for the north pole}
-    $gridSize \leftarrow r \cos(lat[-poleLowIndexS] \frac{\pi}{180})$ \Comment*[l]{Will be reused for the north pole}
+    $polarGridResolution \leftarrow dx[poleLowIndexS] $ \Comment*[l]{Will be reused for the north pole}
+    $gridSize \leftarrow r \cos(lat[poleLowIndexS + gridPad] \frac{\pi}{180})$ \Comment*[l]{Will be reused for the north pole}
     \BlankLine
 
     $gridXAxisS \leftarrow $ array going from $-gridSize$ to $gridSize$ with steps of $polarGridResolution$ \;
@@ -189,9 +191,9 @@ changes. These changes can be found in \autoref{alg:polar grid north vectorised}
 In both algorithms it is important to make a distinction between $gridLatCoords$ and $polarXCoords$ and their respective variants. $gridLatCoords$ are the latitudinal coordinates on the 
 $lat, lon$ grid corresponding to the $x$ and $y$ coordinates on the polar grid. Whereas $polarXCoords$ are the $x$ coordinates on the polar grid corresponding to the latitude and longitude on 
 the $lat, lon$ grid. Those are different to the $gridXValues$ as they represent the values on the $x$ axis as integers which may or may not directly correspond to the $polarXCoords$. So we need 
-a way of mapping the $polarXCoords$ to $gridXValues$ and their respective values and vice versa. This is done in the next section.
+a way of mapping the $polarXCoords$ to $gridXValues$ and their respective values and vice versa. This is done in \autoref{sec:polar switch}.
 
-\subsection{Switching between grids}
+\subsection{Switching between grids} \label{sec:polar switch}
 Now that we have defined the polar plane grid, we need code to convert the values from the $lat, lon$ grid to the polar plane grid and vice versa. Let's start with converting to the polar grid. 
 We need 2 versions of the algorithm for that. One that converts in 2 dimensions, and one that converts in 3 dimensions. The code for the 2 dimensional case is shown in \autoref{alg:beam up 2d}.
 Here we use bivariate spline interpolation \cite{bivariatespline} which is a different form of linear interpolation than discussed in \autoref{sec:interpolation} though the same principle 
@@ -252,6 +254,27 @@ we do not need a 2 dimensional algorithm. How we convert from the polar grid can
         interpolation at the specified coordinates and force them to align to the polar grid}
     }
     \Return{$resample$}
+\end{algorithm}
+
+\subsection{Creating the Other Required Vectors and Matrices (Planes)}
+So now that we have the grids, we need some more vectors and matrices. We need the coriolis plane (the coriolis force on the polar plane) and the velocity vectors. We need these in order for the 
+velocity calculations to go correctly. We also need these at this level and not locally as both velocity and advection need the velocity vectors and it is easier to adjust the coriolis plane for 
+different planets on the highest level than when it is embedded into the calculation algorithms. How we create the plane and the velocity vectors is shown in \autoref{alg:polar grid coriolis}.
+
+\begin{algorithm}[htb]
+    \caption{Generating the coriolis planes and the velocity vectors}
+    \label{alg:polar grid coriolis}
+    $data \leftarrow $ matrix with dimensions $nlat - poleLowIndexN + gridPad \times nlon$ \;
+    \For{$i \leftarrow poleLowIndexN - gridPad$ \KwTo $nlat - 1$}{
+        $data[i - poleLowIndexN, :] \leftarrow coriolis[i]$ \;
+    }
+    $coriolisPlaneN \leftarrow $ \texttt{BeamMeUp2D}$(lat[(poleLowIndexN - gridPad):], lon, data, gridSideLength, gridLatCoordsN, gridLonCoordsN)$ \;
+
+    $data \leftarrow $ matrix with dimensions $poleLowIndexS + gridPad \times nlon$ \;
+    \For{$i \leftarrow 0$ \KwTo $poleLowIndexS + gridPad - 1$}{
+        $data[i, :] \leftarrow coriolis[i]$ \;
+    }
+    $coriolisPlaneS \leftarrow $ \texttt{BeamMeUp2D}$(lat[:(poleLowIndexS + gridPad)], lon, data, gridSideLength, gridLatCoordsS, gridLonCoordsS)$ \;
 \end{algorithm}
 
 \subsection{Gradually Changing Grids}
