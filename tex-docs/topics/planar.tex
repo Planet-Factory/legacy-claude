@@ -583,7 +583,8 @@ use similar information to re-align the velocity vectors to the polar plane grid
 Like we have done with the velocities, we also need to make a calculation for the advection on the polar planes themselves. We do this in \autoref{alg:polar advection}. For more details about 
 advection itself, please refer to \autoref{sec:adv}. The interesting bit of magic happens with the $\dot{y}[i, j, :] + |\dot{y}[i, j, :]|$ term. If $\dot{y}[i, j, :]$ is negative, then this 
 whole term will be $0$ and hence will not be considered, whereas if it is positive it will be considered (that's also why we divide by $2 * polarGridResolution$, to correct for adding 
-$\dot{y}[i, j, :]$ twice). Doing it this way saves an if statement and allows everything to be calculated faster along the last dimension.
+$\dot{y}[i, j, :]$ twice). Doing it this way saves an if statement and allows everything to be calculated faster along the last dimension. We have also added specific assignments for $j = 0$ and 
+for $j = \dot{x}[i].length$ as these indicate the boundaries of the $\dot{x}$ vector and saves us 2 more if statements.
 
 \begin{algorithm}[htb]
     \caption{Performing the advection calculations on the polar plane}
@@ -594,12 +595,22 @@ $\dot{y}[i, j, :]$ twice). Doing it this way saves an if statement and allows ev
     \Output{3-dimensional matrix with the advection data on the polar plane $adv$}
     $adv \leftarrow $ matrix with the same size as $data$ \;
     \For{$i \leftarrow 1$ \KwTo $\dot{x}.length - 1$}{
+        $j \leftarrow 0$ \;
+        $adv[i, j, :] \leftarrow adv + \frac{(\dot{y}[i, j, :] + |\dot{y}[i, j, :]|) * (data[i, j, :] - data[i - 1, j, :])}{2 * polarGridResolution} +$ 
+        $\frac{(\dot{y}[i, j, :] + |\dot{y}[i, j, :]|) * (data[i + 1, j, :] - data[i, j, :])}{2 * polarGridResolution}$ \;
+        $adv[i, j, :] \leftarrow adv + \frac{(\dot{x}[i, j, :] + |\dot{x}[i, j, :]|) * (data[i, j + 1, :] - data[i, j, :])}{2 * polarGridResolution}$ \;
+
         \For{$j \leftarrow 1$ \KwTo $\dot{x}[i].length - 1$}{
             $adv[i, j, :] \leftarrow adv + \frac{(\dot{y}[i, j, :] + |\dot{y}[i, j, :]|) * (data[i, j, :] - data[i - 1, j, :])}{2 * polarGridResolution} +$ 
             $\frac{(\dot{y}[i, j, :] + |\dot{y}[i, j, :]|) * (data[i + 1, j, :] - data[i, j, :])}{2 * polarGridResolution}$ \;
             $adv[i, j, :] \leftarrow adv + \frac{(\dot{x}[i, j, :] + |\dot{x}[i, j, :]|) * (data[i, j, :] - data[i, j - 1, :])}{2 * polarGridResolution} + $
             $\frac{(\dot{x}[i, j, :] + |\dot{x}[i, j, :]|) * (data[i, j + 1, :] - data[i, j, :])}{2 * polarGridResolution}$ \;
         }
+
+        $j \leftarrow \dot{x}[i].length - 1$ \;
+        $adv[i, j, :] \leftarrow adv + \frac{(\dot{y}[i, j, :] + |\dot{y}[i, j, :]|) * (data[i, j, :] - data[i - 1, j, :])}{2 * polarGridResolution} +$ 
+        $\frac{(\dot{y}[i, j, :] + |\dot{y}[i, j, :]|) * (data[i + 1, j, :] - data[i, j, :])}{2 * polarGridResolution}$ \;
+        $adv[i, j, :] \leftarrow adv + \frac{(\dot{x}[i, j, :] + |\dot{x}[i, j, :]|) * (data[i, j, :] - data[i, j - 1, :])}{2 * polarGridResolution}$ \;
     }
     \Return{$adv$}
 \end{algorithm}
