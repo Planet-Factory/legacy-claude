@@ -178,6 +178,7 @@ cpdef beam_me_up_2D(np.ndarray lats,np.ndarray lon,np.ndarray data,np.int_t grid
 	f = RectBivariateSpline(lats, lon, data)
 	cdef np.ndarray polar_plane = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
 	return polar_plane
+
 cpdef beam_me_up(np.ndarray lats,np.ndarray lon,np.ndarray data,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords):
 	'''Projects data on lat-lon grid to x-y polar grid'''
 	cdef np.ndarray polar_plane = np.zeros((grid_size,grid_size,data.shape[2]))
@@ -186,6 +187,7 @@ cpdef beam_me_up(np.ndarray lats,np.ndarray lon,np.ndarray data,np.int_t grid_si
 		f = RectBivariateSpline(lats, lon, data[:,:,k])
 		polar_plane[:,:,k] = f(grid_lat_coords,grid_lon_coords,grid=False).reshape((grid_size,grid_size))
 	return polar_plane
+
 cpdef beam_me_down(lon,data,np.int_t pole_low_index, grid_x_values, grid_y_values,polar_x_coords, polar_y_coords):
 	'''projects data from x-y polar grid onto lat-lon grid'''
 	cdef np.ndarray resample = np.zeros((int(len(polar_x_coords)/len(lon)),len(lon),data.shape[2]))
@@ -194,6 +196,7 @@ cpdef beam_me_down(lon,data,np.int_t pole_low_index, grid_x_values, grid_y_value
 		f = RectBivariateSpline(x=grid_x_values, y=grid_y_values, z=data[:,:,k])
 		resample[:,:,k] = f(polar_x_coords,polar_y_coords,grid=False).reshape((int(len(polar_x_coords)/len(lon)),len(lon)))
 	return resample
+
 cpdef combine_data(np.int_t pole_low_index,np.int_t pole_high_index,np.ndarray polar_data,np.ndarray reprojected_data,np.ndarray lat): 
 	cdef np.ndarray output = np.zeros_like(polar_data)
 	cdef np.int_t overlap = abs(pole_low_index - pole_high_index)
@@ -233,19 +236,11 @@ cpdef grid_x_gradient_matrix(np.ndarray data,DTYPE_f polar_grid_resolution):
 	cdef np.ndarray shift_east = np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:]
 	cdef np.ndarray shift_west = np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:]
 	return (shift_west - shift_east) / (2 * polar_grid_resolution)
+
 cpdef grid_y_gradient_matrix(np.ndarray data,DTYPE_f polar_grid_resolution):
 	cdef np.ndarray shift_south = np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:]
 	cdef np.ndarray shift_north = np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:]
 	return (shift_north - shift_south) / (2 * polar_grid_resolution)
-
-# def grid_p_gradient(data,i,j,k,pressure_levels):
-# 	if k == 0:
-# 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
-# 	elif k == nlevels-1:
-# 		value = (data[i,j,k]-data[i,j,k-1])/(pressure_levels[k]-pressure_levels[k-1])
-# 	else:
-# 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
-# 	return value
 
 cpdef grid_p_gradient_matrix(np.ndarray data, np.ndarray pressure_levels):
 	cpdef np.ndarray shift_up = np.pad(data, ((0,0), (0,0), (1,0)), 'edge')[:,:,:-1]
@@ -254,69 +249,65 @@ cpdef grid_p_gradient_matrix(np.ndarray data, np.ndarray pressure_levels):
 	cpdef np.ndarray shift_pressures_down = np.pad(pressure_levels, (0,1), 'edge')[1:]
 
 	return (shift_down - shift_up)/(shift_pressures_down - shift_pressures_up)
+
 cpdef grid_velocities(np.ndarray polar_plane,np.int_t grid_side_length,np.ndarray coriolis_plane,np.ndarray x_dot,np.ndarray y_dot,DTYPE_f polar_grid_resolution):
 	
-	cpdef np.ndarray x_dot_add = - x_dot*grid_x_gradient_matrix(x_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(x_dot,polar_grid_resolution) + coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
-	cpdef np.ndarray y_dot_add = - x_dot*grid_x_gradient_matrix(y_dot,polar_grid_resolution) - y_dot*grid_y_gradient_matrix(y_dot,polar_grid_resolution) - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
+	cpdef np.ndarray x_dot_add = np.zeros_like(x_dot)
+	cpdef np.ndarray y_dot_add = np.zeros_like(y_dot)
 
-	x_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(x_dot[:,:,17:],polar_grid_resolution) - y_dot[:,:,17:]*grid_y_gradient_matrix(x_dot[:,:,17:],polar_grid_resolution) - 1E-3*x_dot[:,:,17:]
-	y_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(y_dot[:,:,17:],polar_grid_resolution) - y_dot[:,:,17:]*grid_y_gradient_matrix(y_dot[:,:,17:],polar_grid_resolution) - 1E-3*y_dot[:,:,17:]
+	x_dot_add[:,:,:17] = - x_dot[:,:,:17]*grid_x_gradient_matrix(x_dot,polar_grid_resolution)[:,:,:17] - y_dot[:,:,:17]*grid_y_gradient_matrix(x_dot,polar_grid_resolution)[:,:,:17] + coriolis_plane[:,:,None]*y_dot[:,:,:17] - grid_x_gradient_matrix(polar_plane,polar_grid_resolution)[:,:,:17] - 1E-5*x_dot[:,:,:17]
+	y_dot_add[:,:,:17] = - x_dot[:,:,:17]*grid_x_gradient_matrix(y_dot,polar_grid_resolution)[:,:,:17] - y_dot[:,:,:17]*grid_y_gradient_matrix(y_dot,polar_grid_resolution)[:,:,:17] - coriolis_plane[:,:,None]*x_dot[:,:,:17] - grid_y_gradient_matrix(polar_plane,polar_grid_resolution)[:,:,:17] - 1E-5*y_dot[:,:,:17]
+
+	x_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(x_dot,polar_grid_resolution)[:,:,17:] - y_dot[:,:,17:]*grid_y_gradient_matrix(x_dot,polar_grid_resolution)[:,:,17:] - 1E-3*x_dot[:,:,17:]
+	y_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(y_dot,polar_grid_resolution)[:,:,17:] - y_dot[:,:,17:]*grid_y_gradient_matrix(y_dot,polar_grid_resolution)[:,:,17:] - 1E-3*y_dot[:,:,17:]
 
 	return x_dot_add,y_dot_add
 
-cpdef project_velocities_north(lon,x_dot,y_dot,pole_low_index_N,pole_high_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N):
+cpdef project_velocities_north(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,np.int_t pole_low_index_N,np.int_t pole_high_index_N,np.ndarray grid_x_values_N,np.ndarray grid_y_values_N,list polar_x_coords_N,list polar_y_coords_N):
 
-	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
-	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
+	cdef np.ndarray reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
+	cdef np.ndarray reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
 
-	reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
-	reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
+	cdef np.ndarray reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
+	cdef np.ndarray reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
 	reproj_u = np.flip(reproj_u,axis=1)
 	reproj_v = np.flip(reproj_v,axis=1)
 	
 	return reproj_u, reproj_v
-cpdef project_velocities_south(lon,x_dot,y_dot,pole_low_index_S,pole_high_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S):
-	reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
-	reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
 
-	reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
-	reproj_v = - reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
+cpdef project_velocities_south(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,np.int_t pole_low_index_S,np.int_t pole_high_index_S,np.ndarray grid_x_values_S,np.ndarray grid_y_values_S,list polar_x_coords_S,list polar_y_coords_S):
+	cdef np.ndarray reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
+	cdef np.ndarray reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
+
+	cdef np.ndarray reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
+	cdef np.ndarray reproj_v = - reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
 	return reproj_u, reproj_v
+
 cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, DTYPE_f polar_grid_resolution):
 	
 	cpdef np.ndarray output = np.zeros_like(data)
 
-	# output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
-	# output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
+	# output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
+	# output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
 	
 	for i in np.arange(1,x_dot.shape[0]-1):
-
-		j = 0
-		output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
-		output[i,j,:] += 0.5*(x_dot[i,j,:] - abs(x_dot[i,j,:]))*(data[i,j+1,:] - data[i,j,:])/polar_grid_resolution
-
 		for j in np.arange(1,x_dot.shape[1]-1):
 			output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
 			output[i,j,:] += 0.5*(x_dot[i,j,:] + abs(x_dot[i,j,:]))*(data[i,j,:] - data[i,j-1,:])/polar_grid_resolution + 0.5*(x_dot[i,j,:] - abs(x_dot[i,j,:]))*(data[i,j+1,:] - data[i,j,:])/polar_grid_resolution
 
-		j = x_dot.shape[1]-1
-		output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
-		output[i,j,:] += 0.5*(x_dot[i,j,:] + abs(x_dot[i,j,:]))*(data[i,j,:] - data[i,j-1,:])/polar_grid_resolution
-
-
 	return output
 
-cpdef upload_velocities(lat,lon,reproj_u,reproj_v,grid_size,grid_lat_coords,grid_lon_coords):
+cpdef upload_velocities(np.ndarray lat,np.ndarray lon,np.ndarray reproj_u,np.ndarray reproj_v,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords):
 	
-	grid_u = beam_me_up(lat,lon,reproj_u,grid_size,grid_lat_coords,grid_lon_coords)
-	grid_v = beam_me_up(lat,lon,reproj_v,grid_size,grid_lat_coords,grid_lon_coords)
+	cdef np.ndarray grid_u = beam_me_up(lat,lon,reproj_u,grid_size,grid_lat_coords,grid_lon_coords)
+	cdef np.ndarray grid_v = beam_me_up(lat,lon,reproj_v,grid_size,grid_lat_coords,grid_lon_coords)
 
-	nlevels = reproj_u.shape[2]
+	cdef np.int_t nlevels = reproj_u.shape[2]
 
-	x_dot = np.zeros((grid_size,grid_size,nlevels))	
-	y_dot = np.zeros((grid_size,grid_size,nlevels))	
+	cdef np.ndarray x_dot = np.zeros((grid_size,grid_size,nlevels))	
+	cdef np.ndarray y_dot = np.zeros((grid_size,grid_size,nlevels))	
 
 	grid_lon_coords = grid_lon_coords.reshape((grid_size,grid_size))
 
@@ -330,3 +321,12 @@ cpdef upload_velocities(lat,lon,reproj_u,reproj_v,grid_size,grid_lat_coords,grid
 			y_dot[:,:,k] = -grid_u[:,:,k]*np.cos(grid_lon_coords*np.pi/180) - grid_v[:,:,k]*np.sin(grid_lon_coords*np.pi/180)
 
 	return x_dot,y_dot
+
+# def grid_p_gradient(data,i,j,k,pressure_levels):
+# 	if k == 0:
+# 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
+# 	elif k == nlevels-1:
+# 		value = (data[i,j,k]-data[i,j,k-1])/(pressure_levels[k]-pressure_levels[k-1])
+# 	else:
+# 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
+# 	return value

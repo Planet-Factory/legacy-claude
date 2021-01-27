@@ -22,7 +22,7 @@ pressure_levels *= 100
 nlevels = len(pressure_levels)
 
 dt_spinup = 60*17.2					# timestep for initial period where the model only calculates radiative effects
-dt_main = 60*7						# timestep for the main sequence where the model calculates velocities/advection
+dt_main = 60*9.2					# timestep for the main sequence where the model calculates velocities/advection
 spinup_length = 0*day 				# how long the model should only calculate radiative effects
 
 ###
@@ -40,15 +40,15 @@ save = False 						# save current state to file?
 load = False  						# load initial state from file?
 
 save_frequency = 100				# write to file after this many timesteps have passed
-plot_frequency = 10					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
+plot_frequency = 1					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
 ###
 
 above = False 						# display top down view of a pole? showing polar plane data and regular gridded data
 pole = 'n'							# which pole to display - 'n' for north, 's' for south
-above_level = 15					# which vertical level to display over the pole
+above_level = 16					# which vertical level to display over the pole
 
-plot = True							# display plots of output?
+plot = True     					# display plots of output?
 diagnostic = False 					# display raw fields for diagnostic purposes
 level_plots = False					# display plots of output on vertical levels?
 nplots = 3							# how many levels you want to see plots of (evenly distributed through column)
@@ -194,7 +194,7 @@ if setup_grids:
 	data = np.zeros((pole_low_index_S+grid_pad,nlon))
 	for i in range(pole_low_index_S+grid_pad):
 		data[i,:] = coriolis[i]
-	coriolis_plane_S = low_level.beam_me_up_2D(lat[:(grid_pad+pole_low_index_S)],lon,data,grids[1],grid_lat_coords_S,grid_lon_coords_S)
+	coriolis_plane_S = low_level.beam_me_up_2D(lat[:(pole_low_index_S+grid_pad)],lon,data,grids[1],grid_lat_coords_S,grid_lon_coords_S)
 
 	x_dot_N = np.zeros((grids[0],grids[0],nlevels))
 	y_dot_N = np.zeros((grids[0],grids[0],nlevels))
@@ -305,8 +305,8 @@ def plotting_routine():
 			
 			# ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic',levels=15)
 					
-			# field = np.copy(u)[:,:,sample_level]
-			field = np.copy(atmosp_addition)[:,:,sample_level]
+			field = np.copy(w)[:,:,sample_level]
+			# field = np.copy(atmosp_addition)[:,:,sample_level]
 			ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
 			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
 			
@@ -373,28 +373,37 @@ def plotting_routine():
 			gx[0].contourf(lon,lat[:pole_low_index_S],potential_temperature[:pole_low_index_S,:,above_level])
 			
 			gx[1].set_title('polar_plane_advect')
-			# gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,above_level],grids[1],grid_lat_coords_S,grid_lon_coords_S))
 			polar_temps = low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S)
-			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,low_level.polar_plane_advect(polar_temps,x_dot_S,y_dot_S,polar_grid_resolution)[:,:,above_level])
+			output = low_level.beam_me_up(lat[:pole_low_index_S],lon,south_reprojected_addition,grids[1],grid_lat_coords_S,grid_lon_coords_S)
+
+			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,output[:,:,above_level])
 			gx[1].contour(grid_x_values_S/1E3,grid_y_values_S/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
 			gx[1].quiver(grid_x_values_S/1E3,grid_y_values_S/1E3,x_dot_S[:,:,above_level],y_dot_S[:,:,above_level])
 			
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
+
 			gx[2].set_title('south_addition_smoothed')
 			gx[2].contourf(lon,lat[:pole_low_index_S],south_addition_smoothed[:pole_low_index_S,:,above_level])
+			# gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
 			gx[2].quiver(lon[::5],lat[:pole_low_index_S],u[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
 		else:
 			gx[0].set_title('temperature')
 			gx[0].contourf(lon,lat[pole_low_index_N:],potential_temperature[pole_low_index_N:,:,above_level])
 			
 			gx[1].set_title('polar_plane_advect')
-			# gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,np.flip(potential_temperature[pole_low_index_N:,:,above_level],axis=1),grids[0],grid_lat_coords_N,grid_lon_coords_N))
 			polar_temps = low_level.beam_me_up(lat[pole_low_index_N:],lon,np.flip(potential_temperature[pole_low_index_N:,:,:],axis=1),grids[0],grid_lat_coords_N,grid_lon_coords_N)
-			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,low_level.polar_plane_advect(polar_temps,x_dot_N,y_dot_N,polar_grid_resolution)[:,:,above_level])
+			output = low_level.beam_me_up(lat[pole_low_index_N:],lon,north_reprojected_addition,grids[0],grid_lat_coords_N,grid_lon_coords_N)
+			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,output[:,:,above_level])
 			gx[1].contour(grid_x_values_N/1E3,grid_y_values_N/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
 			gx[1].quiver(grid_x_values_N/1E3,grid_y_values_N/1E3,x_dot_N[:,:,above_level],y_dot_N[:,:,above_level])
 			
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
+	
 			gx[2].set_title('south_addition_smoothed')
-			gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
+			# gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
+			gx[2].contourf(lon,lat[pole_low_index_N:],u[pole_low_index_N:,:,above_level])
 			gx[2].quiver(lon[::5],lat[pole_low_index_N:],u[pole_low_index_N:,::5,above_level],v[pole_low_index_N:,::5,above_level])
 		
 	# clear plots
@@ -477,6 +486,8 @@ while True:
 
 		if smoothing: u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		if smoothing: v = top_level.smoothing_3D(v,smoothing_parameter_v)
+
+		x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.update_plane_velocities(lat,lon,pole_low_index_N,pole_low_index_S,np.flip(u[pole_low_index_N:,:,:],axis=1),np.flip(v[pole_low_index_N:,:,:],axis=1),grids,grid_lat_coords_N,grid_lon_coords_N,u[:pole_low_index_S,:,:],v[:pole_low_index_S,:,:],grid_lat_coords_S,grid_lon_coords_S)
 		
 		if verbose:	
 			time_taken = float(round(time.time() - before_projection,3))
@@ -484,7 +495,9 @@ while True:
 
 		### allow for thermal advection in the atmosphere
 		if verbose:	before_advection = time.time()
-		
+
+
+
 		if verbose: before_w = time.time()
 		# using updated u,v fields calculated w
 		# https://www.sjsu.edu/faculty/watkins/omega.htm
@@ -495,44 +508,32 @@ while True:
 		w_N = top_level.w_plane(x_dot_N,y_dot_N,theta_N,pressure_levels,polar_grid_resolution,gravity)
 		w_N = np.flip(low_level.beam_me_down(lon,w_N,pole_low_index_N, grid_x_values_N, grid_y_values_N,polar_x_coords_N, polar_y_coords_N),axis=1)
 		w[pole_low_index_N:,:,:] = low_level.combine_data(pole_low_index_N,pole_high_index_N,w[pole_low_index_N:,:,:],w_N,lat)
-
+		
 		w_S = top_level.w_plane(x_dot_S,y_dot_S,low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S),pressure_levels,polar_grid_resolution,gravity)
 		w_S = low_level.beam_me_down(lon,w_S,pole_low_index_S, grid_x_values_S, grid_y_values_S,polar_x_coords_S, polar_y_coords_S)
 		w[:pole_low_index_S,:,:] = low_level.combine_data(pole_low_index_S,pole_high_index_S,w[:pole_low_index_S,:,:],w_S,lat)
+
+		# for k in np.arange(1,nlevels-1):
+		# 	north_reprojected_addition[:,:,k] += 0.5*(w_N[:,:,k] + abs(w_N[:,:,k]))*(potential_temperature[pole_low_index_N:,:,k] - potential_temperature[pole_low_index_N:,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
+		# 	north_reprojected_addition[:,:,k] += 0.5*(w_N[:,:,k] - abs(w_N[:,:,k]))*(potential_temperature[pole_low_index_N:,:,k+1] - potential_temperature[pole_low_index_N:,:,k])/(pressure_levels[k+1] - pressure_levels[k])
+
+		# 	south_reprojected_addition[:,:,k] += 0.5*(w_S[:,:,k] + abs(w_S[:,:,k]))*(potential_temperature[:pole_low_index_S,:,k] - potential_temperature[:pole_low_index_S,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
+		# 	south_reprojected_addition[:,:,k] += 0.5*(w_S[:,:,k] - abs(w_S[:,:,k]))*(potential_temperature[:pole_low_index_S,:,k+1] - potential_temperature[:pole_low_index_S,:,k])/(pressure_levels[k+1] - pressure_levels[k])
 
 		w[:,:,18:] *= 0
 
 		if verbose:	
 			time_taken = float(round(time.time() - before_w,3))
 			print('Calculate w: ',str(time_taken),'s')
-	
+
+		#################################
+
 		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,pressure_levels)
-
-		# convection_factor = 1.0
-		# convection = np.zeros_like(atmosp_addition)
-		# w_p = low_level.scalar_gradient_z_matrix(w, pressure_levels)
-		# w_n_p = low_level.scalar_gradient_z_matrix(w[pole_low_index_N:], pressure_levels)
-		# w_s_p = low_level.scalar_gradient_z_matrix(w[:pole_low_index_S], pressure_levels)
-
-		# for k in np.arange(1,18):
-
-		# 	convection[:,:,k] += 0.5*(w[:,:,k] - abs(w[:,:,k]))*(potential_temperature[:,:,k] - potential_temperature[:,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
-		# 	convection[:,:,k] += 0.5*(w[:,:,k] + abs(w[:,:,k]))*(potential_temperature[:,:,k+1] - potential_temperature[:,:,k])/(pressure_levels[k+1] - pressure_levels[k])
-		# 	convection[:,:,k] += potential_temperature[:,:,k]*w_p[:,:,k]
-
-		# 	north_reprojected_addition[:,:,k] += convection_factor*0.5*(w_N[:,:,k] - abs(w_N[:,:,k]))*(potential_temperature[pole_low_index_N:,:,k] - potential_temperature[pole_low_index_N:,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
-		# 	north_reprojected_addition[:,:,k] += convection_factor*0.5*(w_N[:,:,k] + abs(w_N[:,:,k]))*(potential_temperature[pole_low_index_N:,:,k+1] - potential_temperature[pole_low_index_N:,:,k])/(pressure_levels[k+1] - pressure_levels[k])
-		# 	north_reprojected_addition[:,:,k] += potential_temperature[pole_low_index_N:,:,k]*w_n_p[:,:,k]
-
-		# 	south_reprojected_addition[:,:,k] += convection_factor*0.5*(w_S[:,:,k] - abs(w_S[:,:,k]))*(potential_temperature[:pole_low_index_S,:,k] - potential_temperature[:pole_low_index_S,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
-		# 	south_reprojected_addition[:,:,k] += convection_factor*0.5*(w_S[:,:,k] + abs(w_S[:,:,k]))*(potential_temperature[:pole_low_index_S,:,k+1] - potential_temperature[:pole_low_index_S,:,k])/(pressure_levels[k+1] - pressure_levels[k])			
-		# 	south_reprojected_addition[:,:,k] += potential_temperature[:pole_low_index_S,:,k]*w_s_p[:,:,k]
-
-		# atmosp_addition += convection_factor*convection
 
 		# combine addition calculated on polar grid with that calculated on the cartestian grid
 		north_addition_smoothed = low_level.combine_data(pole_low_index_N,pole_high_index_N,atmosp_addition[pole_low_index_N:,:,:],north_reprojected_addition,lat)
 		south_addition_smoothed = low_level.combine_data(pole_low_index_S,pole_high_index_S,atmosp_addition[:pole_low_index_S,:,:],south_reprojected_addition,lat)
+		
 		# add the blended/combined addition to global temperature addition array
 		atmosp_addition[:pole_low_index_S,:,:] = south_addition_smoothed
 		atmosp_addition[pole_low_index_N:,:,:] = north_addition_smoothed
@@ -586,4 +587,4 @@ while True:
 	time_taken = float(round(time.time() - initial_time,3))
 
 	print('Time: ',str(time_taken),'s')
-	print('777777777777777777')
+	# print('777777777777777777')
