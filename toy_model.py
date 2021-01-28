@@ -36,11 +36,11 @@ smoothing_parameter_add = 0.3
 
 ###
 
-save = False 						# save current state to file?
-load = False  						# load initial state from file?
+save = True 						# save current state to file?
+load = True  						# load initial state from file?
 
 save_frequency = 100				# write to file after this many timesteps have passed
-plot_frequency = 1					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
+plot_frequency = 5					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
 ###
 
@@ -305,8 +305,8 @@ def plotting_routine():
 			
 			# ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic',levels=15)
 					
-			field = np.copy(w)[:,:,sample_level]
-			# field = np.copy(atmosp_addition)[:,:,sample_level]
+			# field = np.copy(w)[:,:,sample_level]
+			field = np.copy(atmosp_addition)[:,:,sample_level]
 			ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
 			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
 			
@@ -319,8 +319,8 @@ def plotting_routine():
 			ax[0].axhline(y=0,color='black',alpha=0.3)
 			ax[0].set_xlabel('Longitude')
 
-			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
-			test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic',levels=15)
+			test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
+			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic',levels=15)
 			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(potential_temperature,axis=1)), cmap='seismic',levels=15)
 			ax[1].contour(heights_plot, lat_z_plot, np.transpose(np.mean(tracer,axis=1))[:top,:], alpha=0.5, antialiased=True, levels=np.arange(0.001,1.01,0.01))
 

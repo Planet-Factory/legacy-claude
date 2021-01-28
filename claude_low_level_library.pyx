@@ -255,9 +255,18 @@ cpdef grid_velocities(np.ndarray polar_plane,np.int_t grid_side_length,np.ndarra
 	cpdef np.ndarray x_dot_add = np.zeros_like(x_dot)
 	cpdef np.ndarray y_dot_add = np.zeros_like(y_dot)
 
-	x_dot_add[:,:,:17] = - x_dot[:,:,:17]*grid_x_gradient_matrix(x_dot,polar_grid_resolution)[:,:,:17] - y_dot[:,:,:17]*grid_y_gradient_matrix(x_dot,polar_grid_resolution)[:,:,:17] + coriolis_plane[:,:,None]*y_dot[:,:,:17] - grid_x_gradient_matrix(polar_plane,polar_grid_resolution)[:,:,:17] - 1E-5*x_dot[:,:,:17]
-	y_dot_add[:,:,:17] = - x_dot[:,:,:17]*grid_x_gradient_matrix(y_dot,polar_grid_resolution)[:,:,:17] - y_dot[:,:,:17]*grid_y_gradient_matrix(y_dot,polar_grid_resolution)[:,:,:17] - coriolis_plane[:,:,None]*x_dot[:,:,:17] - grid_y_gradient_matrix(polar_plane,polar_grid_resolution)[:,:,:17] - 1E-5*y_dot[:,:,:17]
+	x_dot_add -= 0.5*(x_dot + abs(x_dot))*(x_dot - np.pad(x_dot,((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(x_dot, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - x_dot)/polar_grid_resolution
+	x_dot_add -= 0.5*(y_dot + abs(y_dot))*(x_dot - np.pad(x_dot,((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(x_dot, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - x_dot)/polar_grid_resolution
+	x_dot_add += coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
 
+	y_dot_add -= 0.5*(x_dot + abs(x_dot))*(y_dot - np.pad(y_dot,((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(y_dot, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - y_dot)/polar_grid_resolution
+	y_dot_add -= 0.5*(y_dot + abs(y_dot))*(y_dot - np.pad(y_dot,((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(y_dot, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - y_dot)/polar_grid_resolution
+	y_dot_add += - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
+
+	x_dot_add[:,:,17:] *= 0
+	y_dot_add[:,:,17:] *= 0
+
+	# sponge layer
 	x_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(x_dot,polar_grid_resolution)[:,:,17:] - y_dot[:,:,17:]*grid_y_gradient_matrix(x_dot,polar_grid_resolution)[:,:,17:] - 1E-3*x_dot[:,:,17:]
 	y_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(y_dot,polar_grid_resolution)[:,:,17:] - y_dot[:,:,17:]*grid_y_gradient_matrix(y_dot,polar_grid_resolution)[:,:,17:] - 1E-3*y_dot[:,:,17:]
 
@@ -289,14 +298,11 @@ cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, DTYP
 	
 	cpdef np.ndarray output = np.zeros_like(data)
 
-	# output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
-	# output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
+	output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution 
+	output += 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
+	output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution
+	output += 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
 	
-	for i in np.arange(1,x_dot.shape[0]-1):
-		for j in np.arange(1,x_dot.shape[1]-1):
-			output[i,j,:] += 0.5*(y_dot[i,j,:] + abs(y_dot[i,j,:]))*(data[i,j,:] - data[i-1,j,:])/polar_grid_resolution + 0.5*(y_dot[i,j,:] - abs(y_dot[i,j,:]))*(data[i+1,j,:] - data[i,j,:])/polar_grid_resolution
-			output[i,j,:] += 0.5*(x_dot[i,j,:] + abs(x_dot[i,j,:]))*(data[i,j,:] - data[i,j-1,:])/polar_grid_resolution + 0.5*(x_dot[i,j,:] - abs(x_dot[i,j,:]))*(data[i,j+1,:] - data[i,j,:])/polar_grid_resolution
-
 	return output
 
 cpdef upload_velocities(np.ndarray lat,np.ndarray lon,np.ndarray reproj_u,np.ndarray reproj_v,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords):
