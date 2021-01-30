@@ -1,0 +1,39 @@
+"planet_config":
+    "day": 86400                        # define length of day (used for calculating Coriolis as well) (s)
+    "year": 365                         # define how many days in a year
+    "resolution": 3                     # how many degrees between latitude and longitude gridpoints
+    "planet_radius": 6.4E6              # define the planet's radius (m)
+    "insolation": 1370                  # TOA radiation from star (W m^-2)
+    "gravity": 9.81                     # define surface gravity for planet (m s^-2)
+    "axial_tilt": 23.5                  # tilt of rotational axis w.r.t. solar plane
+    # Definition of Pressure Levels in Atmosphere
+    "pressure_levels": [1000,950,900,800,700,600,500,400,350,300,250,200,150,100,75,50,25,10,5,2,1]
+
+###
+# you probably won't need this, but there is the option to smooth out fields
+# using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)
+###
+"smoothing_config":
+    smoothing: False
+    smoothing_parameter_t: 1.0
+    smoothing_parameter_u: 0.9
+    smoothing_parameter_v: 0.9
+    smoothing_parameter_w: 0.3
+    smoothing_parameter_add: 0.3
+
+"save_config":
+    save: True # save current state to file?
+    load: True # load initial state from file?
+    save_frequency: 100 # write to file after this many timesteps have passed
+    plot_frequency: 5 # how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
+
+"view_config":
+    above: False # display top down view of a pole? showing polar plane data and regular gridded data
+    pole: 'n' # which pole to display - 'n' for north, 's' for south
+    above_level: 16 # which vertical level to display over the pole
+    plot: True # display plots of output?
+    diagnostic: False # display raw fields for diagnostic purposes
+    level_plots: False # display plots of output on vertical levels?
+    nplots: 3 # how many levels you want to see plots of (evenly distributed through column)
+    top: 17 # top pressure level to display (i.e. trim off sponge layer)
+    verbose: False # print times taken to calculate specific processes each timestep

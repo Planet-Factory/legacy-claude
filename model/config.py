@@ -1,7 +1,9 @@
-import numpy as np 
+import numpy as np
+import yaml
+
 from model.pole_enum import PoleEnum
 
-class PlanetProperties:
+class PlanetConfig:
     def __init__(self,
         day: int,
         year: int,
@@ -13,7 +15,7 @@ class PlanetProperties:
         pressure_levels: list(float)
     ):
         self.day = day      # define length of day (used for calculating Coriolis as well) (s)
-        self.year           # length of year (s)
+        self.year = day * year           # length of year (s)
         self.resolution = resolution     # how many degrees between latitude and longitude gridpoints
         self.planet_radius = planet_radius  # define the planet's radius (m)
         self.insolation = insolation     # TOA radiation from star (W m^-2)
@@ -92,11 +94,24 @@ class CoordinateGrids:
 
 class ClaudeConfig:
     def __init__(self,
-        planet_properties: PlanetProperties,
+        planet_config: PlanetConfig,
         smoothing_config: SmoothingConfig,
+        save_config: SaveConfig,
         view_config: ViewConfig
     ):
-        self.planet_properties = planet_properties
+        self.planet_config = planet_config
         self.smoothing_config = smoothing_config
         self.view_config = view_config
-        self.coordinate_grid = CoordinateGrids(resolution = self.planet_properties.resolution, top = self.planet_properties.top)
+        self.coordinate_grid = CoordinateGrids(resolution=self.planet_config.resolution, top=self.planet_config.top)
+
+    @staticmethod
+    def load_from_yaml(data):
+        values = yaml.safe_load(data)
+        planet_config = PlanetConfig(data["planet_config"])
+        smoothing_config = SmoothingConfig(data["smoothing_config"])
+        save_config = SaveConfig(data["save_config"])
+        view_config = ViewConfig(data["view_config"])
+        return ClaudeConfig(planet_config=planet_config,
+            smoothing_config=smoothing_config,
+            save_config=save_config,
+            view_config=view_config)
