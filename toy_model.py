@@ -2,12 +2,24 @@
 
 import numpy as np 
 import matplotlib.pyplot as plt
-import time, sys, pickle
+import time, sys, pickle, os, yaml
 import claude_low_level_library as low_level
 import claude_top_level_library as top_level
+
+from yaml import Loader
+from definitions import CONFIG_PATH
+from model.claude_config_file import ClaudeConfigFile, PlanetConfigFile, SaveConfigFile, ViewConfigFile
+from model.claude_config import ClaudeConfig
 # from twitch import prime_sub
 
 ######## CONTROL ########
+
+DEFAULT_CONFIG_FILE = "DefaultClaudeConfig.yaml"
+
+## Load Configuration
+config_file = open(os.path.join(CONFIG_PATH, DEFAULT_CONFIG_FILE))
+claude_config_file = yaml.load(config_file, Loader=Loader)
+claude_config = ClaudeConfig.load_from_file(claude_config_file=claude_config_file)
 
 day = 60*60*24						# define length of day (used for calculating Coriolis as well) (s)
 resolution = 3						# how many degrees between latitude and longitude gridpoints
