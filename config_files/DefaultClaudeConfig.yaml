@@ -8,8 +8,7 @@ planet_config: !PlanetConfig
     gravity: 9.81                     # define surface gravity for planet (m s^-2)
     axial_tilt: 23.5                  # tilt of rotational axis w.r.t. solar plane
     # Definition of Pressure Levels in Atmosphere
-    pressure_levels: [1000,950,900,800]
-
+    pressure_levels: [1000,950,900,800,700,600,500,400,350,300,250,200,150,100,75,50,25,10,5,2,1]
 ###
 # you probably won't need this, but there is the option to smooth out fields
 # using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)
