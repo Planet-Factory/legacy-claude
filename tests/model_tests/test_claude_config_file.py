@@ -5,7 +5,6 @@ from definitions import CONFIG_PATH
 from model.claude_config_file import PlanetConfigFile
 
 class TestPlanetConfigFile(unittest.TestCase):
-
     def test_yaml_mapping(self):
         #Arrange (set up test)
         test_planet_config = open(os.path.join(os.path.dirname(__file__), "test_files", "TestPlanetConfig.yaml"))
@@ -25,13 +24,4 @@ class TestPlanetConfigFile(unittest.TestCase):
         result_planet_config = yaml.load(test_planet_config, Loader=Loader)
 
         # Assert (Check our results)
-        self.assertEqual(result_planet_config.hours_in_day, expected_planet_config.hours_in_day)
-        self.assertEqual(result_planet_config.days_in_year, expected_planet_config.days_in_year)
-        self.assertEqual(result_planet_config.resolution, expected_planet_config.resolution)
-        self.assertEqual(result_planet_config.insolation, expected_planet_config.insolation)
-        self.assertEqual(result_planet_config.gravity, expected_planet_config.gravity)
-        self.assertEqual(result_planet_config.axial_tilt, expected_planet_config.axial_tilt)
-        self.assertEqual(result_planet_config.pressure_levels, expected_planet_config.pressure_levels)
-
-
-
+        self.assertEqual(result_planet_config, expected_planet_config)
