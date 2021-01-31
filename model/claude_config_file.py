@@ -21,7 +21,7 @@ class PlanetConfigFile(YAMLObject):
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
-
+@dataclass
 class SmoothingConfigFile(YAMLObject):
     yaml_tag = u'!SmoothingConfig'
     smoothing: bool
@@ -34,7 +34,7 @@ class SmoothingConfigFile(YAMLObject):
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
-
+@dataclass
 class SaveConfigFile(YAMLObject):
     yaml_tag = u'!SaveConfig'
     save: bool
@@ -45,7 +45,7 @@ class SaveConfigFile(YAMLObject):
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
-
+@dataclass
 class ViewConfigFile(YAMLObject):
     yaml_tag = u'!ViewConfig'
 
@@ -62,7 +62,7 @@ class ViewConfigFile(YAMLObject):
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
-
+@dataclass
 class ClaudeConfigFile(YAMLObject):
     yaml_tag = u'!ClaudeConfig'
 
