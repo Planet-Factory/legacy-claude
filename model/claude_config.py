@@ -8,44 +8,56 @@ from dataclasses import dataclass
 from model.claude_config_file import *
 
 
-@dataclass(init=False)
+@dataclass
 class PlanetConfig:
-    day: int
-    year: int
-    resolution: int
-    planet_radius: float
-    insolation: float
-    gravity: float
-    axial_tilt: float
-    pressure_levels: List[float]
+    day: int # define length of day (used for calculating Coriolis as well) (s)
+    year: int # length of year (s)
+    resolution: int # how many degrees between latitude and longitude gridpoints
+    planet_radius: float # define the planet's radius (m)
+    insolation: float # TOA radiation from star (W m^-2)
+    gravity: float # define surface gravity for planet (m s^-2)
+    axial_tilt: float # tilt of rotational axis w.r.t. solar plane
+    pressure_levels: np.ndarray # length of year (s)
     nlevels: int
-
-    def __init__(self,
-                 planet_config_file: PlanetConfigFile
-                 ):
-        # define length of day (used for calculating Coriolis as well) (s)
-        self.day = 60 * 60 * planet_config_file.hours_in_day
-        # length of year (s)
-        self.year = self.day * planet_config_file.days_in_year
-        # how many degrees between latitude and longitude gridpoints
-        self.resolution = planet_config_file.resolution
-        # define the planet's radius (m)
-        self.planet_radius = planet_config_file.planet_radius
-        # TOA radiation from star (W m^-2)
-        self.insolation = planet_config_file.insolation
-        # define surface gravity for planet (m s^-2)
-        self.gravity = planet_config_file.gravity
-        # tilt of rotational axis w.r.t. solar plane
-        self.axial_tilt = planet_config_file.axial_tilt
-        self.pressure_levels = planet_config_file.pressure_levels
-        self.nlevels = len(self.pressure_levels)
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
+    def __eq__(self, other):
+        result = False
+        if (isinstance(other, PlanetConfig)):
+            day = self.day == other.day
+            year = self.year == other.year
+            resolution = self.resolution == other.resolution
+            radius = self.planet_radius == other.planet_radius
+            insolation = self.insolation == other.insolation
+            gravity = self.gravity == other.gravity
+            axial_tilt = self.axial_tilt == other.axial_tilt
+            pressure_levels = np.array_equal(self.pressure_levels, other.pressure_levels)
+            nlevels = self.nlevels == other.nlevels
+            result = day & year & resolution & radius & insolation & gravity & axial_tilt & pressure_levels & nlevels
+        return result
+
+    @staticmethod
+    def load_from_file(planet_config_file: PlanetConfigFile):
+        day = 60 * 60 * planet_config_file.hours_in_day
+        year = day * planet_config_file.days_in_year
+        pressure_levels = np.array(planet_config_file.pressure_levels)*100
+        nlevels = len(planet_config_file.pressure_levels)
+        return PlanetConfig(
+            day=day,
+            year=year,
+            nlevels=nlevels,
+            resolution=planet_config_file.resolution,
+            planet_radius=planet_config_file.planet_radius,
+            insolation=planet_config_file.insolation,
+            gravity=planet_config_file.gravity,
+            axial_tilt=planet_config_file.axial_tilt,
+            pressure_levels=pressure_levels
+        )
 
 
-@dataclass(init=False)
+@dataclass
 class SmoothingConfig:
     """
     you probably won't need this, but there is the option to smooth out fields
@@ -59,101 +71,124 @@ class SmoothingConfig:
     smoothing_parameter_w: float
     smoothing_parameter_add: float
 
-    def __init__(self,
-                 smoothing_config_file: SmoothingConfigFile
-                 ):
-        self.smoothing = smoothing_config_file.smoothing
-        self.smoothing_parameter_t = smoothing_config_file.smoothing_parameter_t
-        self.smoothing_parameter_u = smoothing_config_file.smoothing_parameter_u
-        self.smoothing_parameter_v = smoothing_config_file.smoothing_parameter_v
-        self.smoothing_parameter_w = smoothing_config_file.smoothing_parameter_w
-        self.smoothing_parameter_add = smoothing_config_file.smoothing_parameter_add
+    @staticmethod
+    def load_from_file(smoothing_config_file: SmoothingConfigFile):
+        return SmoothingConfig(
+            smoothing=smoothing_config_file.smoothing,
+            smoothing_parameter_t=smoothing_config_file.smoothing_parameter_t,
+            smoothing_parameter_u=smoothing_config_file.smoothing_parameter_u,
+            smoothing_parameter_v=smoothing_config_file.smoothing_parameter_v,
+            smoothing_parameter_w=smoothing_config_file.smoothing_parameter_w,
+            smoothing_parameter_add=smoothing_config_file.smoothing_parameter_add
+        )
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
 
-@dataclass(init=False)
+@dataclass
 class SaveConfig:
-    save: bool
-    load: bool
-    save_frequency: int
+    save: bool  # save current state to file?
+    load: bool  # load initial state from file?
+    save_frequency: int  # write to file after this many timesteps have passed
+    # how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
     plot_frequency: int
 
-    def __init__(self,
-                 save_config_file: SaveConfigFile
-                 ):
-        self.save = save_config_file.save  # save current state to file?
-        self.load = save_config_file.load  # load initial state from file?
-        # write to file after this many timesteps have passed
-        self.save_frequency = save_config_file.save_frequency
-        # how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
-        self.plot_frequency = save_config_file.plot_frequency
+    @staticmethod
+    def load_from_file(save_config_file: SaveConfigFile):
+        return SaveConfig(
+            save=save_config_file.save,
+            load=save_config_file.load,
+
+            save_frequency=save_config_file.save_frequency,
+
+            plot_frequency=save_config_file.plot_frequency
+        )
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
 
-@dataclass(init=False)
+@dataclass
 class ViewConfig:
-
+    # display top down view of a pole? showing polar plane data and regular gridded data
     above: bool
+    # which pole to display - 'n' for north, 's' for south
     pole: PoleType
+    # which vertical level to display over the pole
     above_level: int
-    plot: bool
-    diagnostic: bool
-    level_plots: bool
+    plot: bool  # display plots of output?
+    diagnostic: bool  # display raw fields for diagnostic purposes
+    level_plots: bool  # display plots of output on vertical levels?
+    # how many levels you want to see plots of (evenly distributed through column)
     nplots: int
-    top: int
-    verbose: bool
-    
-    def __init__(self,
-                 view_config_file: ViewConfigFile
-                 ):
-        # display top down view of a pole? showing polar plane data and regular gridded data
-        self.above = view_config_file.above
-        self.pole = PoleType(view_config_file.pole)  # which pole to display - 'n' for north, 's' for south
-        self.above_level = view_config_file.above_level  # which vertical level to display over the pole
-        self.plot = view_config_file.plot  # display plots of output?
-        self.diagnostic = view_config_file.diagnostic  # display raw fields for diagnostic purposes
-        self.level_plots = view_config_file.level_plots  # display plots of output on vertical levels?
-        # how many levels you want to see plots of (evenly distributed through column)
-        self.nplots = view_config_file.nplots
-        # top pressure level to display (i.e. trim off sponge layer)
-        self.top = view_config_file.top
-        self.verbose = view_config_file.verbose  # print times taken to calculate specific processes each timestep
+    top: int  # top pressure level to display (i.e. trim off sponge layer)
+    verbose: bool  # print times taken to calculate specific processes each timestep
+
+    @staticmethod
+    def load_from_file(view_config_file: ViewConfigFile):
+        return ViewConfig(
+            above=view_config_file.above,
+            pole=PoleType(view_config_file.pole),
+            above_level=view_config_file.above_level,
+            plot=view_config_file.plot,
+            diagnostic=view_config_file.diagnostic,
+            level_plots=view_config_file.level_plots,
+            nplots=view_config_file.nplots,
+            top=view_config_file.top,
+            verbose=view_config_file.verbose
+        )
 
 
-@dataclass(init=False)
+@dataclass
 class CoordinateGrid:
-    def __init__(self,
-                 resolution: int,
-                 top: int,
-                 pressure_levels: List[float]
-                 ):
-        self.lat = np.arange(-90, 91, resolution)
-        self.lon = np.arange(0, 360, resolution)
-        self.nlat = len(self.lat)
-        self.nlon = len(self.lon)
-        self.lon_plot, self.lat_plot = np.meshgrid(self.lon, self.lat)
-        self.heights_plot, self.lat_z_plot = np.meshgrid(
-            self.lat, [x/100 for x in pressure_levels[:top]])
-        self.temperature_world = np.zeros((self.nlat, self.nlon))
+    lat: np.ndarray
+    lon: np.ndarray
+    nlat: int
+    nlon: int
+    lon_plot: np.ndarray
+    lat_plot: np.ndarray
+    heights_plot: np.ndarray
+    lat_z_plot: np.ndarray
+    temperature_world: np.ndarray
+
+    @staticmethod
+    def load_from_file(
+        resolution: int,
+        top: int,
+        pressure_levels: List[float]
+    ):
+        lat = np.arange(-90, 91, resolution)
+        lon = np.arange(0, 360, resolution)
+        nlat = len(lat)
+        nlon = len(lon)
+        lon_plot, lat_plot = np.meshgrid(lon, lat)
+        heights_plot, lat_z_plot = np.meshgrid(
+            lat, [x/100 for x in pressure_levels[:top]])
+        temperature_world = np.zeros((nlat, nlon))
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
 
-@dataclass(init=False)
+@dataclass
 class ClaudeConfig:
-    def __init__(self,
-                 claude_config_file: ClaudeConfigFile
-                 ):
-        self.planet_config = claude_config_file.planet_config
-        self.smoothing_config = claude_config_file.smoothing_config
-        self.view_config = claude_config_file.view_config
-        self.coordinate_grid = CoordinateGrid(
-            resolution=self.planet_config.resolution, top=self.view_config.top, pressure_levels=self.planet_config.pressure_levels)
+    @staticmethod
+    def load_from_file(claude_config_file: ClaudeConfigFile):
+        planet_config = PlanetConfig.load_from_file(
+            claude_config_file.planet_config)
+        smoothing_config = SmoothingConfig.load_from_file(
+            claude_config_file.smoothing_config)
+        view_config = ViewConfig.load_from_file(
+            claude_config_file.view_config)
+        coordinate_grid = CoordinateGrid.load_from_file(
+            resolution=planet_config.resolution, top=view_config.top, pressure_levels=planet_config.pressure_levels)
+        return ClaudeConfig(
+            planet_config=planet_config,
+            smoothing_config=smoothing_config,
+            view_config=view_config,
+            coordinate_grid=coordinate_grid
+        )
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)

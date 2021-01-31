@@ -1,6 +1,6 @@
 --- !ClaudeConfig # These are Type Tags to guide config loading and should always be left in
 planet_config: !PlanetConfig
-    hours_in_day: 24                  # define length of day (used for calculating Coriolis as well) (s)
+    hours_in_day: 24                  # define length of day (used for calculating Coriolis as well) (h)
     days_in_year: 365                 # define how many days in a year
     resolution: 3                     # how many degrees between latitude and longitude gridpoints
     planet_radius: 6.4E+6              # define the planet's radius (m)
