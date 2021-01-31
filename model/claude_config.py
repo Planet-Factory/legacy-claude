@@ -197,12 +197,20 @@ class CoordinateGrid:
 
 @dataclass
 class ClaudeConfig:
+
+    planet_config: PlanetConfig
+    smoothing_config: SmoothingConfig
+    save_config: SaveConfig
+    view_config: ViewConfig
+    coordinate_grid: CoordinateGrid
+
     @staticmethod
     def load_from_file(claude_config_file: ClaudeConfigFile):
         planet_config = PlanetConfig.load_from_file(
             claude_config_file.planet_config)
         smoothing_config = SmoothingConfig.load_from_file(
             claude_config_file.smoothing_config)
+        
         view_config = ViewConfig.load_from_file(
             claude_config_file.view_config)
         coordinate_grid = CoordinateGrid.load_from_file(
