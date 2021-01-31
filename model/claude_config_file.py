@@ -3,8 +3,8 @@ import yaml
 
 from yaml import YAMLObject, Dumper
 from typing import List
-from reprlib import recursive_repr
 from dataclasses import dataclass
+
 
 @dataclass
 class PlanetConfigFile(YAMLObject):
@@ -21,6 +21,7 @@ class PlanetConfigFile(YAMLObject):
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
+
 @dataclass
 class SmoothingConfigFile(YAMLObject):
     yaml_tag = u'!SmoothingConfig'
@@ -34,6 +35,7 @@ class SmoothingConfigFile(YAMLObject):
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
 
+
 @dataclass
 class SaveConfigFile(YAMLObject):
     yaml_tag = u'!SaveConfig'
@@ -44,6 +46,7 @@ class SaveConfigFile(YAMLObject):
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
+
 
 @dataclass
 class ViewConfigFile(YAMLObject):
@@ -61,6 +64,7 @@ class ViewConfigFile(YAMLObject):
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
+
 
 @dataclass
 class ClaudeConfigFile(YAMLObject):
