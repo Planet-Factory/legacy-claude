@@ -99,9 +99,7 @@ class SaveConfig:
         return SaveConfig(
             save=save_config_file.save,
             load=save_config_file.load,
-
             save_frequency=save_config_file.save_frequency,
-
             plot_frequency=save_config_file.plot_frequency
         )
 
@@ -156,7 +154,7 @@ class CoordinateGrid:
     def load_from_file(
         resolution: int,
         top: int,
-        pressure_levels: List[float]
+        pressure_levels: np.ndarray
     ):
         lat = np.arange(-90, 91, resolution)
         lon = np.arange(0, 360, resolution)
@@ -164,11 +162,37 @@ class CoordinateGrid:
         nlon = len(lon)
         lon_plot, lat_plot = np.meshgrid(lon, lat)
         heights_plot, lat_z_plot = np.meshgrid(
-            lat, [x/100 for x in pressure_levels[:top]])
+            lat, pressure_levels[:top]/100)
         temperature_world = np.zeros((nlat, nlon))
+        return CoordinateGrid(
+            lat=lat,
+            lon=lon,
+            nlat=nlat,
+            nlon=nlon,
+            lon_plot=lon_plot,
+            lat_plot=lat_plot,
+            heights_plot=heights_plot,
+            lat_z_plot=lat_z_plot,
+            temperature_world=temperature_world
+        )
 
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
+
+    def __eq__(self, other):
+        result = False
+        if (isinstance(other, CoordinateGrid)):
+            lat = np.array_equal(self.lat, other.lat)
+            lon = np.array_equal(self.lon, other.lon)
+            nlat = self.nlat == other.nlat
+            nlon = self.nlon == other.nlon
+            lon_plot = np.array_equal(self.lon_plot, other.lon_plot)
+            lat_plot = np.array_equal(self.lat_plot, other.lat_plot)
+            heights_plot = np.array_equal(self.heights_plot, other.heights_plot)
+            lat_z_plot = np.array_equal(self.lat_z_plot, other.lat_z_plot)
+            temperature_world = np.array_equal(self.temperature_world, other.temperature_world)
+            result = lat & lon & nlat & nlon & lon_plot & lat_plot & heights_plot & lat_z_plot & temperature_world
+        return result
 
 
 @dataclass
