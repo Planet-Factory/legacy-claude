@@ -1,6 +1,6 @@
 "planet_config":
-    "day": 86400                        # define length of day (used for calculating Coriolis as well) (s)
-    "year": 365                         # define how many days in a year
+    "hours_in_day": 24                  # define length of day (used for calculating Coriolis as well) (s)
+    "days_in_year": 365                 # define how many days in a year
     "resolution": 3                     # how many degrees between latitude and longitude gridpoints
     "planet_radius": 6.4E6              # define the planet's radius (m)
     "insolation": 1370                  # TOA radiation from star (W m^-2)
@@ -12,6 +12,7 @@
 ###
 # you probably won't need this, but there is the option to smooth out fields
 # using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)
+# If Smoothing set to false then all other values are optional. Shown here for demonstration purposes
 ###
 "smoothing_config":
     smoothing: False

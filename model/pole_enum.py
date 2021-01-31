@@ -1,5 +1,5 @@
 from enum import Enum
 
-class Pole(Enum):
+class PoleType(Enum):
     NORTH = 'n'
     SOUTH = 's'
