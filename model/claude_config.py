@@ -4,7 +4,7 @@ import yaml
 from yaml import Loader, Dumper
 from typing import List
 from model.pole_enum import PoleType
-
+from reprlib import recursive_repr
 
 class PlanetConfig:
     def __init__(self,
@@ -30,8 +30,9 @@ class PlanetConfig:
         self.pressure_levels = pressure_levels
         self.nlevels = len(self.pressure_levels)
 
+    @recursive_repr
     def __repr__(self):
-        return self.__str__()
+        return '<' + '|'.join(map(repr, self)) + '>'()
     
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
@@ -57,8 +58,9 @@ class SmoothingConfig:
         self.smoothing_parameter_w = smoothing_parameter_w
         self.smoothing_parameter_add = smoothing_parameter_add
     
+    @recursive_repr
     def __repr__(self):
-        return self.__str__()
+        return '<' + '|'.join(map(repr, self)) + '>'
     
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
@@ -78,8 +80,9 @@ class SaveConfig:
         # how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
         self.plot_frequency = plot_frequency
     
+    @recursive_repr
     def __repr__(self):
-        return self.__str__()
+        return '<' + '|'.join(map(repr, self)) + '>'
     
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
@@ -126,8 +129,9 @@ class CoordinateGrids:
             self.lat, [x/100 for x in pressure_levels[:top]])
         self.temperature_world = np.zeros((self.nlat, self.nlon))
     
+    @recursive_repr
     def __repr__(self):
-        return self.__str__()
+        return '<' + '|'.join(map(repr, self)) + '>'
     
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)
@@ -146,8 +150,9 @@ class ClaudeConfig:
         self.coordinate_grid = CoordinateGrids(
             resolution=self.planet_config.resolution, top=self.view_config.top, pressure_levels=self.planet_config.pressure_levels)
 
+    @recursive_repr
     def __repr__(self):
-        return self.__str__()
+        return '<' + '|'.join(map(repr, self)) + '>'
     
     def __str__(self):
         return yaml.dump(data=self, Dumper=Dumper)

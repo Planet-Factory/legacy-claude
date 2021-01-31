@@ -1,7 +1,7 @@
 import unittest, os
 from definitions import CONFIG_PATH
 
-from model.config import ClaudeConfig
+from model.claude_config import ClaudeConfig
 
 class TestClaudeConfig(unittest.TestCase):
 

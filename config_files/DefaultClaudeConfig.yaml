@@ -1,4 +1,5 @@
-"planet_config":
+--- !ClaudeConfig
+!PlanetConfig "planet_config":
     "hours_in_day": 24                  # define length of day (used for calculating Coriolis as well) (s)
     "days_in_year": 365                 # define how many days in a year
     "resolution": 3                     # how many degrees between latitude and longitude gridpoints
@@ -14,7 +15,7 @@
 # using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)
 # If Smoothing set to false then all other values are optional. Shown here for demonstration purposes
 ###
-"smoothing_config":
+!SmoothingConfig smoothing_config":
     smoothing: False
     smoothing_parameter_t: 1.0
     smoothing_parameter_u: 0.9
@@ -22,13 +23,13 @@
     smoothing_parameter_w: 0.3
     smoothing_parameter_add: 0.3
 
-"save_config":
+!SaveConfig save_config":
     save: True # save current state to file?
     load: True # load initial state from file?
     save_frequency: 100 # write to file after this many timesteps have passed
     plot_frequency: 5 # how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
-"view_config":
+!ViewConfig "view_config":
     above: False # display top down view of a pole? showing polar plane data and regular gridded data
     pole: 'n' # which pole to display - 'n' for north, 's' for south
     above_level: 16 # which vertical level to display over the pole
@@ -38,3 +39,4 @@
     nplots: 3 # how many levels you want to see plots of (evenly distributed through column)
     top: 17 # top pressure level to display (i.e. trim off sponge layer)
     verbose: False # print times taken to calculate specific processes each timestep
+"""
