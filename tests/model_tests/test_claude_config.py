@@ -474,3 +474,7 @@ class TestClaudeConfig(unittest.TestCase):
             save_config=expected_save_config,
             view_config=expected_view_config,
             coordinate_grid=expected_coordinate_grid)
+
+        result_claude_config = ClaudeConfig.load_from_file(test_claude_config_file)
+
+        self.assertEquals(result_claude_config, expected_claude_config)

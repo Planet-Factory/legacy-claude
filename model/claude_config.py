@@ -10,14 +10,15 @@ from model.claude_config_file import *
 
 @dataclass
 class PlanetConfig:
-    day: int # define length of day (used for calculating Coriolis as well) (s)
-    year: int # length of year (s)
-    resolution: int # how many degrees between latitude and longitude gridpoints
-    planet_radius: float # define the planet's radius (m)
-    insolation: float # TOA radiation from star (W m^-2)
-    gravity: float # define surface gravity for planet (m s^-2)
-    axial_tilt: float # tilt of rotational axis w.r.t. solar plane
-    pressure_levels: np.ndarray # length of year (s)
+    # define length of day (used for calculating Coriolis as well) (s)
+    day: int
+    year: int  # length of year (s)
+    resolution: int  # how many degrees between latitude and longitude gridpoints
+    planet_radius: float  # define the planet's radius (m)
+    insolation: float  # TOA radiation from star (W m^-2)
+    gravity: float  # define surface gravity for planet (m s^-2)
+    axial_tilt: float  # tilt of rotational axis w.r.t. solar plane
+    pressure_levels: np.ndarray  # length of year (s)
     nlevels: int
 
     def __str__(self):
@@ -33,7 +34,8 @@ class PlanetConfig:
             insolation = self.insolation == other.insolation
             gravity = self.gravity == other.gravity
             axial_tilt = self.axial_tilt == other.axial_tilt
-            pressure_levels = np.array_equal(self.pressure_levels, other.pressure_levels)
+            pressure_levels = np.array_equal(
+                self.pressure_levels, other.pressure_levels)
             nlevels = self.nlevels == other.nlevels
             result = day & year & resolution & radius & insolation & gravity & axial_tilt & pressure_levels & nlevels
         return result
@@ -188,9 +190,11 @@ class CoordinateGrid:
             nlon = self.nlon == other.nlon
             lon_plot = np.array_equal(self.lon_plot, other.lon_plot)
             lat_plot = np.array_equal(self.lat_plot, other.lat_plot)
-            heights_plot = np.array_equal(self.heights_plot, other.heights_plot)
+            heights_plot = np.array_equal(
+                self.heights_plot, other.heights_plot)
             lat_z_plot = np.array_equal(self.lat_z_plot, other.lat_z_plot)
-            temperature_world = np.array_equal(self.temperature_world, other.temperature_world)
+            temperature_world = np.array_equal(
+                self.temperature_world, other.temperature_world)
             result = lat & lon & nlat & nlon & lon_plot & lat_plot & heights_plot & lat_z_plot & temperature_world
         return result
 
@@ -210,14 +214,14 @@ class ClaudeConfig:
             claude_config_file.planet_config)
         smoothing_config = SmoothingConfig.load_from_file(
             claude_config_file.smoothing_config)
-        
-        view_config = ViewConfig.load_from_file(
-            claude_config_file.view_config)
+        save_config = SaveConfig.load_from_file(claude_config_file.save_config)
+        view_config = ViewConfig.load_from_file(claude_config_file.view_config)
         coordinate_grid = CoordinateGrid.load_from_file(
             resolution=planet_config.resolution, top=view_config.top, pressure_levels=planet_config.pressure_levels)
         return ClaudeConfig(
             planet_config=planet_config,
             smoothing_config=smoothing_config,
+            save_config=save_config,
             view_config=view_config,
             coordinate_grid=coordinate_grid
         )
