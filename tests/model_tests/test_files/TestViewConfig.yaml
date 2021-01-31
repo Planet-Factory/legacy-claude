@@ -1,0 +1,11 @@
+--- !ViewConfig
+above: False
+pole: 'n'
+above_level: 16
+plot: True
+diagnostic: False
+level_plots: False
+nplots: 3
+top: 17
+verbose: False
+...

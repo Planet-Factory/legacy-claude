@@ -1,0 +1,8 @@
+--- !SmoothingConfig
+"smoothing": False
+"smoothing_parameter_t": 1.0
+"smoothing_parameter_u": 0.9
+"smoothing_parameter_v": 0.9
+"smoothing_parameter_w": 0.3
+"smoothing_parameter_add": 0.3
+...

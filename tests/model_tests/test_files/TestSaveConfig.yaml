@@ -1,0 +1,6 @@
+--- !SaveConfig
+save: True
+load: True
+save_frequency: 100
+plot_frequency: 5
+...

@@ -1,4 +1,4 @@
---- !ClaudeConfig # These are Type Tags to guide config loading and should always be left in
+--- !ClaudeConfig
 planet_config: !PlanetConfig
     hours_in_day: 24                  # define length of day (used for calculating Coriolis as well) (s)
     days_in_year: 365                 # define how many days in a year
