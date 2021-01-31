@@ -9,6 +9,7 @@ from model.claude_config import PlanetConfig, ClaudeConfig
 class TestPlanetConfig(unittest.TestCase):
 
     def test_equals_all_same(self):
+        # Arrange
         day=3600
         year=7200
         resolution=3
@@ -18,7 +19,7 @@ class TestPlanetConfig(unittest.TestCase):
         axial_tilt=20.0
         pressure_levels=np.array([10000,20000,30000])
         nlevels=3
-
+        # Act (set up 2 identical objects)
         config1 = PlanetConfig(
             day,
             year,
@@ -41,11 +42,10 @@ class TestPlanetConfig(unittest.TestCase):
             pressure_levels,
             nlevels
         )
-
-        self.assertTrue(config1 == config2)
+        # Assert
+        self.assertEquals(config1, config2)
     
     def test_equals_one_var_diffs(self):
-        
         test_data = {
             "day":[3600,2500],
             "year":[7200,3600],
@@ -70,6 +70,7 @@ class TestPlanetConfig(unittest.TestCase):
             test_data["nlevels"][0]
         )
 
+        # Loop around all the fields to set one different each time and check they come out as not equal
         for field in dataclasses.fields(PlanetConfig):
             config2 = PlanetConfig(
                 test_data["day"][1 if field.name=="day" else 0],
@@ -82,9 +83,10 @@ class TestPlanetConfig(unittest.TestCase):
                 test_data["pressure_levels"][1 if field.name=="pressure_levels" else 0],
                 test_data["nlevels"][1 if field.name=="nlevels" else 0]
             )
-            self.assertFalse(config1 == config2, f"Marked as equal when {field.name} is different")
+            self.assertNotEqual(config1, config2, f"Marked as equal when {field.name} is different")
 
     def test_load_from_file(self):
+        # Arrange
         test_config_file = PlanetConfigFile(
             hours_in_day=1,
             days_in_year=2,
@@ -106,8 +108,8 @@ class TestPlanetConfig(unittest.TestCase):
             pressure_levels=np.array([10000,20000,30000]),
             nlevels=3
         )
-
+        # Act
         result_config = PlanetConfig.load_from_file(test_config_file)
-
+        # Assert
         self.assertEqual(result_config, expected_config)
 
