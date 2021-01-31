@@ -432,3 +432,5 @@ TSWLatexianTemp*
 claude_*_level_library*.pyd
 # and the code it's generated from
 claude_*_level_library.c
+
+*.p
