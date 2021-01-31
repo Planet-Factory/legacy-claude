@@ -18,7 +18,7 @@ class PlanetConfig:
     insolation: float  # TOA radiation from star (W m^-2)
     gravity: float  # define surface gravity for planet (m s^-2)
     axial_tilt: float  # tilt of rotational axis w.r.t. solar plane
-    pressure_levels: np.ndarray  # length of year (s)
+    pressure_levels: np.ndarray
     nlevels: int
 
     def __str__(self):
