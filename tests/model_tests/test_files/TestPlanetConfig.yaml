@@ -1,0 +1,10 @@
+--- !PlanetConfig
+"hours_in_day": 24
+"days_in_year": 365
+"resolution": 3
+"planet_radius": 6.4E6
+"insolation": 1370
+"gravity": 9.81
+"axial_tilt": 23.5
+"pressure_levels": [1000,950,900,800]
+...
