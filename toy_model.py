@@ -531,9 +531,9 @@ if PLOT:
         ax[0].cla()
         ax[1].cla()
 
-    if LEVEL_PLOTS:
-        for k in range(NPLOTS):
-            bx[k].cla()
+        if LEVEL_PLOTS:
+            for k in range(NPLOTS):
+                bx[k].cla()
     else:
         ax[0, 0].cla()
         ax[0, 1].cla()
