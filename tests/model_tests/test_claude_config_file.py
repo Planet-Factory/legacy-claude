@@ -1,6 +1,4 @@
-import unittest
-import os
-import yaml
+import unittest, os, yaml
 
 from yaml import Loader
 from definitions import CONFIG_PATH

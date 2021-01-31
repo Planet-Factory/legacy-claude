@@ -1,6 +1,5 @@
-import dataclasses
-import unittest
-import os
+import dataclasses, unittest
+
 import numpy as np
 
 from definitions import CONFIG_PATH
