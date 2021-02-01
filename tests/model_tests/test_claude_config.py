@@ -1,10 +1,11 @@
-import dataclasses, unittest
+import dataclasses
+import unittest
 
 import numpy as np
 
 from definitions import CONFIG_PATH
 from model.claude_config_file import PlanetConfigFile
-from model.claude_config import *
+from model.claude_config import PlanetConfig, SmoothingConfig, SaveConfig, ViewConfig, CoordinateGrid, ClaudeConfig
 
 
 class TestPlanetConfig(unittest.TestCase):
@@ -474,6 +475,7 @@ class TestClaudeConfig(unittest.TestCase):
             view_config=expected_view_config,
             coordinate_grid=expected_coordinate_grid)
 
-        result_claude_config = ClaudeConfig.load_from_file(test_claude_config_file)
+        result_claude_config = ClaudeConfig.load_from_file(
+            test_claude_config_file)
 
         self.assertEquals(result_claude_config, expected_claude_config)

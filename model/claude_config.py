@@ -5,7 +5,7 @@ from yaml import Loader, Dumper
 from typing import List
 from model.pole_enum import PoleType
 from dataclasses import dataclass
-from model.claude_config_file import *
+from model.claude_config_file import PlanetConfigFile, SaveConfigFile, ViewConfigFile, SmoothingConfigFile, ClaudeConfigFile
 
 
 @dataclass
@@ -37,7 +37,7 @@ class PlanetConfig:
             pressure_levels = np.array_equal(
                 self.pressure_levels, other.pressure_levels)
             nlevels = self.nlevels == other.nlevels
-            result = day & year & resolution & radius & insolation & gravity & axial_tilt & pressure_levels & nlevels
+            result = day and year and resolution and radius and insolation and gravity and axial_tilt and pressure_levels and nlevels
         return result
 
     @staticmethod
@@ -195,7 +195,7 @@ class CoordinateGrid:
             lat_z_plot = np.array_equal(self.lat_z_plot, other.lat_z_plot)
             temperature_world = np.array_equal(
                 self.temperature_world, other.temperature_world)
-            result = lat & lon & nlat & nlon & lon_plot & lat_plot & heights_plot & lat_z_plot & temperature_world
+            result = lat and lon and nlat and nlon and lon_plot and lat_plot and heights_plot and lat_z_plot and temperature_world
         return result
 
 
