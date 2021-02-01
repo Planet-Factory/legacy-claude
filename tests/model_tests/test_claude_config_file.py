@@ -1,4 +1,6 @@
-import unittest, os, yaml
+import unittest
+import os
+import yaml
 
 from yaml import Loader
 from definitions import CONFIG_PATH
@@ -97,6 +99,7 @@ class TestViewConfigFile(unittest.TestCase):
 
         # Assert (Check our results)
         self.assertEqual(expected_view_config, result_view_config)
+
 
 class TestClaudeConfigFile(unittest.TestCase):
     def test_yaml_mapping(self):
