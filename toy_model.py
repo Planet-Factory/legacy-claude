@@ -22,7 +22,7 @@ pressure_levels *= 100
 nlevels = len(pressure_levels)
 
 dt_spinup = 60*17.2					# timestep for initial period where the model only calculates radiative effects
-dt_main = 60*9.2					# timestep for the main sequence where the model calculates velocities/advection
+dt_main = 60*7.2					# timestep for the main sequence where the model calculates velocities/advection
 spinup_length = 0*day 				# how long the model should only calculate radiative effects
 
 ###
@@ -36,19 +36,19 @@ smoothing_parameter_add = 0.3
 
 ###
 
-save = True 						# save current state to file?
-load = True  						# load initial state from file?
+save = False 						# save current state to file?
+load = False  						# load initial state from file?
 
 save_frequency = 100				# write to file after this many timesteps have passed
-plot_frequency = 5					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
+plot_frequency = 10					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
 ###
 
 above = False 						# display top down view of a pole? showing polar plane data and regular gridded data
-pole = 'n'							# which pole to display - 'n' for north, 's' for south
-above_level = 16					# which vertical level to display over the pole
+pole = 's'							# which pole to display - 'n' for north, 's' for south
+above_level = 17					# which vertical level to display over the pole
 
-plot = True     					# display plots of output?
+plot = True
 diagnostic = False 					# display raw fields for diagnostic purposes
 level_plots = False					# display plots of output on vertical levels?
 nplots = 3							# how many levels you want to see plots of (evenly distributed through column)
@@ -60,6 +60,7 @@ verbose = False						# print times taken to calculate specific processes each ti
 
 pole_lower_latitude_limit = -75		# how far north polar plane data is calculated from the south pole (do not set this beyond 45!) [mirrored to north pole as well]
 pole_higher_latitude_limit = -85	# how far south regular gridded data is calculated (do not set beyond about 80) [also mirrored to north pole]
+sponge_layer = 10					# at what pressure should the equations of motion stop being applied (to absorb upwelling atmospheric waves) [hPa]
 
 ###
 
@@ -115,7 +116,7 @@ if initial_setup:
 
 	albedo_variance = 0.001
 	albedo = np.random.uniform(-albedo_variance,albedo_variance, (nlat, nlon)) + 0.2
-	albedo = np.zeros((nlat, nlon)) + 0.2
+	# albedo = np.zeros((nlat, nlon)) + 0.2
 
 	specific_gas = 287
 	thermal_diffusivity_roc = 1.5E-6
@@ -133,6 +134,8 @@ if initial_setup:
 	for i in range(nlat):
 		dx[i] = dy*np.cos(lat[i]*np.pi/180)
 		coriolis[i] = angular_speed*np.sin(lat[i]*np.pi/180)
+
+	sponge_index = np.where(pressure_levels < sponge_layer*100)[0][0]
 
 setup_grids = True
 if setup_grids:
@@ -212,7 +215,7 @@ if load:
 	# load in previous save file
 	potential_temperature,temperature_world,u,v,w,x_dot_N,y_dot_N,x_dot_S,y_dot_S,t,albedo,tracer = pickle.load(open("save_file.p","rb"))
 
-sample_level = 5
+sample_level = 15
 tracer = np.zeros_like(potential_temperature)
 
 last_plot = t-0.1
@@ -227,7 +230,7 @@ if plot:
 		ax[0].streamplot(lon_plot, lat_plot, u[:,:,0], v[:,:,0], color='white',density=1)
 		test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
 		ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], colors='white',levels=20,linewidths=1,alpha=0.8)
-		ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(10*w,axis=1))[:top,:],color='black')
+		ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(100*w,axis=1))[:top,:],color='black')
 		plt.subplots_adjust(left=0.1, right=0.75)
 		ax[0].set_title('Surface temperature')
 		ax[0].set_xlim(lon.min(),lon.max())
@@ -303,21 +306,19 @@ def plotting_routine():
 		# update plot
 		if not diagnostic:
 			
-			# ax[0].contourf(lon_plot, lat_plot, temperature_world, cmap='seismic',levels=15)
-					
-			# field = np.copy(w)[:,:,sample_level]
-			field = np.copy(atmosp_addition)[:,:,sample_level]
-			ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
+			# field = temperature_world
+			field = np.copy(w)[:,:,sample_level]
+			# field = np.copy(atmosp_addition)[:,:,sample_level]
+			test = ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
 			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
-			
 			if velocity:	ax[0].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,sample_level], v[::quiver_padding,::quiver_padding,sample_level], color='white')
-			# ax[0].set_title('$\it{Ground} \quad \it{temperature}$')
-
 			ax[0].set_xlim((lon.min(),lon.max()))
 			ax[0].set_ylim((lat.min(),lat.max()))
 			ax[0].set_ylabel('Latitude')
 			ax[0].axhline(y=0,color='black',alpha=0.3)
 			ax[0].set_xlabel('Longitude')
+
+			###
 
 			test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
 			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic',levels=15)
@@ -326,7 +327,7 @@ def plotting_routine():
 
 			if velocity:
 				ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], colors='white',levels=20,linewidths=1,alpha=0.8)
-				ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(5*w,axis=1))[:top,:],color='black')
+				ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(-10*w,axis=1))[:top,:],color='black')
 			ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
 			ax[1].set_xlim((-90,90))
 			ax[1].set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
@@ -374,9 +375,9 @@ def plotting_routine():
 			
 			gx[1].set_title('polar_plane_advect')
 			polar_temps = low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S)
-			output = low_level.beam_me_up(lat[:pole_low_index_S],lon,south_reprojected_addition,grids[1],grid_lat_coords_S,grid_lon_coords_S)
+			output = low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,w[:pole_low_index_S,:,above_level],grids[1],grid_lat_coords_S,grid_lon_coords_S)
 
-			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,output[:,:,above_level])
+			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,output)
 			gx[1].contour(grid_x_values_S/1E3,grid_y_values_S/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
 			gx[1].quiver(grid_x_values_S/1E3,grid_y_values_S/1E3,x_dot_S[:,:,above_level],y_dot_S[:,:,above_level])
 			
@@ -384,8 +385,8 @@ def plotting_routine():
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
 
 			gx[2].set_title('south_addition_smoothed')
-			gx[2].contourf(lon,lat[:pole_low_index_S],south_addition_smoothed[:pole_low_index_S,:,above_level])
-			# gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
+			# gx[2].contourf(lon,lat[:pole_low_index_S],south_addition_smoothed[:pole_low_index_S,:,above_level])
+			gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
 			gx[2].quiver(lon[::5],lat[:pole_low_index_S],u[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
 		else:
 			gx[0].set_title('temperature')
@@ -393,8 +394,10 @@ def plotting_routine():
 			
 			gx[1].set_title('polar_plane_advect')
 			polar_temps = low_level.beam_me_up(lat[pole_low_index_N:],lon,np.flip(potential_temperature[pole_low_index_N:,:,:],axis=1),grids[0],grid_lat_coords_N,grid_lon_coords_N)
-			output = low_level.beam_me_up(lat[pole_low_index_N:],lon,north_reprojected_addition,grids[0],grid_lat_coords_N,grid_lon_coords_N)
-			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,output[:,:,above_level])
+			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,atmosp_addition[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
+			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,w[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
+
+			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,output)
 			gx[1].contour(grid_x_values_N/1E3,grid_y_values_N/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
 			gx[1].quiver(grid_x_values_N/1E3,grid_y_values_N/1E3,x_dot_N[:,:,above_level],y_dot_N[:,:,above_level])
 			
@@ -444,7 +447,7 @@ while True:
 	# print current time in simulation to command line
 	print("+++ t = " + str(round(t/day,2)) + " days +++")
 	print('T: ',round(temperature_world.max()-273.15,1),' - ',round(temperature_world.min()-273.15,1),' C')
-	print('U: ',round(u.max(),2),' - ',round(u.min(),2),' V: ',round(v.max(),2),' - ',round(v.min(),2),' W: ',round(w.max(),2),' - ',round(w.min(),4))
+	print('U: ',round(u[:,:,:sponge_index-1].max(),2),' - ',round(u[:,:,:sponge_index-1].min(),2),' V: ',round(v[:,:,:sponge_index-1].max(),2),' - ',round(v[:,:,:sponge_index-1].min(),2),' W: ',round(w[:,:,:sponge_index-1].max(),2),' - ',round(w[:,:,:sponge_index-1].min(),4))
 
 	tracer[40,50,sample_level] = 1
 	tracer[20,50,sample_level] = 1
@@ -469,7 +472,7 @@ while True:
 
 		if verbose:	before_velocity = time.time()
 		
-		u_add,v_add = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
+		u_add,v_add = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,sponge_index)
 
 		if verbose:	
 			time_taken = float(round(time.time() - before_velocity,3))
@@ -479,7 +482,7 @@ while True:
 		
 		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
 	
-		u_add,v_add,north_reprojected_addition,south_reprojected_addition,x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.polar_planes(u,v,u_add,v_add,potential_temperature,geopotential,grid_velocities,indices,grids,coords,coriolis_plane_N,coriolis_plane_S,grid_side_length,pressure_levels,lat,lon,dt,polar_grid_resolution,gravity)
+		u_add,v_add,x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.polar_planes(u,v,u_add,v_add,potential_temperature,geopotential,grid_velocities,indices,grids,coords,coriolis_plane_N,coriolis_plane_S,grid_side_length,pressure_levels,lat,lon,dt,polar_grid_resolution,gravity,sponge_index)
 		
 		u += u_add
 		v += v_add
@@ -488,6 +491,7 @@ while True:
 		if smoothing: v = top_level.smoothing_3D(v,smoothing_parameter_v)
 
 		x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.update_plane_velocities(lat,lon,pole_low_index_N,pole_low_index_S,np.flip(u[pole_low_index_N:,:,:],axis=1),np.flip(v[pole_low_index_N:,:,:],axis=1),grids,grid_lat_coords_N,grid_lon_coords_N,u[:pole_low_index_S,:,:],v[:pole_low_index_S,:,:],grid_lat_coords_S,grid_lon_coords_S)
+		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
 		
 		if verbose:	
 			time_taken = float(round(time.time() - before_projection,3))
@@ -496,72 +500,49 @@ while True:
 		### allow for thermal advection in the atmosphere
 		if verbose:	before_advection = time.time()
 
-
-
 		if verbose: before_w = time.time()
 		# using updated u,v fields calculated w
 		# https://www.sjsu.edu/faculty/watkins/omega.htm
-		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt)
+		w = -top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,indices,coords,grids,grid_velocities,polar_grid_resolution,lat,lon)
 		if smoothing: w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
 
-		theta_N = low_level.beam_me_up(lat[pole_low_index_N:],lon,potential_temperature[pole_low_index_N:,:,:],grids[0],grid_lat_coords_N,grid_lon_coords_N)
-		w_N = top_level.w_plane(x_dot_N,y_dot_N,theta_N,pressure_levels,polar_grid_resolution,gravity)
-		w_N = np.flip(low_level.beam_me_down(lon,w_N,pole_low_index_N, grid_x_values_N, grid_y_values_N,polar_x_coords_N, polar_y_coords_N),axis=1)
-		w[pole_low_index_N:,:,:] = low_level.combine_data(pole_low_index_N,pole_high_index_N,w[pole_low_index_N:,:,:],w_N,lat)
-		
-		w_S = top_level.w_plane(x_dot_S,y_dot_S,low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S),pressure_levels,polar_grid_resolution,gravity)
-		w_S = low_level.beam_me_down(lon,w_S,pole_low_index_S, grid_x_values_S, grid_y_values_S,polar_x_coords_S, polar_y_coords_S)
-		w[:pole_low_index_S,:,:] = low_level.combine_data(pole_low_index_S,pole_high_index_S,w[:pole_low_index_S,:,:],w_S,lat)
-
-		# for k in np.arange(1,nlevels-1):
-		# 	north_reprojected_addition[:,:,k] += 0.5*(w_N[:,:,k] + abs(w_N[:,:,k]))*(potential_temperature[pole_low_index_N:,:,k] - potential_temperature[pole_low_index_N:,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
-		# 	north_reprojected_addition[:,:,k] += 0.5*(w_N[:,:,k] - abs(w_N[:,:,k]))*(potential_temperature[pole_low_index_N:,:,k+1] - potential_temperature[pole_low_index_N:,:,k])/(pressure_levels[k+1] - pressure_levels[k])
-
-		# 	south_reprojected_addition[:,:,k] += 0.5*(w_S[:,:,k] + abs(w_S[:,:,k]))*(potential_temperature[:pole_low_index_S,:,k] - potential_temperature[:pole_low_index_S,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
-		# 	south_reprojected_addition[:,:,k] += 0.5*(w_S[:,:,k] - abs(w_S[:,:,k]))*(potential_temperature[:pole_low_index_S,:,k+1] - potential_temperature[:pole_low_index_S,:,k])/(pressure_levels[k+1] - pressure_levels[k])
-
 		w[:,:,18:] *= 0
+		# w[:1,:,:] *= 0
+		# w[-1:,:,:] *= 0
+
+		# plt.semilogy(w[5,25,:sponge_index],pressure_levels[:sponge_index])
+		# plt.gca().invert_yaxis()
+		# plt.show()
 
 		if verbose:	
 			time_taken = float(round(time.time() - before_w,3))
 			print('Calculate w: ',str(time_taken),'s')
 
 		#################################
-
-		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,pressure_levels)
-
-		# combine addition calculated on polar grid with that calculated on the cartestian grid
-		north_addition_smoothed = low_level.combine_data(pole_low_index_N,pole_high_index_N,atmosp_addition[pole_low_index_N:,:,:],north_reprojected_addition,lat)
-		south_addition_smoothed = low_level.combine_data(pole_low_index_S,pole_high_index_S,atmosp_addition[:pole_low_index_S,:,:],south_reprojected_addition,lat)
 		
-		# add the blended/combined addition to global temperature addition array
-		atmosp_addition[:pole_low_index_S,:,:] = south_addition_smoothed
-		atmosp_addition[pole_low_index_N:,:,:] = north_addition_smoothed
+		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities)
 
 		if smoothing: atmosp_addition = top_level.smoothing_3D(atmosp_addition,smoothing_parameter_add)
 
-		atmosp_addition[:,:,17] *= 0.5
-		atmosp_addition[:,:,18:] *= 0
+		atmosp_addition[:,:,sponge_index-1] *= 0.5
+		atmosp_addition[:,:,sponge_index:] *= 0
 
 		potential_temperature -= dt*atmosp_addition
 
 		###################################################################
 
-		tracer_addition = top_level.divergence_with_scalar(tracer,u,v,w,dx,dy,pressure_levels)
-		tracer_addition[:4,:,:] *= 0
-		tracer_addition[-4:,:,:] *= 0
-
-		for k in np.arange(1,nlevels-1):
-
-			tracer_addition[:,:,k] += 0.5*(w[:,:,k] - abs(w[:,:,k]))*(tracer[:,:,k] - tracer[:,:,k-1])/(pressure_levels[k] - pressure_levels[k-1])
-			tracer_addition[:,:,k] += 0.5*(w[:,:,k] + abs(w[:,:,k]))*(tracer[:,:,k+1] - tracer[:,:,k])/(pressure_levels[k] - pressure_levels[k-1])
-
+		tracer_addition = top_level.divergence_with_scalar(tracer,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities)
 		tracer -= dt*tracer_addition
 
 		diffusion = top_level.laplacian_3d(potential_temperature,dx,dy,pressure_levels)
 		diffusion[0,:,:] = np.mean(diffusion[1,:,:],axis=0)
 		diffusion[-1,:,:] = np.mean(diffusion[-2,:,:],axis=0)
 		potential_temperature -= dt*1E-4*diffusion
+
+		courant = w*dt
+		for k in range(nlevels-1):
+			courant[:,:,k] /= (pressure_levels[k+1] - pressure_levels[k])
+		print('Courant max: ',round(abs(courant).max(),3))
 
 		###################################################################
 

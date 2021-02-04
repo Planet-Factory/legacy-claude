@@ -250,25 +250,36 @@ cpdef grid_p_gradient_matrix(np.ndarray data, np.ndarray pressure_levels):
 
 	return (shift_down - shift_up)/(shift_pressures_down - shift_pressures_up)
 
-cpdef grid_velocities(np.ndarray polar_plane,np.int_t grid_side_length,np.ndarray coriolis_plane,np.ndarray x_dot,np.ndarray y_dot,DTYPE_f polar_grid_resolution):
+cpdef grid_velocities(np.ndarray polar_plane,np.int_t grid_side_length,np.ndarray coriolis_plane,np.ndarray x_dot,np.ndarray y_dot,DTYPE_f polar_grid_resolution, np.int_t sponge_index, np.ndarray temperature, np.ndarray pressure_levels):
 	
-	cpdef np.ndarray x_dot_add = np.zeros_like(x_dot)
-	cpdef np.ndarray y_dot_add = np.zeros_like(y_dot)
+	cdef np.ndarray x_dot_add = np.zeros_like(x_dot)
+	cdef np.ndarray y_dot_add = np.zeros_like(y_dot)
+
+	# cdef np.ndarray w = w_plane(x_dot,y_dot,temperature,pressure_levels,polar_grid_resolution)
 
 	x_dot_add -= 0.5*(x_dot + abs(x_dot))*(x_dot - np.pad(x_dot,((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(x_dot, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - x_dot)/polar_grid_resolution
 	x_dot_add -= 0.5*(y_dot + abs(y_dot))*(x_dot - np.pad(x_dot,((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(x_dot, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - x_dot)/polar_grid_resolution
+	# x_dot_add -= 0.5*(w + abs(w))*(x_dot - np.pad(x_dot,((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels,(1,0), 'reflect', reflect_type='odd')[:-1]) + 0.5*(w - abs(w))*(np.pad(x_dot, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - x_dot)/(np.pad(pressure_levels,(0,1), 'reflect', reflect_type='odd')[1:] - pressure_levels)
 	x_dot_add += coriolis_plane[:,:,None]*y_dot - grid_x_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*x_dot
 
 	y_dot_add -= 0.5*(x_dot + abs(x_dot))*(y_dot - np.pad(y_dot,((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot - abs(x_dot))*(np.pad(y_dot, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - y_dot)/polar_grid_resolution
 	y_dot_add -= 0.5*(y_dot + abs(y_dot))*(y_dot - np.pad(y_dot,((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot - abs(y_dot))*(np.pad(y_dot, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - y_dot)/polar_grid_resolution
+	# x_dot_add -= 0.5*(w + abs(w))*(y_dot - np.pad(y_dot,((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels,(1,0), 'reflect', reflect_type='odd')[:-1]) + 0.5*(w - abs(w))*(np.pad(y_dot, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - y_dot)/(np.pad(pressure_levels,(0,1), 'reflect', reflect_type='odd')[1:] - pressure_levels)
 	y_dot_add += - coriolis_plane[:,:,None]*x_dot - grid_y_gradient_matrix(polar_plane,polar_grid_resolution) - 1E-5*y_dot
 
-	x_dot_add[:,:,17:] *= 0
-	y_dot_add[:,:,17:] *= 0
+	x_dot_add[:,:,sponge_index:] *= 0
+	y_dot_add[:,:,sponge_index:] *= 0
 
 	# sponge layer
-	x_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(x_dot,polar_grid_resolution)[:,:,17:] - y_dot[:,:,17:]*grid_y_gradient_matrix(x_dot,polar_grid_resolution)[:,:,17:] - 1E-3*x_dot[:,:,17:]
-	y_dot_add[:,:,17:] = - x_dot[:,:,17:]*grid_x_gradient_matrix(y_dot,polar_grid_resolution)[:,:,17:] - y_dot[:,:,17:]*grid_y_gradient_matrix(y_dot,polar_grid_resolution)[:,:,17:] - 1E-3*y_dot[:,:,17:]
+	x_dot_add[:,:,sponge_index:] -= 0.5*(x_dot[:,:,sponge_index:] + abs(x_dot[:,:,sponge_index:]))*(x_dot[:,:,sponge_index:] - np.pad(x_dot[:,:,sponge_index:],((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot[:,:,sponge_index:] - abs(x_dot[:,:,sponge_index:]))*(np.pad(x_dot[:,:,sponge_index:], ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - x_dot[:,:,sponge_index:])/polar_grid_resolution
+	x_dot_add[:,:,sponge_index:] -= 0.5*(y_dot[:,:,sponge_index:] + abs(y_dot[:,:,sponge_index:]))*(x_dot[:,:,sponge_index:] - np.pad(x_dot[:,:,sponge_index:],((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot[:,:,sponge_index:] - abs(y_dot[:,:,sponge_index:]))*(np.pad(x_dot[:,:,sponge_index:], ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - x_dot[:,:,sponge_index:])/polar_grid_resolution
+	# x_dot_add[:,:,sponge_index:] -= 0.5*(w[:,:,sponge_index:] + abs(w[:,:,sponge_index:]))*(x_dot[:,:,sponge_index:] - np.pad(x_dot[:,:,sponge_index:],((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels[sponge_index:] - np.pad(pressure_levels[sponge_index:],(1,0), 'reflect', reflect_type='odd')[:-1]) + 0.5*(w[:,:,sponge_index:] - abs(w[:,:,sponge_index:]))*(np.pad(x_dot[:,:,sponge_index:], ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - x_dot[:,:,sponge_index:])/(np.pad(pressure_levels[sponge_index:],(0,1), 'reflect', reflect_type='odd')[1:] - pressure_levels[sponge_index:])
+	x_dot_add[:,:,sponge_index:] -= 1E-3*x_dot[:,:,sponge_index:]
+
+	y_dot_add[:,:,sponge_index:] -= 0.5*(x_dot[:,:,sponge_index:] + abs(x_dot[:,:,sponge_index:]))*(y_dot[:,:,sponge_index:] - np.pad(y_dot[:,:,sponge_index:],((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution + 0.5*(x_dot[:,:,sponge_index:] - abs(x_dot[:,:,sponge_index:]))*(np.pad(y_dot[:,:,sponge_index:], ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - y_dot[:,:,sponge_index:])/polar_grid_resolution
+	y_dot_add[:,:,sponge_index:] -= 0.5*(y_dot[:,:,sponge_index:] + abs(y_dot[:,:,sponge_index:]))*(y_dot[:,:,sponge_index:] - np.pad(y_dot[:,:,sponge_index:],((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution + 0.5*(y_dot[:,:,sponge_index:] - abs(y_dot[:,:,sponge_index:]))*(np.pad(y_dot[:,:,sponge_index:], ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - y_dot[:,:,sponge_index:])/polar_grid_resolution
+	# y_dot_add[:,:,sponge_index:] -= 0.5*(w[:,:,sponge_index:] + abs(w[:,:,sponge_index:]))*(y_dot[:,:,sponge_index:] - np.pad(y_dot[:,:,sponge_index:],((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels[sponge_index:] - np.pad(pressure_levels[sponge_index:],(1,0), 'reflect', reflect_type='odd')[:-1]) + 0.5*(w[:,:,sponge_index:] - abs(w[:,:,sponge_index:]))*(np.pad(y_dot[:,:,sponge_index:], ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - y_dot[:,:,sponge_index:])/(np.pad(pressure_levels[sponge_index:],(0,1), 'reflect', reflect_type='odd')[1:] - pressure_levels[sponge_index:])
+	y_dot_add[:,:,sponge_index:] -= 1E-3*y_dot[:,:,sponge_index:]
 
 	return x_dot_add,y_dot_add
 
@@ -294,14 +305,18 @@ cpdef project_velocities_south(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 
 	return reproj_u, reproj_v
 
-cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, DTYPE_f polar_grid_resolution):
+cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, np.ndarray w, DTYPE_f polar_grid_resolution):
 	
 	cpdef np.ndarray output = np.zeros_like(data)
 
 	output += 0.5*(x_dot + abs(x_dot))*(data - np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:])/polar_grid_resolution 
 	output += 0.5*(x_dot - abs(x_dot))*(np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:] - data)/polar_grid_resolution
+	
 	output += 0.5*(y_dot + abs(y_dot))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution
 	output += 0.5*(y_dot - abs(y_dot))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
+
+	output += 0.5*(w + abs(w))*(data - np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/polar_grid_resolution
+	output += 0.5*(w - abs(w))*(np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - data)/polar_grid_resolution
 	
 	return output
 
@@ -328,11 +343,16 @@ cpdef upload_velocities(np.ndarray lat,np.ndarray lon,np.ndarray reproj_u,np.nda
 
 	return x_dot,y_dot
 
-# def grid_p_gradient(data,i,j,k,pressure_levels):
-# 	if k == 0:
-# 		value = (data[i,j,k+1]-data[i,j,k])/(pressure_levels[k+1]-pressure_levels[k])
-# 	elif k == nlevels-1:
-# 		value = (data[i,j,k]-data[i,j,k-1])/(pressure_levels[k]-pressure_levels[k-1])
-# 	else:
-# 		value = (data[i,j,k+1]-data[i,j,k-1])/(pressure_levels[k+1]-pressure_levels[k-1])
-# 	return value
+cpdef w_plane(np.ndarray x_dot,np.ndarray y_dot,np.ndarray temperature,np.ndarray pressure_levels,DTYPE_f polar_grid_resolution):
+	''' calculates vertical velocity omega on a given cartesian polar plane'''
+
+	cdef np.ndarray w_temp = np.zeros_like(x_dot)
+	cdef np.int_t k
+	temperature = theta_to_t(temperature,pressure_levels)
+
+	cdef np.ndarray flow_divergence = grid_x_gradient_matrix(x_dot, polar_grid_resolution) + grid_y_gradient_matrix(y_dot, polar_grid_resolution)
+	
+	for k in np.arange(1,len(pressure_levels)).tolist():
+		w_temp[:,:,k] = - np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
+	
+	return w_temp
