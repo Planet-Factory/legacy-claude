@@ -45,18 +45,23 @@ are significant and not based on the previous code then the old alghorithms will
 understanding of what the algorithm does. Do note that the radiation \autoref{sec:rad} is an exception for the first calculations as this forms the basis of the beginning of CLAuDE and the 
 fundamentals of the theory which I deem important enough to be left in place even if the calculations end up significantly different.
 
-This manual will provide an overview of the formulae used and will explain aspects of these formulae. For each equation each symbol will be explained what it is. In such an explanation, the units 
-will be presented in SI units \cite{SI} between brackets like: $T$: The temperature of the planet ($K$). Which indicates that $T$ is the temperature of the planet in degrees Kelvin. If you need 
-to relate SI units to your preferred system of units, please refer to the internet for help with that. There are great calculators online where you only need to plug in a number and select the 
-right units.
+This manual will provide an overview of the formulae used and will explain aspects of these formulae. For each equation each symbol will be explained what it is. In such an explanation, the 
+units will be presented in SI units \cite{SI} between brackets like: $T$: The temperature of the planet (\si{K}). Which indicates that $T$ is the temperature of the planet in degrees Kelvin. If 
+you need to relate SI units to your preferred system of units, please refer to the internet for help with that. There are great calculators online where you only need to plug in a number and 
+select the right units.
 
 Within this manual we will not concern ourselves with plotting the data, instead we focus on the physics side of things and translating formulae into code. If you are interested in how the
 plotting of the data works, or how loading and saving data works, please refer to the relevant stream on Simon's Twitch page \cite{twitch}.
 
-This manual is for the toy model, which is as of now still in development. One important thing to note is that the layout may change significantly when new sections are added. This is due to the amount of code that is added/changed. If a lot of code changes, a lot of so called
-'algorithm' blocks are present which have different placement rules than just plain text. Therefore it may occur that an algorithm is referenced even though it is one or two pages later. This is 
-a pain to fix and if something later on changes, the whole layout may be messed up again and is a pain to fix again. Hence I opt to let \LaTeX (the software/typeset language used to create this 
-manual) figure out the placement of the algorithm blocks, which may or may not be in the right places.
+This manual is for the toy model, which is as of now still in development. One important thing to note is that the layout may change significantly when new sections are added. This is due to the 
+amount of code that is added/changed. If a lot of code changes, a lot of so called 'algorithm' blocks are present which have different placement rules than just plain text. Therefore it may 
+occur that an algorithm is referenced even though it is one or two pages later. This is a pain to fix and if something later on changes, the whole layout may be messed up again and is a pain to 
+fix again. Hence I opt to let \LaTeX (the software/typeset language used to create this manual) figure out the placement of the algorithm blocks, which may or may not be in the right places.
+
+One last important thing, I try to make this manual as generic as possible regarding the code. This means that I try to steer away from using Python specific notation. However, this manual is 
+also the documentation for the project written in Python. Therefore it is sometimes unavoidable to use Python notation. Furthermore, to make the model run efficiently, the code is vectorised. 
+Vectorised code is however more difficult to understand (as a programmer without the required linear algebra) than the For loops that it replaces. Therefore, it is not uncommon to see (parts of) 
+algorithms repeated in their relevant sections, once as a standard for loop and once as the vectorised version.
 
 The manual is now up on the Planet Factory GitHub repository\cite{claudeGit}, together with all the source code. There is also a fork \cite{nomGit} that also contains the source code. 
 The fork will usually be more up to date than the version on the Planet Factory repository as Simon needs to merge pull requests into the repository. However I can update the fork freely so if a 
