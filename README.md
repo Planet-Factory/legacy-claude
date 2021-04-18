@@ -38,4 +38,4 @@ If you think you'd enjoy this videos, you can watch him [here](https://www.youtu
 CLAuDE is currently being developed on Wednesday [Twitch](https://twitch.tv/drsimonclark) streams every week! 
 
 ### Licensing
-TODO: Add LICENSE  
+[MIT License](LICENSE)  
