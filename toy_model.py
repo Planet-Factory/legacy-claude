@@ -1,6 +1,6 @@
 # CLimate Analysis using Digital Estimations (CLAuDE)
 
-import numpy as np 
+import numpy as np
 import matplotlib.pyplot as plt
 import time, sys, pickle
 import claude_low_level_library as low_level
@@ -28,11 +28,11 @@ spinup_length = 0*day 				# how long the model should only calculate radiative e
 ###
 
 smoothing = False					# you probably won't need this, but there is the option to smooth out fields using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)
-smoothing_parameter_t = 1.0			
-smoothing_parameter_u = 0.9			
-smoothing_parameter_v = 0.9			
-smoothing_parameter_w = 0.3			
-smoothing_parameter_add = 0.3		
+smoothing_parameter_t = 1.0
+smoothing_parameter_u = 0.9
+smoothing_parameter_v = 0.9
+smoothing_parameter_w = 0.3
+smoothing_parameter_add = 0.3
 
 ###
 
@@ -141,7 +141,7 @@ setup_grids = True
 if setup_grids:
 
 	grid_pad = 2
-	
+
 	pole_low_index_S = np.where(lat > pole_lower_latitude_limit)[0][0]
 	pole_high_index_S = np.where(lat > pole_higher_latitude_limit)[0][0]
 
@@ -167,7 +167,7 @@ if setup_grids:
 			polar_y_coords_S.append(-planet_radius*np.cos(lat[i]*np.pi/180.0)*np.cos(lon[j]*np.pi/180.0) )
 
 	### north pole ###
-	
+
 	pole_low_index_N  	= 	np.where(lat < -pole_lower_latitude_limit)[0][-1]
 	pole_high_index_N 	= 	np.where(lat < -pole_higher_latitude_limit)[0][-1]
 
@@ -237,7 +237,7 @@ if plot:
 		ax[1].set_title('Atmosphere temperature')
 		ax[1].set_xlim(lat.min(),lat.max())
 		ax[1].set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
-		ax[1].set_yscale('log')		
+		ax[1].set_yscale('log')
 		ax[1].set_ylabel('Pressure (hPa)')
 		ax[1].set_xlabel('Latitude')
 		cbar_ax = f.add_axes([0.85, 0.15, 0.05, 0.7])
@@ -269,13 +269,13 @@ if plot:
 
 		g, bx = plt.subplots(nplots,figsize=(9,8),sharex=True)
 		g.canvas.set_window_title('CLAuDE pressure levels')
-		for k, z in zip(range(nplots), level_plots_levels):	
+		for k, z in zip(range(nplots), level_plots_levels):
 			z += 1
 			bx[k].contourf(lon_plot, lat_plot, potential_temperature[:,:,z], cmap='seismic')
 			bx[k].set_title(str(pressure_levels[z]/100)+' hPa')
 			bx[k].set_ylabel('Latitude')
 		bx[-1].set_xlabel('Longitude')
-	
+
 	plt.ion()
 	plt.show()
 	plt.pause(2)
@@ -285,10 +285,10 @@ if plot:
 		ax[1].cla()
 		if level_plots:
 			for k in range(nplots):
-				bx[k].cla()		
+				bx[k].cla()
 	else:
 		ax[0,0].cla()
-		ax[0,1].cla()	
+		ax[0,1].cla()
 		ax[1,0].cla()
 		ax[1,1].cla()
 
@@ -298,14 +298,14 @@ if above:
 	plt.show()
 
 def plotting_routine():
-	
+
 	quiver_padding = int(12/resolution)
 
 	if plot:
 		if verbose:	before_plot = time.time()
 		# update plot
 		if not diagnostic:
-			
+
 			# field = temperature_world
 			field = np.copy(w)[:,:,sample_level]
 			# field = np.copy(atmosp_addition)[:,:,sample_level]
@@ -337,7 +337,7 @@ def plotting_routine():
 			f.colorbar(test, cax=cbar_ax)
 			cbar_ax.set_title('Temperature (K)')
 			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
-				
+
 		else:
 			ax[0,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], cmap='seismic')
 			ax[0,0].set_title('u')
@@ -353,14 +353,14 @@ def plotting_routine():
 			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
 
 		if level_plots:
-			for k, z in zip(range(nplots), level_plots_levels):	
+			for k, z in zip(range(nplots), level_plots_levels):
 				z += 1
 				bx[k].contourf(lon_plot, lat_plot, potential_temperature[:,:,z], cmap='seismic',levels=15)
 				bx[k].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,z], v[::quiver_padding,::quiver_padding,z], color='white')
 				bx[k].set_title(str(round(pressure_levels[z]/100))+' hPa')
 				bx[k].set_ylabel('Latitude')
 				bx[k].set_xlim((lon.min(),lon.max()))
-				bx[k].set_ylim((lat.min(),lat.max()))				
+				bx[k].set_ylim((lat.min(),lat.max()))
 			bx[-1].set_xlabel('Longitude')
 
 	if above and velocity:
@@ -372,7 +372,7 @@ def plotting_routine():
 		if pole == 's':
 			gx[0].set_title('temperature')
 			gx[0].contourf(lon,lat[:pole_low_index_S],potential_temperature[:pole_low_index_S,:,above_level])
-			
+
 			gx[1].set_title('polar_plane_advect')
 			polar_temps = low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S)
 			output = low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,w[:pole_low_index_S,:,above_level],grids[1],grid_lat_coords_S,grid_lon_coords_S)
@@ -380,7 +380,7 @@ def plotting_routine():
 			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,output)
 			gx[1].contour(grid_x_values_S/1E3,grid_y_values_S/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
 			gx[1].quiver(grid_x_values_S/1E3,grid_y_values_S/1E3,x_dot_S[:,:,above_level],y_dot_S[:,:,above_level])
-			
+
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
 
@@ -391,7 +391,7 @@ def plotting_routine():
 		else:
 			gx[0].set_title('temperature')
 			gx[0].contourf(lon,lat[pole_low_index_N:],potential_temperature[pole_low_index_N:,:,above_level])
-			
+
 			gx[1].set_title('polar_plane_advect')
 			polar_temps = low_level.beam_me_up(lat[pole_low_index_N:],lon,np.flip(potential_temperature[pole_low_index_N:,:,:],axis=1),grids[0],grid_lat_coords_N,grid_lon_coords_N)
 			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,atmosp_addition[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
@@ -400,15 +400,15 @@ def plotting_routine():
 			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,output)
 			gx[1].contour(grid_x_values_N/1E3,grid_y_values_N/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
 			gx[1].quiver(grid_x_values_N/1E3,grid_y_values_N/1E3,x_dot_N[:,:,above_level],y_dot_N[:,:,above_level])
-			
+
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
-	
+
 			gx[2].set_title('south_addition_smoothed')
 			# gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
 			gx[2].contourf(lon,lat[pole_low_index_N:],u[pole_low_index_N:,:,above_level])
 			gx[2].quiver(lon[::5],lat[pole_low_index_N:],u[pole_low_index_N:,::5,above_level],v[pole_low_index_N:,::5,above_level])
-		
+
 	# clear plots
 	if plot or above:	plt.pause(0.001)
 	if plot:
@@ -416,7 +416,7 @@ def plotting_routine():
 			ax[0].cla()
 			ax[1].cla()
 			cbar_ax.cla()
-					
+
 		else:
 			ax[0,0].cla()
 			ax[0,1].cla()
@@ -424,10 +424,10 @@ def plotting_routine():
 			ax[1,1].cla()
 		if level_plots:
 			for k in range(nplots):
-				bx[k].cla()	
-		if verbose:		
+				bx[k].cla()
+		if verbose:
 			time_taken = float(round(time.time() - before_plot,3))
-			print('Plotting: ',str(time_taken),'s')	
+			print('Plotting: ',str(time_taken),'s')
 	if above:
 		gx[0].cla()
 		gx[1].cla()
@@ -471,19 +471,19 @@ while True:
 	if velocity:
 
 		if verbose:	before_velocity = time.time()
-		
+
 		u_add,v_add = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,sponge_index)
 
-		if verbose:	
+		if verbose:
 			time_taken = float(round(time.time() - before_velocity,3))
 			print('Velocity: ',str(time_taken),'s')
 
 		if verbose:	before_projection = time.time()
-		
+
 		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
-	
+
 		u_add,v_add,x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.polar_planes(u,v,u_add,v_add,potential_temperature,geopotential,grid_velocities,indices,grids,coords,coriolis_plane_N,coriolis_plane_S,grid_side_length,pressure_levels,lat,lon,dt,polar_grid_resolution,gravity,sponge_index)
-		
+
 		u += u_add
 		v += v_add
 
@@ -492,8 +492,8 @@ while True:
 
 		x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.update_plane_velocities(lat,lon,pole_low_index_N,pole_low_index_S,np.flip(u[pole_low_index_N:,:,:],axis=1),np.flip(v[pole_low_index_N:,:,:],axis=1),grids,grid_lat_coords_N,grid_lon_coords_N,u[:pole_low_index_S,:,:],v[:pole_low_index_S,:,:],grid_lat_coords_S,grid_lon_coords_S)
 		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
-		
-		if verbose:	
+
+		if verbose:
 			time_taken = float(round(time.time() - before_projection,3))
 			print('Projection: ',str(time_taken),'s')
 
@@ -514,12 +514,12 @@ while True:
 		# plt.gca().invert_yaxis()
 		# plt.show()
 
-		if verbose:	
+		if verbose:
 			time_taken = float(round(time.time() - before_w,3))
 			print('Calculate w: ',str(time_taken),'s')
 
 		#################################
-		
+
 		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities)
 
 		if smoothing: atmosp_addition = top_level.smoothing_3D(atmosp_addition,smoothing_parameter_add)
@@ -546,7 +546,7 @@ while True:
 
 		###################################################################
 
-		if verbose:	
+		if verbose:
 			time_taken = float(round(time.time() - before_advection,3))
 			print('Advection: ',str(time_taken),'s')
 
