@@ -10,7 +10,7 @@ import claude_top_level_library as top_level
 ######## CONTROL ########
 
 day = 60*60*24						# define length of day (used for calculating Coriolis as well) (s)
-resolution = 3						# how many degrees between latitude and longitude gridpoints
+resolution = 5						# how many degrees between latitude and longitude gridpoints
 planet_radius = 6.4E6				# define the planet's radius (m)
 insolation = 1370					# TOA radiation from star (W m^-2)
 gravity = 9.81 						# define surface gravity for planet (m s^-2)
@@ -21,8 +21,8 @@ pressure_levels = np.array([1000,950,900,800,700,600,500,400,350,300,250,200,150
 pressure_levels *= 100
 nlevels = len(pressure_levels)
 
-dt_spinup = 60*17.2					# timestep for initial period where the model only calculates radiative effects
-dt_main = 60*7.2					# timestep for the main sequence where the model calculates velocities/advection
+dt_spinup = 60*22.2					# timestep for initial period where the model only calculates radiative effects
+dt_main = 60*12.2					# timestep for the main sequence where the model calculates velocities/advection
 spinup_length = 0*day 				# how long the model should only calculate radiative effects
 
 ###
@@ -39,8 +39,8 @@ smoothing_parameter_add = 0.3
 save = False 						# save current state to file?
 load = False  						# load initial state from file?
 
-save_frequency = 100				# write to file after this many timesteps have passed
-plot_frequency = 10					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
+save_frequency = 25					# write to file after this many timesteps have passed
+plot_frequency = 1					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
 ###
 
@@ -58,8 +58,8 @@ verbose = False						# print times taken to calculate specific processes each ti
 
 ###
 
-pole_lower_latitude_limit = -75		# how far north polar plane data is calculated from the south pole (do not set this beyond 45!) [mirrored to north pole as well]
-pole_higher_latitude_limit = -85	# how far south regular gridded data is calculated (do not set beyond about 80) [also mirrored to north pole]
+pole_lower_latitude_limit = -65		# how far north polar plane data is calculated from the south pole (do not set this beyond 45!) [mirrored to north pole as well]
+pole_higher_latitude_limit = -70	# how far south regular gridded data is calculated (do not set beyond about 80) [also mirrored to north pole]
 sponge_layer = 10					# at what pressure should the equations of motion stop being applied (to absorb upwelling atmospheric waves) [hPa]
 
 ###
@@ -104,10 +104,10 @@ if not load:
 
 initial_setup = True
 if initial_setup:
-	sigma = np.zeros_like(pressure_levels)
+	sigma = np.zeros_like(pressure_levels)								# the Exner function
 	kappa = 287/1000
 	for i in range(len(sigma)):
-		sigma[i] = 1E3*(pressure_levels[i]/pressure_levels[0])**kappa
+		sigma[i] = 1E3*(pressure_levels[i]/pressure_levels[0])**kappa	# note the 1E3 here is the heat capacity of dry air at constant pressure (accurate to 4 s.f.)
 
 	heat_capacity_earth = np.zeros_like(temperature_world) + 1E6
 
@@ -115,8 +115,8 @@ if initial_setup:
 	# heat_capacity_earth[30:40,80:90] = 1E7
 
 	albedo_variance = 0.001
-	albedo = np.random.uniform(-albedo_variance,albedo_variance, (nlat, nlon)) + 0.2
-	# albedo = np.zeros((nlat, nlon)) + 0.2
+	# albedo = np.random.uniform(-albedo_variance,albedo_variance, (nlat, nlon)) + 0.2
+	albedo = np.zeros((nlat, nlon)) + 0.2
 
 	specific_gas = 287
 	thermal_diffusivity_roc = 1.5E-6
@@ -307,8 +307,8 @@ def plotting_routine():
 		if not diagnostic:
 			
 			# field = temperature_world
-			field = np.copy(w)[:,:,sample_level]
-			# field = np.copy(atmosp_addition)[:,:,sample_level]
+			# field = np.copy(w)[:,:,sample_level]
+			field = np.copy(atmosp_addition)[:,:,sample_level]
 			test = ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
 			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
 			if velocity:	ax[0].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,sample_level], v[::quiver_padding,::quiver_padding,sample_level], color='white')
@@ -449,8 +449,9 @@ while True:
 	print('T: ',round(temperature_world.max()-273.15,1),' - ',round(temperature_world.min()-273.15,1),' C')
 	print('U: ',round(u[:,:,:sponge_index-1].max(),2),' - ',round(u[:,:,:sponge_index-1].min(),2),' V: ',round(v[:,:,:sponge_index-1].max(),2),' - ',round(v[:,:,:sponge_index-1].min(),2),' W: ',round(w[:,:,:sponge_index-1].max(),2),' - ',round(w[:,:,:sponge_index-1].min(),4))
 
-	tracer[40,50,sample_level] = 1
-	tracer[20,50,sample_level] = 1
+	# tracer[40,50,sample_level] = 1
+	# tracer[20,50,sample_level] = 1
+	tracer[18,20,sample_level] = 1
 
 	if verbose: before_radiation = time.time()
 	temperature_world, potential_temperature = top_level.radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, day, year, axial_tilt)
@@ -467,6 +468,7 @@ while True:
 	# update geopotential field
 	geopotential = np.zeros_like(potential_temperature)
 	for k in np.arange(1,nlevels):	geopotential[:,:,k] = geopotential[:,:,k-1] - potential_temperature[:,:,k]*(sigma[k]-sigma[k-1])
+	geopotential[:,:,0] = geopotential[:,:,1] - 287*low_level.theta_to_t(potential_temperature,pressure_levels)[:,:,0]/pressure_levels[0]
 
 	if velocity:
 
@@ -503,14 +505,12 @@ while True:
 		if verbose: before_w = time.time()
 		# using updated u,v fields calculated w
 		# https://www.sjsu.edu/faculty/watkins/omega.htm
-		w = -top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,indices,coords,grids,grid_velocities,polar_grid_resolution,lat,lon)
+		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,indices,coords,grids,grid_velocities,polar_grid_resolution,lat,lon)
 		if smoothing: w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
 
-		w[:,:,18:] *= 0
-		# w[:1,:,:] *= 0
-		# w[-1:,:,:] *= 0
+		# w[:,:,18:] *= 0
 
-		# plt.semilogy(w[5,25,:sponge_index],pressure_levels[:sponge_index])
+		# plt.semilogy(w[30,25,:sponge_index],pressure_levels[:sponge_index])
 		# plt.gca().invert_yaxis()
 		# plt.show()
 
@@ -520,7 +520,7 @@ while True:
 
 		#################################
 		
-		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities)
+		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities,geopotential,coriolis)
 
 		if smoothing: atmosp_addition = top_level.smoothing_3D(atmosp_addition,smoothing_parameter_add)
 
@@ -531,7 +531,7 @@ while True:
 
 		###################################################################
 
-		tracer_addition = top_level.divergence_with_scalar(tracer,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities)
+		tracer_addition = top_level.divergence_with_scalar(tracer,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities,geopotential,coriolis)
 		tracer -= dt*tracer_addition
 
 		diffusion = top_level.laplacian_3d(potential_temperature,dx,dy,pressure_levels)
@@ -542,7 +542,8 @@ while True:
 		courant = w*dt
 		for k in range(nlevels-1):
 			courant[:,:,k] /= (pressure_levels[k+1] - pressure_levels[k])
-		print('Courant max: ',round(abs(courant).max(),3))
+		courant_max_coords = np.where(abs(courant) == abs(courant).max())
+		print('Courant max: ',round(abs(courant).max(),3),' at lat = ',str(lat[courant_max_coords[0]][0]),', lon = ',str(lon[courant_max_coords[1]][0]),', pressure = ',str(pressure_levels[courant_max_coords[2]][0]/100.),'hPa')
 
 		###################################################################
 
@@ -568,4 +569,4 @@ while True:
 	time_taken = float(round(time.time() - initial_time,3))
 
 	print('Time: ',str(time_taken),'s')
-	# print('777777777777777777')
+	print('777777777777777777')

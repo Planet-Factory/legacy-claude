@@ -4,6 +4,7 @@ import claude_low_level_library as low_level
 import numpy as np
 cimport numpy as np
 cimport cython
+from scipy.interpolate import RectBivariateSpline
 
 ctypedef np.float64_t DTYPE_f
 
@@ -25,16 +26,48 @@ cpdef laplacian_3d(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_lev
 	cdef np.ndarray output = low_level.scalar_gradient_x_matrix(low_level.scalar_gradient_x_matrix(a,dx),dx) + low_level.scalar_gradient_y_matrix(low_level.scalar_gradient_y_matrix(a,dy),dy) + low_level.scalar_gradient_z_matrix_primitive(low_level.scalar_gradient_z_matrix_primitive(a, pressure_levels),pressure_levels)
 	return output
 
-cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarray w, np.ndarray dx, DTYPE_f dy, np.ndarray lat, np.ndarray lon, np.ndarray pressure_levels, DTYPE_f polar_grid_resolution, tuple indices, tuple coords, tuple grids, tuple grid_velocities):
+cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarray w, np.ndarray dx, DTYPE_f dy, np.ndarray lat, np.ndarray lon, np.ndarray pressure_levels, DTYPE_f polar_grid_resolution, tuple indices, tuple coords, tuple grids, tuple grid_velocities, np.ndarray geopotential, np.ndarray coriolis):
 	''' divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field '''
 	# https://scicomp.stackexchange.com/questions/27737/advection-equation-with-finite-difference-importance-of-forward-backward-or-ce
 
 	cdef np.ndarray output = np.zeros_like(u)
+	
 	output += (u + abs(u))*(a - np.roll(a, 1, axis=1))/dx[:, None, None] + (u - abs(u))*(np.roll(a, -1, axis=1) - a)/dx[:, None, None]
 	output += (v + abs(v))*(a - np.pad(a, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy + (v - abs(v))*(np.pad(a, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - a)/dy
+
+	output += 0.5*a*(u - np.roll(u,1,axis=1))/dx[:,None,None]
+	output += 0.5*a*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:])/dy
 	
-	output += 0.5*(w + abs(w))*(a - np.pad(a, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, ((1,0)), 'reflect', reflect_type='odd')[:-1]) 
-	output += 0.5*(w - abs(w))*(np.pad(a, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,:-1] - a)/(np.pad(pressure_levels, ((0,1)), 'reflect', reflect_type='odd')[1:] - pressure_levels)
+	# output += 0.5*(w + abs(w))*(a - np.pad(a, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, ((1,0)), 'reflect', reflect_type='odd')[:-1]) 
+	# output += 0.5*(w - abs(w))*(np.pad(a, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,:-1] - a)/(np.pad(pressure_levels, ((0,1)), 'reflect', reflect_type='odd')[1:] - pressure_levels)
+
+	################################################
+
+	# u_advection = np.zeros_like(u)
+	
+	# lon_shift_advection_plus = lon + (lon[1]-lon[0])/2 % 360
+	# lon_shift_advection_minu = lon - (lon[1]-lon[0])/2 % 360
+
+	# lat_shift_advection_plus = lat + (lat[1]-lat[0])/2
+	# lat_shift_advection_minu = lat - (lat[1]-lat[0])/2
+
+	# for k in range(len(pressure_levels)):
+	# 	geopotential_function = RectBivariateSpline(lat, lon, geopotential[:,:,k])
+	# 	u_advection[:,:,k] = (geopotential_function(lat_shift_advection_plus,lon) - geopotential_function(lat_shift_advection_minu,lon))/(dy*1E-4)
+
+	# u += 4*u_advection
+
+	# for k in range(len(pressure_levels)):
+	# 	u_function = RectBivariateSpline(lat, lon, u[:,:,k])
+	# 	u_advection[:,:,k] = u_function(lat,lon_shift_advection_minu)
+
+	# u -= 4*u_advection
+
+	# output += a*low_level.scalar_gradient_x_matrix(u,dx) 
+	# output += a*low_level.scalar_gradient_y_matrix(v,dy)
+	# output += a*low_level.scalar_gradient_z_matrix(w,pressure_levels)
+	
+	################################################
 	
 	### POLAR PLANE ADDITION ###
 
@@ -48,7 +81,7 @@ cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarra
 	w_N = low_level.beam_me_up(lat[pole_low_index_N:],lon,np.flip(w[pole_low_index_N:,:,:],axis=1),grid_length_N,grid_lat_coords_N,grid_lon_coords_N)
 	
 	# advect temperature field, isolate field to subtract from existing temperature field (CARTESIAN)
-	north_polar_plane_addition = low_level.polar_plane_advect(north_polar_plane_field,x_dot_N,y_dot_N,w_N,polar_grid_resolution)
+	north_polar_plane_addition = low_level.polar_plane_advect(north_polar_plane_field,x_dot_N,y_dot_N,w_N,polar_grid_resolution,pressure_levels)
 	
 	# project addition to temperature field onto polar grid (POLAR) [NB flip is due to north pole and definition of planar coordinates]
 	north_reprojected_addition = np.flip(low_level.beam_me_down(lon,north_polar_plane_addition,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N),axis=1)
@@ -58,7 +91,7 @@ cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarra
 	###
 	south_polar_plane_field = low_level.beam_me_up(lat[:pole_low_index_S],lon,a[:pole_low_index_S,:,:],grid_length_S,grid_lat_coords_S,grid_lon_coords_S)
 	w_S = low_level.beam_me_up(lat[:pole_low_index_S],lon,w[:pole_low_index_S,:,:],grid_length_S,grid_lat_coords_S,grid_lon_coords_S)
-	south_polar_plane_addition = low_level.polar_plane_advect(south_polar_plane_field,x_dot_S,y_dot_S,w_S,polar_grid_resolution)
+	south_polar_plane_addition = low_level.polar_plane_advect(south_polar_plane_field,x_dot_S,y_dot_S,w_S,polar_grid_resolution,pressure_levels)
 	south_reprojected_addition = low_level.beam_me_down(lon,south_polar_plane_addition,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)
 	output[:pole_low_index_S,:,:] = low_level.combine_data(pole_low_index_S,pole_high_index_S,output[:pole_low_index_S,:,:],south_reprojected_addition,lat)
 
@@ -109,16 +142,37 @@ cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_t
 
 cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt,np.int_t sponge_index):
 
-	# calculate acceleration of atmosphere using primitive equations on beta-plane
-	cpdef np.ndarray u_temp = dt*(-(u+abs(u))*(u - np.roll(u, 1, axis=1))/dx[:, None, None] - (u-abs(u))*(np.roll(u, -1, axis=1) - u)/dx[:, None, None] 
-		- (v+abs(v))*(u - np.pad(u, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v-abs(v))*(np.pad(u, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - u)/dy 
-		- 0.5*(w+abs(w))*(u - np.pad(u, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(u, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - u)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
-		+ coriolis[:, None, None]*v - low_level.scalar_gradient_x_matrix(geopotential, dx) - 1E-5*u)
+	resolution = 5.0
 
-	cpdef np.ndarray v_temp = dt*(-(u+abs(u))*(v - np.roll(v, 1, axis=1))/dx[:, None, None] - (u-abs(u))*(np.roll(v, -1, axis=1) - v)/dx[:, None, None]
+	lat = np.arange(-90,91,resolution)
+	lon = np.arange(0,360,resolution)
+
+	u_shift = np.zeros_like(u)
+	v_shift = np.zeros_like(v)
+
+	for k in range(len(pressure_levels)):
+		f_u = RectBivariateSpline(lat, lon+resolution/2, u[:,:,k])
+		u_shift[:,:,k] = f_u(lat+resolution/2,lon)
+
+		f_v = RectBivariateSpline(lat+resolution/2, lon, v[:,:,k])
+		v_shift[:,:,k] = f_v(lat,lon+resolution/2)
+
+	# calculate acceleration of atmosphere using primitive equations on beta-plane
+	cpdef np.ndarray u_temp = dt*(
+		- (u+abs(u))*(u - np.roll(u, 1, axis=1))/dx[:, None, None] - (u-abs(u))*(np.roll(u, -1, axis=1) - u)/dx[:, None, None] 
+		- (v_shift+abs(v_shift))*(u - np.pad(u, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v_shift-abs(v_shift))*(np.pad(u, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - u)/dy 
+		# - 0.5*(w+abs(w))*(u - np.pad(u, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(u, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - u)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
+		+ coriolis[:, None, None]*v_shift
+		- (np.roll(geopotential,-1,axis=1)-geopotential)/dx[:,None,None]
+		- 1E-5*u)
+
+	cpdef np.ndarray v_temp = dt*(
+		- (u_shift+abs(u_shift))*(v - np.roll(v, 1, axis=1))/dx[:, None, None] - (u_shift-abs(u_shift))*(np.roll(v, -1, axis=1) - v)/dx[:, None, None]
 		- (v+abs(v))*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v-abs(v))*(np.pad(v, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - v)/dy 
-		- 0.5*(w+abs(w))*(v - np.pad(v, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(v, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - v)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
-		- coriolis[:, None, None]*u - low_level.scalar_gradient_y_matrix(geopotential, dy) - 1E-5*v)
+		# - 0.5*(w+abs(w))*(v - np.pad(v, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(v, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - v)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
+		- coriolis[:, None, None]*u_shift 
+		- (np.pad(geopotential, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - geopotential)/dy
+		- 1E-5*v)
 	
 	# advection only in sponge layer
 	cpdef np.ndarray u_temp_sponge = dt*(-(u+abs(u))*(u - np.roll(u, 1, axis=1))/dx[:, None, None] - (u-abs(u))*(np.roll(u, -1, axis=1) - u)/dx[:, None, None] 
@@ -153,18 +207,21 @@ cpdef w_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_l
 	cdef np.ndarray flow_divergence = low_level.scalar_gradient_x_matrix(u, dx) + low_level.scalar_gradient_y_matrix(v, dy)
 	
 	for k in range(nlevels):
-		w_temp[:,:,k] = - np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
+		w_temp[:,:,k] = np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
 	
-	w_temp[-1:,:,:] = 0
-	w_temp[:1,:,:] = 0
-
-	w_temp[0,:,:] = np.mean(w[1,:,:],axis=0)
-	w_temp[-1,:,:] = np.mean(w[-2,:,:],axis=0)
-
 	# pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S = indices[:]
 	# grid_lat_coords_N,grid_lon_coords_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,grid_lat_coords_S,grid_lon_coords_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S = coords[:]
 	# grid_length_N,grid_length_S = grids[:]
 	# x_dot_N,y_dot_N,x_dot_S,y_dot_S = grid_velocities[:]
+	
+	# w_temp[:pole_low_index_S,:,:] = np.mean(w[pole_low_index_S,:,:],axis=0)[None,None,:]
+	# w_temp[pole_low_index_N:,:,:] = np.mean(w[pole_low_index_N,:,:],axis=0)[None,None,:]
+
+	w_temp[:4,:,:] = np.mean(w[4,:,:],axis=0)[None,None,:]
+	w_temp[-4:,:,:] = np.mean(w[-4,:,:],axis=0)[None,None,:]
+
+	# w_temp[0,:,:] = np.mean(w[1,:,:],axis=0)
+	# w_temp[-1,:,:] = np.mean(w[-2,:,:],axis=0)
 
 	# theta_N = low_level.beam_me_up(lat[pole_low_index_N:],lon,potential_temperature[pole_low_index_N:,:,:],grids[0],grid_lat_coords_N,grid_lon_coords_N)
 	# w_N = low_level.w_plane(x_dot_N,y_dot_N,theta_N,pressure_levels,polar_grid_resolution)
@@ -253,4 +310,4 @@ cpdef update_plane_velocities(np.ndarray lat,np.ndarray lon,np.int_t pole_low_in
 	x_dot_S,y_dot_S = low_level.upload_velocities(lat[:pole_low_index_S],lon,new_u_S,new_v_S,grids[1],grid_lat_coords_S,grid_lon_coords_S)
 	return x_dot_N,y_dot_N,x_dot_S,y_dot_S
 
-	
+		
