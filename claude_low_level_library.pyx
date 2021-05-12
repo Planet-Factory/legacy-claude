@@ -285,9 +285,6 @@ cpdef project_velocities_north(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 	cdef np.ndarray reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
 	cdef np.ndarray reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
 
-	# cdef np.ndarray reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
-	# cdef np.ndarray reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
-
 	cdef np.ndarray reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
 	cdef np.ndarray reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
@@ -302,11 +299,11 @@ cpdef project_velocities_north(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 	lat = np.arange(-90,91,resolution)[30:]
 
 	for k in range(reproj_u.shape[2]):
-			f_u = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
-			u_shift[:,:,k] = f_u(lat,lon+resolution/2)
+		f_u = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
+		u_shift[:,:,k] = f_u(lat,lon+resolution/2)
 
-			f_v = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
-			v_shift[:,:,k] = f_v(lat+resolution/2,lon)
+		f_v = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
+		v_shift[:,:,k] = f_v(lat+resolution/2,lon)
 	
 	# return u_shift, v_shift
 	return reproj_u,reproj_v

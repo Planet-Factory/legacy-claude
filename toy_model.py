@@ -218,8 +218,8 @@ if load:
 sample_level = 15
 tracer = np.zeros_like(potential_temperature)
 
-last_plot = t-0.1
-last_save = t-0.1
+last_plot = t - 0.1
+last_save = t - 0.1
 
 if plot:
 	if not diagnostic:
