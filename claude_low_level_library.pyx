@@ -205,42 +205,39 @@ cpdef combine_data(np.int_t pole_low_index,np.int_t pole_high_index,np.ndarray p
 	cdef np.int_t k,i
 
 	if lat[pole_low_index] < 0:		# SOUTH POLE
-		for k in range(output.shape[2]):
-			for i in range(pole_low_index):
-				
-				if i < pole_high_index:
-					scale_polar_data = 0.0
-					scale_reprojected_data = 1.0
-				else:
-					scale_polar_data = (i+1-pole_high_index)/overlap
-					scale_reprojected_data = 1 - (i+1-pole_high_index)/overlap
-				
-				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
+		for i in range(pole_low_index):
+			
+			if i < pole_high_index:
+				scale_polar_data = 0.0
+				scale_reprojected_data = 1.0
+			else:
+				scale_polar_data = 0#(i+1-pole_high_index)/overlap
+				scale_reprojected_data = 1.0# - (i+1-pole_high_index)/overlap
+			
+			output[i,:,:] = scale_reprojected_data*reprojected_data[i,:,:] + scale_polar_data*polar_data[i,:,:]
 	
 	else:							# NORTH POLE
 		# polar_data = np.roll(polar_data,int(polar_data.shape[1]/2),axis=1)
-		for k in range(output.shape[2]):
-			for i in range(nlat-pole_low_index):
-				
-				if i + pole_low_index + 1 > pole_high_index:
-					scale_polar_data = 0.0
-					scale_reprojected_data = 1.0
-				else:
-					scale_polar_data = 1 - i/overlap
-					scale_reprojected_data = i/overlap
+		for i in range(nlat-pole_low_index):
+			if i + pole_low_index + 1 > pole_high_index:
+				scale_polar_data = 0.0
+				scale_reprojected_data = 1.0
+			else:
+				scale_polar_data = 0#1.0 - i/overlap
+				scale_reprojected_data = 1.0#i/overlap
 
-				output[i,:,k] = scale_reprojected_data*reprojected_data[i,:,k] + scale_polar_data*polar_data[i,:,k]
+			output[i,:,:] = scale_reprojected_data*reprojected_data[i,:,:] + scale_polar_data*polar_data[i,:,:]
 	return output
 
 cpdef grid_x_gradient_matrix(np.ndarray data,DTYPE_f polar_grid_resolution):
 	cdef np.ndarray shift_east = np.pad(data, ((0,0), (1,0), (0,0)), 'reflect', reflect_type='odd')[:,:-1,:]
 	cdef np.ndarray shift_west = np.pad(data, ((0,0), (0,1), (0,0)), 'reflect', reflect_type='odd')[:,1:,:]
-	return (shift_west - shift_east) / (2 * polar_grid_resolution)
+	return (shift_west - shift_east) / (2*polar_grid_resolution)
 
 cpdef grid_y_gradient_matrix(np.ndarray data,DTYPE_f polar_grid_resolution):
 	cdef np.ndarray shift_south = np.pad(data, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:]
 	cdef np.ndarray shift_north = np.pad(data, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:]
-	return (shift_north - shift_south) / (2 * polar_grid_resolution)
+	return (shift_north - shift_south) / (2*polar_grid_resolution)
 
 cpdef grid_p_gradient_matrix(np.ndarray data, np.ndarray pressure_levels):
 	cpdef np.ndarray shift_up = np.pad(data, ((0,0), (0,0), (1,0)), 'edge')[:,:,:-1]
@@ -374,12 +371,12 @@ cpdef w_plane(np.ndarray x_dot,np.ndarray y_dot,np.ndarray temperature,np.ndarra
 	''' calculates vertical velocity omega on a given cartesian polar plane'''
 
 	cdef np.ndarray w_temp = np.zeros_like(x_dot)
-	cdef np.int_t k
-	temperature = theta_to_t(temperature,pressure_levels)
+	# cdef np.int_t k
+	# temperature = theta_to_t(temperature,pressure_levels)
 
-	cdef np.ndarray flow_divergence = grid_x_gradient_matrix(x_dot, polar_grid_resolution) + grid_y_gradient_matrix(y_dot, polar_grid_resolution)
+	# cdef np.ndarray flow_divergence = grid_x_gradient_matrix(x_dot, polar_grid_resolution) + grid_y_gradient_matrix(y_dot, polar_grid_resolution)
 	
-	for k in np.arange(1,len(pressure_levels)).tolist():
-		w_temp[:,:,k] = - np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
+	# for k in np.arange(1,len(pressure_levels)).tolist():
+	# 	w_temp[:,:,k] = - np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
 	
 	return w_temp

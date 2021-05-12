@@ -59,7 +59,7 @@ verbose = False						# print times taken to calculate specific processes each ti
 ###
 
 pole_lower_latitude_limit = -65		# how far north polar plane data is calculated from the south pole (do not set this beyond 45!) [mirrored to north pole as well]
-pole_higher_latitude_limit = -70	# how far south regular gridded data is calculated (do not set beyond about 80) [also mirrored to north pole]
+pole_higher_latitude_limit = -75	# how far south regular gridded data is calculated (do not set beyond about 80) [also mirrored to north pole]
 sponge_layer = 10					# at what pressure should the equations of motion stop being applied (to absorb upwelling atmospheric waves) [hPa]
 
 ###
@@ -387,7 +387,7 @@ def plotting_routine():
 			gx[2].set_title('south_addition_smoothed')
 			# gx[2].contourf(lon,lat[:pole_low_index_S],south_addition_smoothed[:pole_low_index_S,:,above_level])
 			gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
-			gx[2].quiver(lon[::5],lat[:pole_low_index_S],u[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
+			gx[2].quiver(lon[::5],lat[:pole_low_index_S],atmosp_addition[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
 		else:
 			gx[0].set_title('temperature')
 			gx[0].contourf(lon,lat[pole_low_index_N:],potential_temperature[pole_low_index_N:,:,above_level])
@@ -406,7 +406,7 @@ def plotting_routine():
 	
 			gx[2].set_title('south_addition_smoothed')
 			# gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
-			gx[2].contourf(lon,lat[pole_low_index_N:],u[pole_low_index_N:,:,above_level])
+			gx[2].contourf(lon,lat[pole_low_index_N:],atmosp_addition[pole_low_index_N:,:,above_level])
 			gx[2].quiver(lon[::5],lat[pole_low_index_N:],u[pole_low_index_N:,::5,above_level],v[pole_low_index_N:,::5,above_level])
 		
 	# clear plots
@@ -492,7 +492,7 @@ while True:
 		if smoothing: u = top_level.smoothing_3D(u,smoothing_parameter_u)
 		if smoothing: v = top_level.smoothing_3D(v,smoothing_parameter_v)
 
-		x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.update_plane_velocities(lat,lon,pole_low_index_N,pole_low_index_S,np.flip(u[pole_low_index_N:,:,:],axis=1),np.flip(v[pole_low_index_N:,:,:],axis=1),grids,grid_lat_coords_N,grid_lon_coords_N,u[:pole_low_index_S,:,:],v[:pole_low_index_S,:,:],grid_lat_coords_S,grid_lon_coords_S)
+		# x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.update_plane_velocities(lat,lon,pole_low_index_N,pole_low_index_S,np.flip(u[pole_low_index_N:,:,:],axis=1),np.flip(v[pole_low_index_N:,:,:],axis=1),grids,grid_lat_coords_N,grid_lon_coords_N,u[:pole_low_index_S,:,:],v[:pole_low_index_S,:,:],grid_lat_coords_S,grid_lon_coords_S)
 		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
 		
 		if verbose:	
@@ -527,7 +527,7 @@ while True:
 		atmosp_addition[:,:,sponge_index-1] *= 0.5
 		atmosp_addition[:,:,sponge_index:] *= 0
 
-		potential_temperature -= dt*atmosp_addition
+		# potential_temperature -= dt*atmosp_addition
 
 		###################################################################
 

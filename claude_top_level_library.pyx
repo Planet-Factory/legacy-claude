@@ -163,7 +163,7 @@ cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pre
 		- (v_shift+abs(v_shift))*(u - np.pad(u, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v_shift-abs(v_shift))*(np.pad(u, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - u)/dy 
 		# - 0.5*(w+abs(w))*(u - np.pad(u, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(u, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - u)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
 		+ coriolis[:, None, None]*v_shift
-		- (np.roll(geopotential,-1,axis=1)-geopotential)/dx[:,None,None]
+		- 2*(np.roll(geopotential,-1,axis=1)-geopotential)/dx[:,None,None]
 		- 1E-5*u)
 
 	cpdef np.ndarray v_temp = dt*(
@@ -171,7 +171,7 @@ cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pre
 		- (v+abs(v))*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v-abs(v))*(np.pad(v, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - v)/dy 
 		# - 0.5*(w+abs(w))*(v - np.pad(v, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(v, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - v)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
 		- coriolis[:, None, None]*u_shift 
-		- (np.pad(geopotential, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - geopotential)/dy
+		- 2*(np.pad(geopotential, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - geopotential)/dy
 		- 1E-5*v)
 	
 	# advection only in sponge layer
@@ -201,24 +201,24 @@ cpdef w_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_l
 	cdef np.ndarray w_temp = np.zeros_like(u)
 	cdef np.ndarray temperature_atmos = low_level.theta_to_t(potential_temperature,pressure_levels) 
 	
-	cdef np.int_t nlevels, k
-	nlevels = len(pressure_levels)
+	# cdef np.int_t nlevels, k
+	# nlevels = len(pressure_levels)
 
-	cdef np.ndarray flow_divergence = low_level.scalar_gradient_x_matrix(u, dx) + low_level.scalar_gradient_y_matrix(v, dy)
+	# cdef np.ndarray flow_divergence = low_level.scalar_gradient_x_matrix(u, dx) + low_level.scalar_gradient_y_matrix(v, dy)
 	
-	for k in range(nlevels):
-		w_temp[:,:,k] = np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
+	# for k in range(nlevels):
+	# 	w_temp[:,:,k] = np.trapz(flow_divergence[:,:,k:],pressure_levels[k:])
 	
-	# pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S = indices[:]
-	# grid_lat_coords_N,grid_lon_coords_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,grid_lat_coords_S,grid_lon_coords_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S = coords[:]
-	# grid_length_N,grid_length_S = grids[:]
-	# x_dot_N,y_dot_N,x_dot_S,y_dot_S = grid_velocities[:]
+	# # pole_low_index_N,pole_high_index_N,pole_low_index_S,pole_high_index_S = indices[:]
+	# # grid_lat_coords_N,grid_lon_coords_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N,grid_lat_coords_S,grid_lon_coords_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S = coords[:]
+	# # grid_length_N,grid_length_S = grids[:]
+	# # x_dot_N,y_dot_N,x_dot_S,y_dot_S = grid_velocities[:]
 	
-	# w_temp[:pole_low_index_S,:,:] = np.mean(w[pole_low_index_S,:,:],axis=0)[None,None,:]
-	# w_temp[pole_low_index_N:,:,:] = np.mean(w[pole_low_index_N,:,:],axis=0)[None,None,:]
+	# # w_temp[:pole_low_index_S,:,:] = np.mean(w[pole_low_index_S,:,:],axis=0)[None,None,:]
+	# # w_temp[pole_low_index_N:,:,:] = np.mean(w[pole_low_index_N,:,:],axis=0)[None,None,:]
 
-	w_temp[:4,:,:] = np.mean(w[4,:,:],axis=0)[None,None,:]
-	w_temp[-4:,:,:] = np.mean(w[-4,:,:],axis=0)[None,None,:]
+	# w_temp[:4,:,:] = np.mean(w[4,:,:],axis=0)[None,None,:]
+	# w_temp[-4:,:,:] = np.mean(w[-4,:,:],axis=0)[None,None,:]
 
 	# w_temp[0,:,:] = np.mean(w[1,:,:],axis=0)
 	# w_temp[-1,:,:] = np.mean(w[-2,:,:],axis=0)
