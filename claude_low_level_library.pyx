@@ -285,6 +285,9 @@ cpdef project_velocities_north(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 	cdef np.ndarray reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)		
 	cdef np.ndarray reproj_y_dot = beam_me_down(lon,y_dot,pole_low_index_N,grid_x_values_N,grid_y_values_N,polar_x_coords_N,polar_y_coords_N)
 
+	# cdef np.ndarray reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
+	# cdef np.ndarray reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
+
 	cdef np.ndarray reproj_u = + reproj_x_dot*np.sin(lon[None,:,None]*np.pi/180) + reproj_y_dot*np.cos(lon[None,:,None]*np.pi/180)
 	cdef np.ndarray reproj_v = + reproj_x_dot*np.cos(lon[None,:,None]*np.pi/180) - reproj_y_dot*np.sin(lon[None,:,None]*np.pi/180)
 
@@ -305,7 +308,8 @@ cpdef project_velocities_north(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 			f_v = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
 			v_shift[:,:,k] = f_v(lat+resolution/2,lon)
 	
-	return u_shift, v_shift
+	# return u_shift, v_shift
+	return reproj_u,reproj_v
 
 cpdef project_velocities_south(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,np.int_t pole_low_index_S,np.int_t pole_high_index_S,np.ndarray grid_x_values_S,np.ndarray grid_y_values_S,list polar_x_coords_S,list polar_y_coords_S):
 	cdef np.ndarray reproj_x_dot = beam_me_down(lon,x_dot,pole_low_index_S,grid_x_values_S,grid_y_values_S,polar_x_coords_S,polar_y_coords_S)		
@@ -328,7 +332,8 @@ cpdef project_velocities_south(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 			f_v = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
 			v_shift[:,:,k] = f_v(lat+resolution/2,lon)
 
-	return u_shift, v_shift
+	# return u_shift, v_shift
+	return reproj_u,reproj_v
 
 cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, np.ndarray w, DTYPE_f polar_grid_resolution, np.ndarray pressure_levels):
 	
