@@ -26,7 +26,7 @@ cpdef laplacian_3d(np.ndarray a,np.ndarray dx,DTYPE_f dy,np.ndarray pressure_lev
 	cdef np.ndarray output = low_level.scalar_gradient_x_matrix(low_level.scalar_gradient_x_matrix(a,dx),dx) + low_level.scalar_gradient_y_matrix(low_level.scalar_gradient_y_matrix(a,dy),dy) + low_level.scalar_gradient_z_matrix_primitive(low_level.scalar_gradient_z_matrix_primitive(a, pressure_levels),pressure_levels)
 	return output
 
-cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarray w, np.ndarray dx, DTYPE_f dy, np.ndarray lat, np.ndarray lon, np.ndarray pressure_levels, DTYPE_f polar_grid_resolution, tuple indices, tuple coords, tuple grids, tuple grid_velocities, np.ndarray geopotential, np.ndarray coriolis):
+cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarray w, np.ndarray dx, DTYPE_f dy, np.ndarray lat, np.ndarray lon, np.ndarray pressure_levels, DTYPE_f polar_grid_resolution, tuple indices, tuple coords, tuple grids, tuple grid_velocities):
 	''' divergence of (a*u) where a is a scalar field and u is the atmospheric velocity field '''
 	# https://scicomp.stackexchange.com/questions/27737/advection-equation-with-finite-difference-importance-of-forward-backward-or-ce
 
@@ -41,32 +41,6 @@ cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarra
 	# output += 0.5*(w + abs(w))*(a - np.pad(a, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, ((1,0)), 'reflect', reflect_type='odd')[:-1]) 
 	# output += 0.5*(w - abs(w))*(np.pad(a, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,:-1] - a)/(np.pad(pressure_levels, ((0,1)), 'reflect', reflect_type='odd')[1:] - pressure_levels)
 
-	################################################
-
-	# u_advection = np.zeros_like(u)
-	
-	# lon_shift_advection_plus = lon + (lon[1]-lon[0])/2 % 360
-	# lon_shift_advection_minu = lon - (lon[1]-lon[0])/2 % 360
-
-	# lat_shift_advection_plus = lat + (lat[1]-lat[0])/2
-	# lat_shift_advection_minu = lat - (lat[1]-lat[0])/2
-
-	# for k in range(len(pressure_levels)):
-	# 	geopotential_function = RectBivariateSpline(lat, lon, geopotential[:,:,k])
-	# 	u_advection[:,:,k] = (geopotential_function(lat_shift_advection_plus,lon) - geopotential_function(lat_shift_advection_minu,lon))/(dy*1E-4)
-
-	# u += 4*u_advection
-
-	# for k in range(len(pressure_levels)):
-	# 	u_function = RectBivariateSpline(lat, lon, u[:,:,k])
-	# 	u_advection[:,:,k] = u_function(lat,lon_shift_advection_minu)
-
-	# u -= 4*u_advection
-
-	# output += a*low_level.scalar_gradient_x_matrix(u,dx) 
-	# output += a*low_level.scalar_gradient_y_matrix(v,dy)
-	# output += a*low_level.scalar_gradient_z_matrix(w,pressure_levels)
-	
 	################################################
 	
 	### POLAR PLANE ADDITION ###
@@ -140,9 +114,7 @@ cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_t
 
 	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
-cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt,np.int_t sponge_index):
-
-	resolution = 5.0
+cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt,np.int_t sponge_index, DTYPE_f resolution):
 
 	lat = np.arange(-90,91,resolution)
 	lon = np.arange(0,360,resolution)

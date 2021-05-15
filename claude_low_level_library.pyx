@@ -211,8 +211,8 @@ cpdef combine_data(np.int_t pole_low_index,np.int_t pole_high_index,np.ndarray p
 				scale_polar_data = 0.0
 				scale_reprojected_data = 1.0
 			else:
-				scale_polar_data = 0#(i+1-pole_high_index)/overlap
-				scale_reprojected_data = 1.0# - (i+1-pole_high_index)/overlap
+				scale_polar_data = (i+1-pole_high_index)/overlap
+				scale_reprojected_data = 1.0 - (i+1-pole_high_index)/overlap
 			
 			output[i,:,:] = scale_reprojected_data*reprojected_data[i,:,:] + scale_polar_data*polar_data[i,:,:]
 	
@@ -223,8 +223,8 @@ cpdef combine_data(np.int_t pole_low_index,np.int_t pole_high_index,np.ndarray p
 				scale_polar_data = 0.0
 				scale_reprojected_data = 1.0
 			else:
-				scale_polar_data = 0#1.0 - i/overlap
-				scale_reprojected_data = 1.0#i/overlap
+				scale_polar_data = 1.0 - i/overlap
+				scale_reprojected_data = i/overlap
 
 			output[i,:,:] = scale_reprojected_data*reprojected_data[i,:,:] + scale_polar_data*polar_data[i,:,:]
 	return output
@@ -294,9 +294,9 @@ cpdef project_velocities_north(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 	u_shift = np.zeros_like(reproj_u)
 	v_shift = np.zeros_like(reproj_v)
 
-	resolution = 5.0
+	resolution = lon[2] - lon[1]
 
-	lat = np.arange(-90,91,resolution)[30:]
+	lat = np.arange(-90,91,resolution)[pole_low_index_N:]
 
 	for k in range(reproj_u.shape[2]):
 		f_u = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
@@ -318,9 +318,9 @@ cpdef project_velocities_south(np.ndarray lon,np.ndarray x_dot,np.ndarray y_dot,
 	u_shift = np.zeros_like(reproj_u)
 	v_shift = np.zeros_like(reproj_v)
 
-	resolution = 5.0
+	resolution = lon[2] - lon[1]
 
-	lat = np.arange(-90,91,resolution)[:6]
+	lat = np.arange(-90,91,resolution)[:pole_low_index_S]
 
 	for k in range(reproj_u.shape[2]):
 			f_u = RectBivariateSpline(lat, lon, reproj_u[:,:,k])
