@@ -278,8 +278,8 @@ cpdef polar_planes(np.ndarray u,np.ndarray v,np.ndarray u_add,np.ndarray v_add,n
 
 cpdef update_plane_velocities(np.ndarray lat,np.ndarray lon,np.int_t pole_low_index_N,np.int_t pole_low_index_S,np.ndarray new_u_N,np.ndarray new_v_N,tuple grids,np.ndarray grid_lat_coords_N,np.ndarray grid_lon_coords_N,np.ndarray new_u_S,np.ndarray new_v_S,np.ndarray grid_lat_coords_S,np.ndarray grid_lon_coords_S):
 	''' re-project combined velocites to polar plane (prevent discontinuity at the boundary)'''
-	x_dot_N,y_dot_N = low_level.upload_velocities(lat[pole_low_index_N:],lon,new_u_N,new_v_N,grids[0],grid_lat_coords_N,grid_lon_coords_N)
-	x_dot_S,y_dot_S = low_level.upload_velocities(lat[:pole_low_index_S],lon,new_u_S,new_v_S,grids[1],grid_lat_coords_S,grid_lon_coords_S)
+	x_dot_N,y_dot_N = low_level.upload_velocities(lat[pole_low_index_N:],lon,new_u_N,new_v_N,grids[0],grid_lat_coords_N,grid_lon_coords_N,lon[2]-lon[1])
+	x_dot_S,y_dot_S = low_level.upload_velocities(lat[:pole_low_index_S],lon,new_u_S,new_v_S,grids[1],grid_lat_coords_S,grid_lon_coords_S,lon[2]-lon[1])
 	return x_dot_N,y_dot_N,x_dot_S,y_dot_S
 
 		

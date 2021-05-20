@@ -346,10 +346,10 @@ cpdef polar_plane_advect(np.ndarray data,np.ndarray x_dot,np.ndarray y_dot, np.n
 	
 	return output
 
-cpdef upload_velocities(np.ndarray lat,np.ndarray lon,np.ndarray reproj_u,np.ndarray reproj_v,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords):
+cpdef upload_velocities(np.ndarray lat,np.ndarray lon,np.ndarray reproj_u,np.ndarray reproj_v,np.int_t grid_size,np.ndarray grid_lat_coords,np.ndarray grid_lon_coords,DTYPE_f resolution):
 	
-	cdef np.ndarray grid_u = beam_me_up(lat,lon+2.5,reproj_u,grid_size,grid_lat_coords,grid_lon_coords)
-	cdef np.ndarray grid_v = beam_me_up(lat+2.5,lon,reproj_v,grid_size,grid_lat_coords,grid_lon_coords)
+	cdef np.ndarray grid_u = beam_me_up(lat,lon+resolution/2,reproj_u,grid_size,grid_lat_coords,grid_lon_coords)
+	cdef np.ndarray grid_v = beam_me_up(lat+resolution/2,lon,reproj_v,grid_size,grid_lat_coords,grid_lon_coords)
 
 	cdef np.int_t nlevels = reproj_u.shape[2]
 
