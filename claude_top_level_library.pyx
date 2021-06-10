@@ -32,11 +32,11 @@ cpdef divergence_with_scalar(np.ndarray a, np.ndarray u, np.ndarray v, np.ndarra
 
 	cdef np.ndarray output = np.zeros_like(u)
 	
-	output += (u + abs(u))*(a - np.roll(a, 1, axis=1))/dx[:, None, None] + (u - abs(u))*(np.roll(a, -1, axis=1) - a)/dx[:, None, None]
-	output += (v + abs(v))*(a - np.pad(a, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy + (v - abs(v))*(np.pad(a, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - a)/dy
+	output += 0.5*u*(a - np.roll(a, 1, axis=1))/dx[:, None, None]
+	output += 0.5*v*(a - np.pad(a, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy
 
-	output += 0.5*a*(u - np.roll(u,1,axis=1))/dx[:,None,None]
-	output += 0.5*a*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:])/dy
+	# output += 0.5*a*(u - np.roll(u,1,axis=1))/dx[:,None,None]
+	# output += 0.5*a*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy
 	
 	# output += 0.5*(w + abs(w))*(a - np.pad(a, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, ((1,0)), 'reflect', reflect_type='odd')[:-1]) 
 	# output += 0.5*(w - abs(w))*(np.pad(a, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,:-1] - a)/(np.pad(pressure_levels, ((0,1)), 'reflect', reflect_type='odd')[1:] - pressure_levels)
@@ -114,38 +114,48 @@ cpdef radiation_calculation(np.ndarray temperature_world, np.ndarray potential_t
 
 	return temperature_world, low_level.t_to_theta(temperature_atmos,pressure_levels)
 
-cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,DTYPE_f gravity,np.ndarray dx,DTYPE_f dy,DTYPE_f dt,np.int_t sponge_index, DTYPE_f resolution):
+cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pressure_levels,np.ndarray geopotential,np.ndarray potential_temperature,np.ndarray coriolis,np.ndarray coriolis_v,DTYPE_f gravity,np.ndarray dx,np.ndarray dx_v,DTYPE_f dy,DTYPE_f dt,np.int_t sponge_index, DTYPE_f resolution):
 
-	lat = np.arange(-90,91,resolution)
-	lon = np.arange(0,360,resolution)
+	# u_shift = np.zeros_like(u)
+	# v_shift = np.zeros_like(v)
 
-	u_shift = np.zeros_like(u)
-	v_shift = np.zeros_like(v)
+	# lat = np.arange(-90,90.0001,resolution)
+	# lon = np.arange(0,360,resolution)
 
-	for k in range(len(pressure_levels)):
-		f_u = RectBivariateSpline(lat, lon+resolution/2, u[:,:,k])
-		u_shift[:,:,k] = f_u(lat+resolution/2,lon)
+	# for k in range(len(u[0,0,:])):
 
-		f_v = RectBivariateSpline(lat+resolution/2, lon, v[:,:,k])
-		v_shift[:,:,k] = f_v(lat,lon+resolution/2)
+	# 	f_u = RectBivariateSpline(lat, lon + resolution/2 % 360, u[:,:,k],kx=2,ky=2)
+	# 	f_v = RectBivariateSpline(lat + resolution/2, lon, v[:,:,k],kx=2,ky=2)
+
+	# 	# u_shift[:,:,k] = f_u(lat,lon + resolution/2 % 360)
+	# 	# v_shift[:,:,k] = f_v(lat,lon + resolution/2 % 360)
+
+	# 	u_shift[:,:,k] = u[:,:,k]
+	# 	v_shift[:,:,k] = v[:,:,k]
+
+	u_shift = np.copy(u)
+	v_shift = np.copy(v)
+
 
 	# calculate acceleration of atmosphere using primitive equations on beta-plane
 	cpdef np.ndarray u_temp = dt*(
-		- (u+abs(u))*(u - np.roll(u, 1, axis=1))/dx[:, None, None] - (u-abs(u))*(np.roll(u, -1, axis=1) - u)/dx[:, None, None] 
-		- (v_shift+abs(v_shift))*(u - np.pad(u, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v_shift-abs(v_shift))*(np.pad(u, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - u)/dy 
+		- u*(np.roll(u, -1, axis=1) - np.roll(u, 1, axis=1))/dx[:, None, None]
+		- v_shift*(np.pad(u, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - np.pad(u, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy
 		# - 0.5*(w+abs(w))*(u - np.pad(u, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(u, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - u)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
 		+ coriolis[:, None, None]*v_shift
-		- 2*(np.roll(geopotential,-1,axis=1)-geopotential)/dx[:,None,None]
+		- 2*(geopotential - np.roll(geopotential,-1,axis=1))/dx[:,None,None]
 		- 1E-5*u)
 
 	cpdef np.ndarray v_temp = dt*(
-		- (u_shift+abs(u_shift))*(v - np.roll(v, 1, axis=1))/dx[:, None, None] - (u_shift-abs(u_shift))*(np.roll(v, -1, axis=1) - v)/dx[:, None, None]
-		- (v+abs(v))*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v-abs(v))*(np.pad(v, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - v)/dy 
+		- u_shift*(np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1))/dx_v[:, None, None]
+		- v*(np.pad(v, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy
 		# - 0.5*(w+abs(w))*(v - np.pad(v, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.5*(w-abs(w))*(np.pad(v, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - v)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
-		- coriolis[:, None, None]*u_shift 
-		- 2*(np.pad(geopotential, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - geopotential)/dy
+		- coriolis_v[:, None, None]*u_shift 
+		- 2*(geopotential - np.pad(geopotential, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy
 		- 1E-5*v)
 	
+	###
+
 	# advection only in sponge layer
 	cpdef np.ndarray u_temp_sponge = dt*(-(u+abs(u))*(u - np.roll(u, 1, axis=1))/dx[:, None, None] - (u-abs(u))*(np.roll(u, -1, axis=1) - u)/dx[:, None, None] 
 		- (v+abs(v))*(u - np.pad(u, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v-abs(v))*(np.pad(u, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - u)/dy 
@@ -155,6 +165,8 @@ cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pre
 		- (v+abs(v))*(v - np.pad(v, ((1,0), (0,0), (0,0)), 'reflect', reflect_type='odd')[:-1,:,:])/dy - (v-abs(v))*(np.pad(v, ((0,1), (0,0), (0,0)), 'reflect', reflect_type='odd')[1:,:,:] - v)/dy
 		- 0.5*(w+abs(w))*(v - np.pad(v, ((0,0), (0,0), (1,0)), 'reflect', reflect_type='odd')[:,:,:-1])/(pressure_levels - np.pad(pressure_levels, (1,0), 'reflect', reflect_type='odd')[:-1]) - 0.05*(w-abs(w))*(np.pad(v, ((0,0), (0,0), (0,1)), 'reflect', reflect_type='odd')[:,:,1:] - v)/(pressure_levels - np.pad(pressure_levels, (0,1), 'reflect', reflect_type='odd')[1:])
 		- 1E-3*v)
+
+	###
 	
 	cpdef np.ndarray u_add = np.zeros_like(u_temp)
 	cpdef np.ndarray v_add = np.zeros_like(v_temp)
@@ -162,10 +174,13 @@ cpdef velocity_calculation(np.ndarray u,np.ndarray v,np.ndarray w,np.ndarray pre
 	u_add[:,:,:sponge_index] += u_temp[:,:,:sponge_index]
 	v_add[:,:,:sponge_index] += v_temp[:,:,:sponge_index]
 	
+	u_add[:,:,sponge_index:] += u_temp_sponge[:,:,sponge_index:]
+	v_add[:,:,sponge_index:] += v_temp_sponge[:,:,sponge_index:]
+
 	###
 
-	u_add[:,:,sponge_index:] += u_temp_sponge[:,:,sponge_index:]
-	v_add[:,:,sponge_index:] += v_temp_sponge[:,:,sponge_index:]	
+	u_add[(0,-1),:,:] *= 0	
+	v_add[(0,-1),:,:] *= 0	
 
 	return u_add,v_add
 

@@ -40,13 +40,14 @@ save = False 						# save current state to file?
 load = False  						# load initial state from file?
 
 save_frequency = 25					# write to file after this many timesteps have passed
-plot_frequency = 1					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
+plot_frequency = 5					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
 ###
 
 above = False 						# display top down view of a pole? showing polar plane data and regular gridded data
 pole = 's'							# which pole to display - 'n' for north, 's' for south
 above_level = 17					# which vertical level to display over the pole
+sample_level = 15 					# which level to seed the tracer on
 
 plot = True
 diagnostic = False 					# display raw fields for diagnostic purposes
@@ -126,16 +127,22 @@ if initial_setup:
 	circle = np.pi*planet_radius**2
 	sphere = 4*np.pi*planet_radius**2
 
-	# define how far apart the gridpoints are: note that we use central difference derivatives, and so these distances are actually twice the distance between gridboxes
+	# define how far apart the gridpoints are: note that sometimes we use central difference derivatives, and so these distances are actually twice the distance between gridboxes
 	dy = circumference/nlat
 	dx = np.zeros(nlat)
+	dx_v = np.zeros_like(dx)
 	coriolis = np.zeros(nlat)	# also define the coriolis parameter here
+	coriolis_v = np.zeros(nlat)	# also define the coriolis parameter for the v field 
 	angular_speed = 2*np.pi/day
 	for i in range(nlat):
 		dx[i] = dy*np.cos(lat[i]*np.pi/180)
+		dx_v[i] = dy*np.cos((lat[i]+resolution/2)*np.pi/180)
 		coriolis[i] = angular_speed*np.sin(lat[i]*np.pi/180)
+		coriolis_v[i] = angular_speed*np.sin((lat[i]+resolution/2)*np.pi/180)
 
 	sponge_index = np.where(pressure_levels < sponge_layer*100)[0][0]
+
+	tracer = np.zeros((nlat,nlon,nlevels))
 
 setup_grids = True
 if setup_grids:
@@ -148,7 +155,7 @@ if setup_grids:
 	size_of_grid = planet_radius*np.cos(lat[pole_low_index_S]*np.pi/180.0)
 
 	# how many times does polar_grid_resolution fit into size_of_grid?
-	n_grid_divisions = int(np.ceil(size_of_grid/(2*polar_grid_resolution))) + 1
+	n_grid_divisions = int(np.ceil(size_of_grid/(2*polar_grid_resolution))) + 3
 
 	### south pole ###
 	grid_x_values_S = []
@@ -236,9 +243,6 @@ if load:
 	# load in previous save file
 	potential_temperature,temperature_world,u,v,w,x_dot_N,y_dot_N,x_dot_S,y_dot_S,t,albedo,tracer = pickle.load(open("save_file.p","rb"))
 
-sample_level = 15
-tracer = np.zeros_like(potential_temperature)
-
 last_plot = t - 0.1
 last_save = t - 0.1
 
@@ -299,7 +303,7 @@ if plot:
 	
 	plt.ion()
 	plt.show()
-	plt.pause(2)
+	plt.pause(0.1)
 
 	if not diagnostic:
 		ax[0].cla()
@@ -328,8 +332,8 @@ def plotting_routine():
 		if not diagnostic:
 			
 			# field = temperature_world
-			# field = np.copy(w)[:,:,sample_level]
 			field = np.copy(atmosp_addition)[:,:,sample_level]
+			# field = np.copy(u)[:,:,sample_level]
 			test = ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
 			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
 			if velocity:	ax[0].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,sample_level], v[::quiver_padding,::quiver_padding,sample_level], color='white')
@@ -406,7 +410,7 @@ def plotting_routine():
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
 
 			gx[2].set_title('south_addition_smoothed')
-			gx[2].contourf(lon,lat[:pole_low_index_S],atmosp_addition[:pole_low_index_S,:,above_level])
+			gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
 			gx[2].quiver(lon[::5],lat[:pole_low_index_S],u[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
 		else:
 			gx[0].set_title('temperature')
@@ -424,7 +428,7 @@ def plotting_routine():
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
 			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
 	
-			gx[2].set_title('south_addition_smoothed')
+			gx[2].set_title('north_addition_smoothed')
 			# gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
 			gx[2].contourf(lon,lat[pole_low_index_N:],atmosp_addition[pole_low_index_N:,:,above_level])
 			gx[2].quiver(lon[::5],lat[pole_low_index_N:],u[pole_low_index_N:,::5,above_level],v[pole_low_index_N:,::5,above_level])
@@ -469,8 +473,6 @@ while True:
 	print('T: ',round(temperature_world.max()-273.15,1),' - ',round(temperature_world.min()-273.15,1),' C')
 	print('U: ',round(u[:,:,:sponge_index-1].max(),2),' - ',round(u[:,:,:sponge_index-1].min(),2),' V: ',round(v[:,:,:sponge_index-1].max(),2),' - ',round(v[:,:,:sponge_index-1].min(),2),' W: ',round(w[:,:,:sponge_index-1].max(),2),' - ',round(w[:,:,:sponge_index-1].min(),4))
 
-	# tracer[40,50,sample_level] = 1
-	# tracer[20,50,sample_level] = 1
 	tracer[18,20,sample_level] = 1
 
 	if verbose: before_radiation = time.time()
@@ -494,7 +496,7 @@ while True:
 
 		if verbose:	before_velocity = time.time()
 		
-		u_add,v_add = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,sponge_index,resolution)
+		u_add,v_add = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,coriolis_v,gravity,dx,dx_v,dy,dt,sponge_index,resolution)
 
 		if verbose:	
 			time_taken = float(round(time.time() - before_velocity,3))
@@ -527,8 +529,7 @@ while True:
 		# https://www.sjsu.edu/faculty/watkins/omega.htm
 		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,indices,coords,grids,grid_velocities,polar_grid_resolution,lat,lon)
 		if smoothing: w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
-
-		# w[:,:,18:] *= 0
+		w[:,:,(sponge_index+1):] *= 0
 
 		# plt.semilogy(w[30,25,:sponge_index],pressure_levels[:sponge_index])
 		# plt.gca().invert_yaxis()
@@ -555,8 +556,8 @@ while True:
 		tracer -= dt*tracer_addition
 
 		diffusion = top_level.laplacian_3d(potential_temperature,dx,dy,pressure_levels)
-		diffusion[0,:,:] = np.mean(diffusion[1,:,:],axis=0)
-		diffusion[-1,:,:] = np.mean(diffusion[-2,:,:],axis=0)
+		diffusion[0,:,:] = np.mean(diffusion[1,:,:],axis=0)[None,:,]
+		diffusion[-1,:,:] = np.mean(diffusion[-2,:,:],axis=0)[None,:,]
 		potential_temperature -= dt*1E-4*diffusion
 
 		courant = w*dt
@@ -581,6 +582,7 @@ while True:
 			last_save = t
 
 	if np.isnan(u.max()):
+		print('NaN in u')
 		sys.exit()
 
 	# advance time by one timestep
