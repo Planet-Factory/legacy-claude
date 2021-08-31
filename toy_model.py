@@ -3,42 +3,216 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import time, sys, pickle
-import claude_low_level_library as low_level
+import claude_low_level_library as low_level # NOTE: Shouldn't have to load low level lib if it's actually low level
 import claude_top_level_library as top_level
+import configparser as cfgpsr
 # from twitch import prime_sub
 
-######## CONTROL ########
 
-day = 60*60*24						# define length of day (used for calculating Coriolis as well) (s)
-resolution = 5						# how many degrees between latitude and longitude gridpoints
-planet_radius = 6.4E6				# define the planet's radius (m)
-insolation = 1370					# TOA radiation from star (W m^-2)
-gravity = 9.81 						# define surface gravity for planet (m s^-2)
-axial_tilt = 23.5					# tilt of rotational axis w.r.t. solar plane
-year = 365*day						# length of year (s)
+######## DEV NOTES ########
+"""
+- All constants changed to CAPITALS
+- Need general variable name review + documentation
+- Break program down further into functions, especially plotting and timing
+- Timing method requires a higher level of sophistication
 
-pressure_levels = np.array([1000,950,900,800,700,600,500,400,350,300,250,200,150,100,75,50,25,10,5,2,1])
-pressure_levels *= 100
-nlevels = len(pressure_levels)
+- Looks like the cython is still the slow part of the program (as expected - it's doing all the heavy lifting). This could be optimised greatly, eg numpy functions aren't optimised by cython at all.
+"""
 
-dt_spinup = 60*52.2					# timestep for initial period where the model only calculates radiative effects
-dt_main = 60*12.2					# timestep for the main sequence where the model calculates velocities/advection
-spinup_length = 0*day 				# how long the model should only calculate radiative effects
+######## CLASSES ########
+
+# NOTE: cython does NOT like python classes - try to avoid where python objects must be fed into cython
+
+class TimeInSeconds:
+	minute = 60
+	hour = 60 * minute
+	day = 24 * hour
+	year = 365.25 * day
+	pass
+
+class SmoothingParams:
+	# DEV: probably not much point in putting this as a class, but imo nicer to group it all up
+	t = 1.0
+	u = 0.9
+	v = 0.9
+	w = 0.3
+	add = 0.3
+
+	def output(self):
+		"Prints parameters - not much use outside of debugging"
+		print("t: {0} \nu: {1} \nv: {2} \nw: {3} \nadd: {4}".format(t, u, v, w))
+	pass
+
+
+######## FUNCTIONS ########
+
+def plotting_routine():
+	# TODO: Needs breaking down into consituant functions
+
+	quiver_padding = int(12/resolution)
+
+	if plot:
+		if verbose:	before_plot = time.time()
+		# update plot
+		if not diagnostic:
+			
+			# field = temperature_world
+			field = np.copy(atmosp_addition)[:,:,sample_level]
+			# field = np.copy(u)[:,:,sample_level]
+			test = ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
+			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
+			if velocity:	ax[0].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,sample_level], v[::quiver_padding,::quiver_padding,sample_level], color='white')
+			ax[0].set_xlim((lon.min(),lon.max()))
+			ax[0].set_ylim((lat.min(),lat.max()))
+			ax[0].set_ylabel('Latitude')
+			ax[0].axhline(y=0,color='black',alpha=0.3)
+			ax[0].set_xlabel('Longitude')
+
+			###
+
+			test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
+			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic',levels=15)
+			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(potential_temperature,axis=1)), cmap='seismic',levels=15)
+			ax[1].contour(heights_plot, lat_z_plot, np.transpose(np.mean(tracer,axis=1))[:top,:], alpha=0.5, antialiased=True, levels=np.arange(0.001,1.01,0.01))
+
+			if velocity:
+				ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], colors='white',levels=20,linewidths=1,alpha=0.8)
+				ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(-10*w,axis=1))[:top,:],color='black')
+			ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
+			ax[1].set_xlim((-90,90))
+			ax[1].set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
+			ax[1].set_ylabel('Pressure (hPa)')
+			ax[1].set_xlabel('Latitude')
+			ax[1].set_yscale('log')
+			f.colorbar(test, cax=cbar_ax)
+			cbar_ax.set_title('Temperature (K)')
+			f.suptitle( 'Time ' + str(round(t/TimeInSeconds.day,2)) + ' days' )
+				
+		else:
+			ax[0,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], cmap='seismic')
+			ax[0,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:], cmap='seismic')
+			ax[1,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1))[:top,:], cmap='seismic')
+			ax[1,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic')
+
+			ax[0,0].set_title('u')
+			ax[0,1].set_title('v')
+			ax[1,0].set_title('w')
+			ax[1,1].set_title('atmosp_addition')
+
+			for axis in ax.ravel():
+				axis.set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
+				axis.set_yscale('log')
+			f.suptitle( 'Time ' + str(round(t/TimeInSeconds.day,2)) + ' days' )
+
+		if level_plots:
+			for k, z in zip(range(nplots), level_plots_levels):	
+				z += 1
+				bx[k].contourf(lon_plot, lat_plot, potential_temperature[:,:,z], cmap='seismic',levels=15)
+				bx[k].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,z], v[::quiver_padding,::quiver_padding,z], color='white')
+				bx[k].set_title(str(round(pressure_levels[z]/100))+' hPa')
+				bx[k].set_ylabel('Latitude')
+				bx[k].set_xlim((lon.min(),lon.max()))
+				bx[k].set_ylim((lat.min(),lat.max()))				
+			bx[-1].set_xlabel('Longitude')
+
+	if above and velocity:
+		gx[0].set_title('Original data')
+		gx[1].set_title('Polar plane')
+		gx[2].set_title('Reprojected data')
+		g.suptitle( 'Time ' + str(round(t/TimeInSeconds.day,2)) + ' days' )
+
+		if pole == 's':
+			gx[0].set_title('temperature')
+			gx[0].contourf(lon,lat[:pole_low_index_S],potential_temperature[:pole_low_index_S,:,above_level])
+			
+			gx[1].set_title('polar_plane_advect')
+			polar_temps = low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S)
+			output = low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,w[:pole_low_index_S,:,above_level],grids[1],grid_lat_coords_S,grid_lon_coords_S)
+
+			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,output)
+			gx[1].contour(grid_x_values_S/1E3,grid_y_values_S/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
+			gx[1].quiver(grid_x_values_S/1E3,grid_y_values_S/1E3,x_dot_S[:,:,above_level],y_dot_S[:,:,above_level])
+			
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
+
+			gx[2].set_title('south_addition_smoothed')
+			gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
+			gx[2].quiver(lon[::5],lat[:pole_low_index_S],u[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
+		else:
+			gx[0].set_title('temperature')
+			gx[0].contourf(lon,lat[pole_low_index_N:],potential_temperature[pole_low_index_N:,:,above_level])
+			
+			gx[1].set_title('polar_plane_advect')
+			polar_temps = low_level.beam_me_up(lat[pole_low_index_N:],lon,np.flip(potential_temperature[pole_low_index_N:,:,:],axis=1),grids[0],grid_lat_coords_N,grid_lon_coords_N)
+			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,atmosp_addition[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
+			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,w[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
+
+			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,output)
+			gx[1].contour(grid_x_values_N/1E3,grid_y_values_N/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
+			gx[1].quiver(grid_x_values_N/1E3,grid_y_values_N/1E3,x_dot_N[:,:,above_level],y_dot_N[:,:,above_level])
+			
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
+			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
+	
+			gx[2].set_title('north_addition_smoothed')
+			# gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
+			gx[2].contourf(lon,lat[pole_low_index_N:],atmosp_addition[pole_low_index_N:,:,above_level])
+			gx[2].quiver(lon[::5],lat[pole_low_index_N:],u[pole_low_index_N:,::5,above_level],v[pole_low_index_N:,::5,above_level])
+		
+	# clear plots
+	if plot or above:	plt.pause(0.001)
+	if plot:
+		if not diagnostic:
+			ax[0].cla()
+			ax[1].cla()
+			cbar_ax.cla()
+					
+		else:
+			ax[0,0].cla()
+			ax[0,1].cla()
+			ax[1,0].cla()
+			ax[1,1].cla()
+		if level_plots:
+			for k in range(nplots):
+				bx[k].cla()	
+		if verbose:		
+			time_taken = float(round(time.time() - before_plot,3))
+			print('Plotting: ',str(time_taken),'s')	
+	if above:
+		gx[0].cla()
+		gx[1].cla()
+		gx[2].cla()
+
+
+######## CONTROL ########	
+
+cfg = cfgpsr.ConfigParser() # setup config parsing for user-facing constants only
+cfg.read("settings.cfg")
+
+resolution = int(cfg["Planet"]["resolution"])		# how many degrees between latitude and longitude gridpoints
+planet_radius = float(cfg["Planet"]["radius"])		# define the planet's radius (m)
+insolation = float(cfg["Planet"]["insolation"])		# TOA radiation from star (W m^-2)
+gravity = float(cfg["Planet"]["gravity"])			# define surface gravity for planet (m s^-2)
+axial_tilt = float(cfg["Planet"]["axial_tilt"]) 	# tilt of rotational axis w.r.t. solar plane
 
 ###
 
-smoothing = False					# you probably won't need this, but there is the option to smooth out fields using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)
-smoothing_parameter_t = 1.0			
-smoothing_parameter_u = 0.9			
-smoothing_parameter_v = 0.9			
-smoothing_parameter_w = 0.3			
-smoothing_parameter_add = 0.3		
+pressure_levels = np.array([1000,950,900,800,700,600,500,400,350,300,250,200,150,100,75,50,25,10,5,2,1]) * 100
+nlevels = len(pressure_levels)
+
+dt_spinup = TimeInSeconds.minute * 52.2		# timestep for initial period where the model only calculates radiative effects
+dt_main = TimeInSeconds.minute * 12.2		# timestep for the main sequence where the model calculates velocities/advection
+spinup_length = TimeInSeconds.day * 0 		# how long the model should only calculate radiative effects
+
+###
+
+smoothing = False					# you probably won't need this, but there is the option to smooth out fields using FFTs (NB this slows down computation considerably and can introduce nonphysical errors)	
 
 ###
 
 save = False 						# save current state to file?
 load = False  						# load initial state from file?
-
 save_frequency = 25					# write to file after this many timesteps have passed
 plot_frequency = 5					# how many timesteps between plots (set this low if you want realtime plots, set this high to improve performance)
 
@@ -55,7 +229,7 @@ level_plots = False					# display plots of output on vertical levels?
 nplots = 3							# how many levels you want to see plots of (evenly distributed through column)
 top = 17							# top pressure level to display (i.e. trim off sponge layer)
 
-verbose = False						# print times taken to calculate specific processes each timestep
+verbose = False						# enables timing for process calculation on each timestep
 
 ###
 
@@ -73,6 +247,7 @@ nlon = len(lon)
 lon_plot, lat_plot = np.meshgrid(lon, lat)
 heights_plot, lat_z_plot = np.meshgrid(lat,pressure_levels[:top]/100)
 temperature_world = np.zeros((nlat,nlon))
+
 
 ##########################
 
@@ -105,13 +280,11 @@ if not load:
 
 initial_setup = True
 if initial_setup:
+	kappa = 287 / 1000
 	sigma = np.zeros_like(pressure_levels)								# the Exner function
-	kappa = 287/1000
-	for i in range(len(sigma)):
-		sigma[i] = 1E3*(pressure_levels[i]/pressure_levels[0])**kappa	# note the 1E3 here is the heat capacity of dry air at constant pressure (accurate to 4 s.f.)
+	sigma[:] = 1E3 * (pressure_levels[:] / pressure_levels[0])**kappa		# note the 1E3 here is the heat capacity of dry air at constant pressure (accurate to 4 s.f.)
 
 	heat_capacity_earth = np.zeros_like(temperature_world) + 1E6
-
 	# heat_capacity_earth[15:36,30:60] = 1E7
 	# heat_capacity_earth[30:40,80:90] = 1E7
 
@@ -123,22 +296,23 @@ if initial_setup:
 	thermal_diffusivity_roc = 1.5E-6
 
 	# define planet size and various geometric constants
-	circumference = 2*np.pi*planet_radius
-	circle = np.pi*planet_radius**2
-	sphere = 4*np.pi*planet_radius**2
+	circumference = 2 * np.pi * planet_radius
+	circle = np.pi * planet_radius**2
+	sphere = 4 * np.pi * planet_radius**2
 
 	# define how far apart the gridpoints are: note that sometimes we use central difference derivatives, and so these distances are actually twice the distance between gridboxes
-	dy = circumference/nlat
+	dy = circumference / nlat
 	dx = np.zeros(nlat)
 	dx_v = np.zeros_like(dx)
 	coriolis = np.zeros(nlat)	# also define the coriolis parameter here
 	coriolis_v = np.zeros(nlat)	# also define the coriolis parameter for the v field 
-	angular_speed = 2*np.pi/day
+	angular_speed = 2 * np.pi / TimeInSeconds.day
+	
 	for i in range(nlat):
-		dx[i] = dy*np.cos(lat[i]*np.pi/180)
-		dx_v[i] = dy*np.cos((lat[i]+resolution/2)*np.pi/180)
-		coriolis[i] = angular_speed*np.sin(lat[i]*np.pi/180)
-		coriolis_v[i] = angular_speed*np.sin((lat[i]+resolution/2)*np.pi/180)
+		dx[i] = dy * np.cos(lat[i] * np.pi / 180)
+		dx_v[i] = dy * np.cos((lat[i] + resolution / 2) * np.pi / 180)
+		coriolis[i] = angular_speed * np.sin(lat[i] * np.pi / 180)
+		coriolis_v[i] = angular_speed * np.sin((lat[i] + resolution / 2) * np.pi / 180)
 
 	sponge_index = np.where(pressure_levels < sponge_layer*100)[0][0]
 
@@ -246,6 +420,8 @@ if load:
 last_plot = t - 0.1
 last_save = t - 0.1
 
+# TODO: This plotting really needs tidying up, perhaps move to a plotting module
+
 if plot:
 	if not diagnostic:
 		# set up plot
@@ -268,7 +444,7 @@ if plot:
 		cbar_ax = f.add_axes([0.85, 0.15, 0.05, 0.7])
 		f.colorbar(test, cax=cbar_ax)
 		cbar_ax.set_title('Temperature (K)')
-		f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
+		f.suptitle( 'Time ' + str(round(t/TimeInSeconds.day,2)) + ' days' )
 
 	else:
 		# set up plot
@@ -285,7 +461,7 @@ if plot:
 		for axis in ax.ravel():
 			axis.set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
 			axis.set_yscale('log')
-		f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
+		f.suptitle( 'Time ' + str(round(t/TimeInSeconds.day,2)) + ' days' )
 
 	if level_plots:
 
@@ -322,141 +498,11 @@ if above:
 	plt.ion()
 	plt.show()
 
-def plotting_routine():
-	
-	quiver_padding = int(12/resolution)
 
-	if plot:
-		if verbose:	before_plot = time.time()
-		# update plot
-		if not diagnostic:
-			
-			# field = temperature_world
-			field = np.copy(atmosp_addition)[:,:,sample_level]
-			# field = np.copy(u)[:,:,sample_level]
-			test = ax[0].contourf(lon_plot, lat_plot, field, cmap='seismic',levels=15)
-			ax[0].contour(lon_plot, lat_plot, tracer[:,:,sample_level], alpha=0.5, antialiased=True, levels=np.arange(0.01,1.01,0.01))
-			if velocity:	ax[0].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,sample_level], v[::quiver_padding,::quiver_padding,sample_level], color='white')
-			ax[0].set_xlim((lon.min(),lon.max()))
-			ax[0].set_ylim((lat.min(),lat.max()))
-			ax[0].set_ylabel('Latitude')
-			ax[0].axhline(y=0,color='black',alpha=0.3)
-			ax[0].set_xlabel('Longitude')
+####### MAIN LOOP ########
 
-			###
-
-			test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(low_level.theta_to_t(potential_temperature,pressure_levels),axis=1))[:top,:], cmap='seismic',levels=15)
-			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic',levels=15)
-			# test = ax[1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(potential_temperature,axis=1)), cmap='seismic',levels=15)
-			ax[1].contour(heights_plot, lat_z_plot, np.transpose(np.mean(tracer,axis=1))[:top,:], alpha=0.5, antialiased=True, levels=np.arange(0.001,1.01,0.01))
-
-			if velocity:
-				ax[1].contour(heights_plot,lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], colors='white',levels=20,linewidths=1,alpha=0.8)
-				ax[1].quiver(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:],np.transpose(np.mean(-10*w,axis=1))[:top,:],color='black')
-			ax[1].set_title('$\it{Atmospheric} \quad \it{temperature}$')
-			ax[1].set_xlim((-90,90))
-			ax[1].set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
-			ax[1].set_ylabel('Pressure (hPa)')
-			ax[1].set_xlabel('Latitude')
-			ax[1].set_yscale('log')
-			f.colorbar(test, cax=cbar_ax)
-			cbar_ax.set_title('Temperature (K)')
-			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
-				
-		else:
-			ax[0,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(u,axis=1))[:top,:], cmap='seismic')
-			ax[0,0].set_title('u')
-			ax[0,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(v,axis=1))[:top,:], cmap='seismic')
-			ax[0,1].set_title('v')
-			ax[1,0].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(w,axis=1))[:top,:], cmap='seismic')
-			ax[1,0].set_title('w')
-			ax[1,1].contourf(heights_plot, lat_z_plot, np.transpose(np.mean(atmosp_addition,axis=1))[:top,:], cmap='seismic')
-			ax[1,1].set_title('atmosp_addition')
-			for axis in ax.ravel():
-				axis.set_ylim((pressure_levels.max()/100,pressure_levels[:top].min()/100))
-				axis.set_yscale('log')
-			f.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
-
-		if level_plots:
-			for k, z in zip(range(nplots), level_plots_levels):	
-				z += 1
-				bx[k].contourf(lon_plot, lat_plot, potential_temperature[:,:,z], cmap='seismic',levels=15)
-				bx[k].quiver(lon_plot[::quiver_padding,::quiver_padding], lat_plot[::quiver_padding,::quiver_padding], u[::quiver_padding,::quiver_padding,z], v[::quiver_padding,::quiver_padding,z], color='white')
-				bx[k].set_title(str(round(pressure_levels[z]/100))+' hPa')
-				bx[k].set_ylabel('Latitude')
-				bx[k].set_xlim((lon.min(),lon.max()))
-				bx[k].set_ylim((lat.min(),lat.max()))				
-			bx[-1].set_xlabel('Longitude')
-
-	if above and velocity:
-		gx[0].set_title('Original data')
-		gx[1].set_title('Polar plane')
-		gx[2].set_title('Reprojected data')
-		g.suptitle( 'Time ' + str(round(t/day,2)) + ' days' )
-
-		if pole == 's':
-			gx[0].set_title('temperature')
-			gx[0].contourf(lon,lat[:pole_low_index_S],potential_temperature[:pole_low_index_S,:,above_level])
-			
-			gx[1].set_title('polar_plane_advect')
-			polar_temps = low_level.beam_me_up(lat[:pole_low_index_S],lon,potential_temperature[:pole_low_index_S,:,:],grids[1],grid_lat_coords_S,grid_lon_coords_S)
-			output = low_level.beam_me_up_2D(lat[:pole_low_index_S],lon,w[:pole_low_index_S,:,above_level],grids[1],grid_lat_coords_S,grid_lon_coords_S)
-
-			gx[1].contourf(grid_x_values_S/1E3,grid_y_values_S/1E3,output)
-			gx[1].contour(grid_x_values_S/1E3,grid_y_values_S/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
-			gx[1].quiver(grid_x_values_S/1E3,grid_y_values_S/1E3,x_dot_S[:,:,above_level],y_dot_S[:,:,above_level])
-			
-			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
-			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_S]*np.pi/180.0)/1E3,color='r',fill=False))
-
-			gx[2].set_title('south_addition_smoothed')
-			gx[2].contourf(lon,lat[:pole_low_index_S],u[:pole_low_index_S,:,above_level])
-			gx[2].quiver(lon[::5],lat[:pole_low_index_S],u[:pole_low_index_S,::5,above_level],v[:pole_low_index_S,::5,above_level])
-		else:
-			gx[0].set_title('temperature')
-			gx[0].contourf(lon,lat[pole_low_index_N:],potential_temperature[pole_low_index_N:,:,above_level])
-			
-			gx[1].set_title('polar_plane_advect')
-			polar_temps = low_level.beam_me_up(lat[pole_low_index_N:],lon,np.flip(potential_temperature[pole_low_index_N:,:,:],axis=1),grids[0],grid_lat_coords_N,grid_lon_coords_N)
-			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,atmosp_addition[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
-			output = low_level.beam_me_up_2D(lat[pole_low_index_N:],lon,w[pole_low_index_N:,:,above_level],grids[0],grid_lat_coords_N,grid_lon_coords_N)
-
-			gx[1].contourf(grid_x_values_N/1E3,grid_y_values_N/1E3,output)
-			gx[1].contour(grid_x_values_N/1E3,grid_y_values_N/1E3,polar_temps[:,:,above_level],colors='white',levels=20,linewidths=1,alpha=0.8)
-			gx[1].quiver(grid_x_values_N/1E3,grid_y_values_N/1E3,x_dot_N[:,:,above_level],y_dot_N[:,:,above_level])
-			
-			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_low_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
-			gx[1].add_patch(plt.Circle((0,0),planet_radius*np.cos(lat[pole_high_index_N]*np.pi/180.0)/1E3,color='r',fill=False))
-	
-			gx[2].set_title('north_addition_smoothed')
-			# gx[2].contourf(lon,lat[pole_low_index_N:],north_addition_smoothed[:,:,above_level])
-			gx[2].contourf(lon,lat[pole_low_index_N:],atmosp_addition[pole_low_index_N:,:,above_level])
-			gx[2].quiver(lon[::5],lat[pole_low_index_N:],u[pole_low_index_N:,::5,above_level],v[pole_low_index_N:,::5,above_level])
-		
-	# clear plots
-	if plot or above:	plt.pause(0.001)
-	if plot:
-		if not diagnostic:
-			ax[0].cla()
-			ax[1].cla()
-			cbar_ax.cla()
-					
-		else:
-			ax[0,0].cla()
-			ax[0,1].cla()
-			ax[1,0].cla()
-			ax[1,1].cla()
-		if level_plots:
-			for k in range(nplots):
-				bx[k].cla()	
-		if verbose:		
-			time_taken = float(round(time.time() - before_plot,3))
-			print('Plotting: ',str(time_taken),'s')	
-	if above:
-		gx[0].cla()
-		gx[1].cla()
-		gx[2].cla()
-
+# TODO: Implement new timing system using Timer package rather than `if verbose`
+ 
 while True:
 
 	initial_time = time.time()
@@ -469,19 +515,16 @@ while True:
 		velocity = True
 
 	# print current time in simulation to command line
-	print("+++ t = " + str(round(t/day,2)) + " days +++")
+	print("+++ t = " + str(round(t/TimeInSeconds.day,2)) + " days +++")
 	print('T: ',round(temperature_world.max()-273.15,1),' - ',round(temperature_world.min()-273.15,1),' C')
 	print('U: ',round(u[:,:,:sponge_index-1].max(),2),' - ',round(u[:,:,:sponge_index-1].min(),2),' V: ',round(v[:,:,:sponge_index-1].max(),2),' - ',round(v[:,:,:sponge_index-1].min(),2),' W: ',round(w[:,:,:sponge_index-1].max(),2),' - ',round(w[:,:,:sponge_index-1].min(),4))
 
 	tracer[18,20,sample_level] = 1
 
-	if verbose: before_radiation = time.time()
-	temperature_world, potential_temperature = top_level.radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, day, year, axial_tilt)
-	if smoothing: potential_temperature = top_level.smoothing_3D(potential_temperature,smoothing_parameter_t)
-	if verbose:
-		time_taken = float(round(time.time() - before_radiation,3))
-		print('Radiation: ',str(time_taken),'s')
-
+	temperature_world, potential_temperature = top_level.radiation_calculation(temperature_world, potential_temperature, pressure_levels, heat_capacity_earth, albedo, insolation, lat, lon, t, dt, TimeInSeconds.day, TimeInSeconds.year, axial_tilt)
+	if smoothing: 
+		potential_temperature = top_level.smoothing_3D(potential_temperature,SmoothingParams.t)
+		
 	diffusion = top_level.laplacian_2d(temperature_world,dx,dy)
 	diffusion[0,:] = np.mean(diffusion[1,:],axis=0)
 	diffusion[-1,:] = np.mean(diffusion[-2,:],axis=0)
@@ -494,56 +537,42 @@ while True:
 
 	if velocity:
 
-		if verbose:	before_velocity = time.time()
-		
 		u_add,v_add = top_level.velocity_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,coriolis_v,gravity,dx,dx_v,dy,dt,sponge_index,resolution)
 
-		if verbose:	
-			time_taken = float(round(time.time() - before_velocity,3))
-			print('Velocity: ',str(time_taken),'s')
-
-		if verbose:	before_projection = time.time()
-		
 		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
 	
 		u_add,v_add,x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.polar_planes(u,v,u_add,v_add,potential_temperature,geopotential,grid_velocities,indices,grids,coords,coriolis_plane_N,coriolis_plane_S,grid_side_length,pressure_levels,lat,lon,dt,polar_grid_resolution,gravity,sponge_index)
-		
+
 		u += u_add
 		v += v_add
 
-		if smoothing: u = top_level.smoothing_3D(u,smoothing_parameter_u)
-		if smoothing: v = top_level.smoothing_3D(v,smoothing_parameter_v)
+		if smoothing: 
+			u = top_level.smoothing_3D(u,SmoothingParams.u)
+			v = top_level.smoothing_3D(v,SmoothingParams.v)
 
 		# x_dot_N,y_dot_N,x_dot_S,y_dot_S = top_level.update_plane_velocities(lat,lon,pole_low_index_N,pole_low_index_S,np.flip(u[pole_low_index_N:,:,:],axis=1),np.flip(v[pole_low_index_N:,:,:],axis=1),grids,grid_lat_coords_N,grid_lon_coords_N,u[:pole_low_index_S,:,:],v[:pole_low_index_S,:,:],grid_lat_coords_S,grid_lon_coords_S)
 		grid_velocities = (x_dot_N,y_dot_N,x_dot_S,y_dot_S)
-		
-		if verbose:	
-			time_taken = float(round(time.time() - before_projection,3))
-			print('Projection: ',str(time_taken),'s')
+
 
 		### allow for thermal advection in the atmosphere
-		if verbose:	before_advection = time.time()
 
-		if verbose: before_w = time.time()
 		# using updated u,v fields calculated w
 		# https://www.sjsu.edu/faculty/watkins/omega.htm
 		w = top_level.w_calculation(u,v,w,pressure_levels,geopotential,potential_temperature,coriolis,gravity,dx,dy,dt,indices,coords,grids,grid_velocities,polar_grid_resolution,lat,lon)
-		if smoothing: w = top_level.smoothing_3D(w,smoothing_parameter_w,0.25)
+		if smoothing: 
+			w = top_level.smoothing_3D(w,SmoothingParams.w,0.25)
 		w[:,:,(sponge_index+1):] *= 0
 
 		# plt.semilogy(w[30,25,:sponge_index],pressure_levels[:sponge_index])
 		# plt.gca().invert_yaxis()
 		# plt.show()
 
-		if verbose:	
-			time_taken = float(round(time.time() - before_w,3))
-			print('Calculate w: ',str(time_taken),'s')
-
 		#################################
 		
 		atmosp_addition = top_level.divergence_with_scalar(potential_temperature,u,v,w,dx,dy,lat,lon,pressure_levels,polar_grid_resolution,indices,coords,grids,grid_velocities)
 
-		if smoothing: atmosp_addition = top_level.smoothing_3D(atmosp_addition,smoothing_parameter_add)
+		if smoothing: 
+			atmosp_addition = top_level.smoothing_3D(atmosp_addition,SmoothingParams.add)
 
 		atmosp_addition[:,:,sponge_index-1] *= 0.5
 		atmosp_addition[:,:,sponge_index:] *= 0
@@ -568,14 +597,12 @@ while True:
 
 		###################################################################
 
-		if verbose:	
-			time_taken = float(round(time.time() - before_advection,3))
-			print('Advection: ',str(time_taken),'s')
+	# TODO: need a better way to do plotting and saving
 
 	if t-last_plot >= plot_frequency*dt:
 		plotting_routine()
 		last_plot = t
-
+	
 	if save:
 		if t-last_save >= save_frequency*dt:
 			pickle.dump((potential_temperature,temperature_world,u,v,w,x_dot_N,y_dot_N,x_dot_S,y_dot_S,t,albedo,tracer), open("save_file.p","wb"))
@@ -585,10 +612,8 @@ while True:
 		print('NaN in u')
 		sys.exit()
 
-	# advance time by one timestep
-	t += dt
+	t += dt # advance time by one timestep
 
 	time_taken = float(round(time.time() - initial_time,3))
-
 	print('Time: ',str(time_taken),'s')
 	print('777777777777777777')
