@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 # CLimate Analysis using Digital Estimations (CLAuDE)
 
 import numpy as np 
