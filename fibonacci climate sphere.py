@@ -146,7 +146,7 @@ def plotting():
 
     plt.xlim((0,2*np.pi))
     plt.ylim((0,np.pi))
-    plt.title(str(len(points)+' points'))
+    plt.title(str(len(points))+' points')
 
     plt.pause(0.01)
 
