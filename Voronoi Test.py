@@ -3,7 +3,7 @@ import scipy
 from scipy.spatial import SphericalVoronoi, geometric_slerp
 from mpl_toolkits.mplot3d import proj3d
 import numpy as np
-import math, os, sys, math
+import math, os, sys
 
 def fibonacci_sphere(samples):
 
@@ -82,6 +82,13 @@ midPoints = np.array([
     for (a, b) in zip(region, np.roll(region, 1))
 ])
 ax.scatter(midPoints[..., 0], midPoints[..., 1], midPoints[..., 2], c='k')
+
+# the length of each Voronoi edge. It's in the same order as midpoints
+vlens = np.array([
+    math.acos(np.dot(sv.vertices[a], sv.vertices[b]))
+    for region in sv.regions
+    for (a, b) in zip(region, np.roll(region, 1))
+])
 
 ax.azim = 10
 ax.elev = 40
