@@ -25,7 +25,9 @@ def fibonacci_sphere(samples):
         theta = math.acos(z)
         varphi = np.arctan2(y,x) + np.pi
 
-        if theta > 0.05*np.pi and theta < 0.95*np.pi:
+        threshold = 0.0*np.pi
+
+        if theta > threshold and theta < np.pi-threshold:
             # points.append((x, y, z))
             points.append((varphi,theta))
 
@@ -54,7 +56,7 @@ def get_v(ls):
         output.append(item.v)
     return output
 
-class pixel:
+class Pixel:
     
     def __init__(self,lon,lat):
         self.lat = lat
@@ -76,8 +78,12 @@ class pixel:
             )/self.heat_capacity
 
     def update_velocity(self,dt,temp,u,v):
-        self.u -= dt*( self.u*field_d_lon(u,self.lat,self.lon) + self.v*field_d_lat(u,self.lat,self.lon) 
-            + self.f*self.v + field_d_lon(temp,self.lat,self.lon) )
+        self.u -= dt*( 
+            self.u*field_d_lon(u,self.lat,self.lon) 
+            + self.v*field_d_lat(u,self.lat,self.lon) 
+            + self.f*self.v 
+            + field_d_lon(temp,self.lat,self.lon) 
+            )
         self.v -= dt*( self.u*field_d_lon(v,self.lat,self.lon) + self.v*field_d_lat(v,self.lat,self.lon) 
             - self.f*self.u + field_d_lat(temp,self.lat,self.lon) )
 
@@ -89,7 +95,7 @@ class pixel:
 
 #################
 
-points = fibonacci_sphere(1500)
+points = fibonacci_sphere(2500)
 lons = []
 lats = []
 for point in points:
@@ -102,9 +108,32 @@ print('Fibonacci points calculated')
 
 atmosp = []
 for point in points:
-    atmosp.append(pixel(point[0],point[1]))
+    atmosp.append(Pixel(point[0],point[1]))
 
 print('Atmosphere constructed')
+
+# fig = plt.figure()
+# ax = fig.add_subplot(projection='3d')
+
+# xs = []
+# ys = []
+# zs = []
+
+# for point in points:
+#     xs.append(np.sin(point[1])*np.sin(point[0]))
+#     ys.append(np.sin(point[1])*np.cos(point[0]))
+#     zs.append(-np.cos(point[1]))
+
+# u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+# x = 0.99*np.cos(u)*np.sin(v)
+# y = 0.99*np.sin(u)*np.sin(v)
+# z = 0.99*np.cos(v)
+# ax.plot_surface(x, y, z, color="r")
+
+# ax.scatter(xs,ys,zs)
+# plt.show()
+
+# sys.exit()
 
 #################
 
