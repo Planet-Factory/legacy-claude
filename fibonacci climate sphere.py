@@ -35,11 +35,6 @@ def fibonacci_sphere(samples):
 
 radius = 6.4E6
 
-def field_d_lat(field,lat,lon):
-    return field(lat,lon,dtheta=1)[0]/radius
-def field_d_lon(field,lat,lon):
-    return field(lat,lon,dphi=1)[0]/(radius*np.sin(lat))
-
 def get_temps(ls):
     temps = []
     for item in ls:
@@ -71,26 +66,32 @@ class Pixel:
         
         self.f = 1E-5*np.cos(self.lat)
 
-    def update_temp(self,dt,solar_constant,sun_lon):    
+    def update_temp(self,dt,solar_constant,sun_lon):
         self.temp += dt*(
             solar_constant*(1-self.albedo)*max(0,np.sin(self.lat))*max(0,np.sin(self.lon-sun_lon)) 
             - (5.67E-8)*(self.temp**4)
             )/self.heat_capacity
 
-    def update_velocity(self,dt,temp,u,v):
+    def update_velocity(self,dt,temp_d_lat,temp_d_lon,u_d_lat,u_d_lon,v_d_lat,v_d_lon):
         self.u -= dt*( 
-            self.u*field_d_lon(u,self.lat,self.lon) 
-            + self.v*field_d_lat(u,self.lat,self.lon) 
+            self.u*u_d_lon/(radius*np.sin(self.lat))
+            + self.v*u_d_lat/radius
             + self.f*self.v 
-            + field_d_lon(temp,self.lat,self.lon) 
+            + temp_d_lon/(radius*np.sin(self.lat))
             )
-        self.v -= dt*( self.u*field_d_lon(v,self.lat,self.lon) + self.v*field_d_lat(v,self.lat,self.lon) 
-            - self.f*self.u + field_d_lat(temp,self.lat,self.lon) )
+        self.v -= dt*(
+            self.u*v_d_lon/(radius*np.sin(self.lat))
+            + self.v*v_d_lat/radius
+            - self.f*self.u
+            + temp_d_lat/radius
+            )
 
-    def advect(self,dt,temp,u,v):
+    def advect(self,dt,temp_d_lat,temp_d_lon,u_d_lon,v_d_lat):
         self.temp -= dt*( 
-            self.temp*field_d_lon(u,self.lat,self.lon) + self.u*field_d_lon(temp,self.lat,self.lon) +
-            self.temp*field_d_lat(v,self.lat,self.lon) + self.v*field_d_lat(temp,self.lat,self.lon) 
+            self.temp*u_d_lon/(radius*np.sin(self.lat))
+            + self.u*temp_d_lon/(radius*np.sin(self.lat))
+            + self.temp*v_d_lat/radius
+            + self.v*temp_d_lat/radius
             )
 
 #################
@@ -190,7 +191,7 @@ def plotting():
 plotting()
 plt.ion()
 
-sun_lon = 0
+sun_lon = 0.0
 
 time = 0
 while True:
@@ -208,15 +209,24 @@ while True:
     temps = interpolate.SmoothSphereBivariateSpline(lats, lons, temps_list,s=0.5)
     us = interpolate.SmoothSphereBivariateSpline(lats, lons, u_list,s=0.5)
     vs = interpolate.SmoothSphereBivariateSpline(lats, lons, v_list,s=0.5)
+
+    # compute the derivatives with respect to latitude and longitude of the
+    # values we care about at all the points we care about.
+    temp_d_lat = temps(lats, lons, dtheta = 1, grid = False)
+    temp_d_lon = temps(lats, lons, dphi   = 1, grid = False)
+    u_d_lat    = us   (lats, lons, dtheta = 1, grid = False)
+    u_d_lon    = us   (lats, lons, dphi   = 1, grid = False)
+    v_d_lat    = vs   (lats, lons, dtheta = 1, grid = False)
+    v_d_lon    = vs   (lats, lons, dphi   = 1, grid = False)
     
     # decrease weights of points near the poles?
     # vary smoothing parameter
     # different approach for velocities?
 
-    for point in atmosp:
+    for i, point in enumerate(atmosp):
         point.update_temp(dt,1370,sun_lon)
-        point.update_velocity(dt,temps,us,vs)
-        point.advect(dt,temps,us,vs)
+        point.update_velocity(dt,temp_d_lat[i],temp_d_lon[i],u_d_lat[i],u_d_lon[i],v_d_lat[i],v_d_lon[i])
+        point.advect(dt,temp_d_lat[i],temp_d_lon[i],u_d_lon[i],v_d_lat[i])
 
     ###
 
@@ -224,5 +234,5 @@ while True:
 
     ###
 
-    sun_lon += dt*2*np.pi/day
+    sun_lon += dt*2.0*np.pi/day
     time += dt
