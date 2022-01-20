@@ -58,33 +58,33 @@ effect on the whole flow. All the symbols in \autoref{eq:x momentum} and \autore
 \end{itemize}
 
 If we then define a vector $\bar{u}$ as $(u, v, 0)$, we can rewrite both \autoref{eq:x momentum} as \autoref{eq:x momentum laplace}. Here $\nabla u$ is the gradient of $u$ in both $x$ and $y$ 
-directions. Then if we write out $\nabla u$ we get \autoref{eq:x momentum final}. Similarly, if we want to get $\delta v$ instead of $\delta u$ we rewrite \autoref{eq:y momentum} to get 
+directions. Then if we write out $\nabla u$ we get \autoref{eq:x momentum final}. Similarly, if we want to get $\partial v$ instead of $\partial u$ we rewrite \autoref{eq:y momentum} to get 
 \autoref{eq:y momentum laplace} and \autoref{eq:y momentum final}.
 
 \begin{subequations}
     \begin{equation}
         \label{eq:x momentum}
-        \frac{Du}{Dt} - fv = -\frac{1}{\rho} \frac{\delta p}{\delta x}
+        \frac{Du}{Dt} - fv = -\frac{1}{\rho} \frac{\partial p}{\partial x}
     \end{equation}
     \begin{equation}
         \label{eq:y momentum}
-        \frac{Dv}{Dt} - fu = -\frac{1}{\rho} \frac{\delta p}{\delta y}
+        \frac{Dv}{Dt} - fu = -\frac{1}{\rho} \frac{\partial p}{\partial y}
     \end{equation}
     \begin{equation}
         \label{eq:x momentum laplace}
-        \frac{\delta u}{\delta t} + \bar{u} \cdot \nabla u - fv = -\frac{1}{\rho}\frac{\delta p}{\delta x}
+        \frac{\partial u}{\partial t} + \bar{u} \cdot \nabla u - fv = -\frac{1}{\rho}\frac{\partial p}{\partial x}
     \end{equation}
     \begin{equation}
         \label{eq:y momentum laplace}
-        \frac{\delta v}{\delta t} + \bar{u} \cdot \nabla v - fu = -\frac{1}{\rho}\frac{\delta p}{\delta y}
+        \frac{\partial v}{\partial t} + \bar{u} \cdot \nabla v - fu = -\frac{1}{\rho}\frac{\partial p}{\partial y}
     \end{equation}
     \begin{equation}
         \label{eq:x momentum final}
-        \frac{\delta u}{\delta t} + u\frac{\delta u}{\delta x} + v\frac{\delta u}{\delta y} - fv = -\frac{1}{\rho}\frac{\delta p}{\delta x}
+        \frac{\partial u}{\partial t} + u\frac{\partial u}{\partial x} + v\frac{\partial u}{\partial y} - fv = -\frac{1}{\rho}\frac{\partial p}{\partial x}
     \end{equation}
     \begin{equation}
         \label{eq:y momentum final}
-        \frac{\delta v}{\delta t} + u\frac{\delta v}{\delta x} + v\frac{\delta v}{\delta y} - fu = -\frac{1}{\rho}\frac{\delta p}{\delta y}
+        \frac{\partial v}{\partial t} + u\frac{\partial v}{\partial x} + v\frac{\partial v}{\partial y} - fu = -\frac{1}{\rho}\frac{\partial p}{\partial y}
     \end{equation}
 \end{subequations}
 
@@ -197,7 +197,7 @@ height, we need the Exner function to define it. Or rather, we need that functio
 \end{subequations}
 
 Now to turn this into code we need to be careful about a few things. First we are talking about a change in geopotential height here, so defining one level of geopotential height means that it 
-is dependent on the level below it. Second this calculatoin needs potential temperature and therefore it should be passed along to the velocity calculations function. With those two things out 
+is dependent on the level below it. Second this calculation needs potential temperature and therefore it should be passed along to the velocity calculations function. With those two things out 
 of the way, we get the code as shown in \autoref{alg:geopot}. Note that \texttt{Smooth3D} refers to \autoref{alg:smooth}.
 
 \begin{algorithm}
