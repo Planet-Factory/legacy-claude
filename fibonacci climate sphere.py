@@ -1,228 +1,245 @@
+from dataclasses import dataclass
 import math, os, sys, math
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate, spatial
 from matplotlib.patches import Rectangle
 
-def fibonacci_sphere(samples):
 
-    points = []
+# Constants -------------------------------------------------------------------
 
-    index = 0
+GOLDEN_RATIO_RAD = math.pi * (3. - math.sqrt(5.))
 
-    phi = math.pi * (3. - math.sqrt(5.))  # golden angle in radians
+PLANET_RADIUS = 6.4E6
+PLANET_ALBEDO = 0.3
+HEAT_CAPACITY = 1E5
 
-    for i in range(samples):
+DAY_IN_SECONDS = 60 * 60 * 24
+YEAR_IN_SECONDS = 365.25 * DAY_IN_SECONDS
+TIMESTEP = 18 * 60
 
-        y = 1 - (i / float(samples - 1)) * 2  # y goes from 1 to -1
-        radius = math.sqrt(1 - y * y)  # radius at y
+SOLAR_CONSTANT = 1370
 
-        golden = phi * i  # golden angle increment
+PLOTTING_RESOLUTION = 75
 
-        x = math.cos(golden) * radius
-        z = math.sin(golden) * radius
+# -----------------------------------------------------------------------------
+class Planet:
+    """This should be a single instance object to contain planetary properties and operations."""
 
-        theta = math.acos(z)
-        varphi = np.arctan2(y,x) + np.pi
+    def __init__(self, num_locations: int) -> None:
+        """Generate the fibonacci sphere and constructs the atmosphere for the planet."""
+        self.num_points = num_locations
+        self._generate_fibonacci_sphere()
+        self._construct_atmosphere()
+        pass
 
-        threshold = 0.0*np.pi
+    def _generate_fibonacci_sphere(self) -> None:
+        """PRIVATE.
 
-        if theta > threshold and theta < np.pi-threshold:
-            # points.append((x, y, z))
-            points.append((varphi,theta))
+        Generates a Fibonacci sphere where the number of points is equivalent
+        to num_locations. The function provides the properties self.locations,
+        self.latitudes and self.longitudes. self.locations is a list of tuples
+        of latitudes and longitudes.
+        """
+        self.locations = []
+        self.latitudes = []
+        self.longitudes = []
 
-    return points
+        for i in range(self.num_points):
 
-radius = 6.4E6
+            y = 1 - (i / float(self.num_points - 1)) * 2  # y goes from 1 to -1
+            radius_at_y = math.sqrt(1 - y * y)
 
-def field_d_lat(field,lat,lon):
-    return field(lat,lon,dtheta=1)[0]/radius
-def field_d_lon(field,lat,lon):
-    return field(lat,lon,dphi=1)[0]/(radius*np.sin(lat))
+            golden_ang_delta = GOLDEN_RATIO_RAD * i  # golden angle increment
 
-def get_temps(ls):
-    temps = []
-    for item in ls:
-        temps.append(item.temp)
-    return temps
-def get_u(ls):
-    output = []
-    for item in ls:
-        output.append(item.u)
-    return output
-def get_v(ls):
-    output = []
-    for item in ls:
-        output.append(item.v)
-    return output
+            x = math.cos(golden_ang_delta) * radius_at_y
+            z = math.sin(golden_ang_delta) * radius_at_y
 
+            theta = math.acos(z)
+            varphi = np.arctan2(radius_at_y, x) + np.pi
+
+            threshold = 0.0*np.pi
+
+            if theta > threshold and theta < np.pi-threshold:
+                # points.append((x, y, z))
+                self.locations.append((varphi,theta))
+                self.latitudes.append(theta)
+                self.longitudes.append(varphi)
+
+        self.pixels = [Pixel(vartheta, phi) for vartheta, phi in self.locations]
+        print("Fibonacci sphere generated")
+
+        return
+
+    def _construct_atmosphere(self) -> None:
+        """PRIVATE.
+
+        Initialises a list of Pixel objects for each location.
+        """
+        self.atmosphere = [Pixel(vartheta, phi) for vartheta, phi in self.locations]
+        print("Atmosphere constructed")
+
+        return
+
+    # PUBLIC
+    def get_temperatures(self) -> list:
+        """Get a list of temperatures for all locations."""
+        self.temperatures = [pixel.temperature for pixel in self.atmosphere]
+        return self.temperatures
+
+    def get_zonal_velocities(self) -> list:
+        """Get a list of zonal velocities for all locations."""
+        self.zonal_velocities = [pixel.zonal_velocity for pixel in self.atmosphere]
+        return self.zonal_velocities
+
+    def get_merdional_velocities(self) -> list:
+        """Get a list of meridonal velocities for all locations."""
+        self.meridional_velocities = [pixel.meridional_velocity for pixel in self.atmosphere]
+        return self.meridional_velocities
+
+    def update(self, sun_lon: float):
+        """Use to update the planet via an interation. Currently updates temperate, velocity and advects."""
+        for location in self.atmosphere.locations:
+            location.update_temp(sun_lon)
+            location.update_velocity()
+            location.advect()
+
+@dataclass
 class Pixel:
+    """Contains all location-specific properties and operations."""
+
+    latitude: float
+    longitude: float
+    temperature: float
+    zonal_velocity: float
+    meridional_velocity: float
+    coreolis_force: float
     
-    def __init__(self,lon,lat):
-        self.lat = lat
-        self.lon = lon 
-        self.temp = 270 + 20*np.sin(self.lat)
+    def __init__(self, longitude, latitude):
+        """Set initial property values for: latitude, longitude, temperature, zonal velocity, meridional velocity and coreolis force."""
+        self.latitude = latitude
+        self.longitude = longitude 
+        self.temperature = 270 + 20 * np.sin(self.latitude)
 
-        self.u = 0
-        self.v = 0
-
-        self.heat_capacity = 1E5
-        self.albedo = 0.3
+        self.zonal_velocity = 0
+        self.meridional_velocity = 0
         
-        self.f = 1E-5*np.cos(self.lat)
+        self.coreolis_force = 1E-5 * np.cos(self.latitude)
 
-    def update_temp(self,dt,solar_constant,sun_lon):    
-        self.temp += dt*(
-            solar_constant*(1-self.albedo)*max(0,np.sin(self.lat))*max(0,np.sin(self.lon-sun_lon)) 
-            - (5.67E-8)*(self.temp**4)
-            )/self.heat_capacity
+    def update_temp(self, sun_lon):
+        """Perform an operation to update the temperate based on calculation <REF DOCS>."""
+        self.temperature += TIMESTEP * (
+            SOLAR_CONSTANT * (1-PLANET_ALBEDO) * max(0,np.sin(self.latitude)) * max(0,np.sin(self.longitude-sun_lon)) 
+            - (5.67E-8) * (self.temperature ** 4)
+            ) / HEAT_CAPACITY
 
-    def update_velocity(self,dt,temp,u,v):
-        self.u -= dt*( 
-            self.u*field_d_lon(u,self.lat,self.lon) 
-            + self.v*field_d_lat(u,self.lat,self.lon) 
-            + self.f*self.v 
-            + field_d_lon(temp,self.lat,self.lon) 
+    def update_velocity(self):
+        """Perform an operation to update the zonal and meridional velocities based on calculation <REF DOCS>."""
+        self.zonal_velocity -= TIMESTEP * ( 
+            self.zonal_velocity * self._field_d_lon(self.zonal_velocity) 
+            + self.meridional_velocity * self._field_d_lat(self.zonal_velocity) 
+            + self.coreolis_force * self.meridional_velocity 
+            + self._field_d_lon(self.temperature) 
             )
-        self.v -= dt*( self.u*field_d_lon(v,self.lat,self.lon) + self.v*field_d_lat(v,self.lat,self.lon) 
-            - self.f*self.u + field_d_lat(temp,self.lat,self.lon) )
-
-    def advect(self,dt,temp,u,v):
-        self.temp -= dt*( 
-            self.temp*field_d_lon(u,self.lat,self.lon) + self.u*field_d_lon(temp,self.lat,self.lon) +
-            self.temp*field_d_lat(v,self.lat,self.lon) + self.v*field_d_lat(temp,self.lat,self.lon) 
+        self.meridional_velocity -= TIMESTEP * (
+            self.zonal_velocity * self._field_d_lon(self.meridional_velocity) 
+            + self.meridional_velocity * self._field_d_lat(self.meridional_velocity) 
+            - self.coreolis_force * self.zonal_velocity 
+            + self._field_d_lat(self.temperature) 
             )
 
-#################
+    def advect(self):
+        """Perform an operation to calculate advection effects based on calculation <REF DOCS>."""
+        self.temperature -= TIMESTEP*( 
+            self.temperature * self._field_d_lon(self.zonal_velocity) 
+            + self.zonal_velocity * self._field_d_lon(self.temperature)
+            + self.temperature * self._field_d_lat(self.meridional_velocity) 
+            + self.meridional_velocity * self._field_d_lat(self.temperature) 
+            )
 
-points = fibonacci_sphere(2500)
-lons = []
-lats = []
-for point in points:
-    lons.append(point[0])
-    lats.append(point[1])
-
-print('Fibonacci points calculated')
-
-#################
-
-atmosp = []
-for point in points:
-    atmosp.append(Pixel(point[0],point[1]))
-
-print('Atmosphere constructed')
-
-# fig = plt.figure()
-# ax = fig.add_subplot(projection='3d')
-
-# xs = []
-# ys = []
-# zs = []
-
-# for point in points:
-#     xs.append(np.sin(point[1])*np.sin(point[0]))
-#     ys.append(np.sin(point[1])*np.cos(point[0]))
-#     zs.append(-np.cos(point[1]))
-
-# u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-# x = 0.99*np.cos(u)*np.sin(v)
-# y = 0.99*np.sin(u)*np.sin(v)
-# z = 0.99*np.cos(v)
-# ax.plot_surface(x, y, z, color="r")
-
-# ax.scatter(xs,ys,zs)
-# plt.show()
-
-# sys.exit()
-
-#################
-
-res = 75
-
-dt = 18*60
-day = 60*60*24
-year = 365.25*day
-
-lons_grid = np.linspace(0,2*np.pi,2*res)
-lats_grid = np.linspace(0,np.pi,res)
-lons_grid_gridded,lats_grid_gridded = np.meshgrid(lons_grid,lats_grid)
-
-#################
-
-temps_list = get_temps(atmosp)
-u_list = get_u(atmosp)
-v_list = get_v(atmosp)
-
-temps = interpolate.SmoothSphereBivariateSpline(lats, lons, temps_list, s=4)
-us = interpolate.SmoothSphereBivariateSpline(lats, lons, u_list, s=4)
-vs = interpolate.SmoothSphereBivariateSpline(lats, lons, v_list, s=4)
-
-def plotting():
-
-    temps_list = get_temps(atmosp)
-    u_list = get_u(atmosp)
-    v_list = get_v(atmosp)
-
-    atmosp_temp = temps(lats_grid,lons_grid)
-    U = us(lats_grid,lons_grid)
-    V = vs(lats_grid,lons_grid)
-
-    quiver_resample = 4
-    plt.pcolormesh(lons_grid_gridded,lats_grid_gridded,atmosp_temp)
-    plt.gca().add_patch(Rectangle((0,0),2*np.pi,np.pi,linewidth=1,edgecolor='w',facecolor='none'))
-    plt.quiver(lons_grid_gridded[::quiver_resample,::quiver_resample],lats_grid_gridded[::quiver_resample,::quiver_resample],U[::quiver_resample,::quiver_resample],V[::quiver_resample,::quiver_resample])
-    plt.scatter(lons,lats,s=0.5,color='black')
-
-    plt.xlim((0,2*np.pi))
-    plt.ylim((0,np.pi))
-    plt.title(str(len(points))+' points')
-
-    plt.pause(0.01)
-
-    print('T: ',round(atmosp_temp.max()-273.15,1),' - ',round(atmosp_temp.min()-273.15,1),' C')
-    print('U: ',round(U.max(),2),' - ',round(U.min(),2),' V: ',round(V.max(),2),' - ',round(V.min(),2))
+    # PRIVATE
+    def _field_d_lat(self, interpolated_field: interpolate.SmoothSphereBivariateSpline):
+        """Do something stupid with an interpolated field for a proxy some shit idk."""
+        return interpolated_field(self.latitude, self.longitude, dphi=1)[0] / PLANET_RADIUS
     
-    if np.isinf(atmosp_temp.max()):
-        sys.exit()
-    if np.isnan(U.max()):
-        sys.exit()
+    def _field_d_lon(self, interpolated_field: interpolate.SmoothSphereBivariateSpline):
+        """Do something stupid with an interpolated field for a proxy some shit idk."""
+        return interpolated_field(self.latitude, self.longitude, dphi=1)[0] / (PLANET_RADIUS * np.sin(self.latitude))
 
-plotting()
-plt.ion()
+class Plotter:
+    """Public class to use as an object-oriented way to plot on each iteration and initialise the plot."""
 
-sun_lon = 0
+    def __init__(self, num_points: int) -> None:
+        """Initialise the plot and sets x and y limits, and generates the numpy grids used in plotting."""
+        plt.ion()
+        plt.xlim((0,2*np.pi))
+        plt.ylim((0,np.pi))
+        plt.title(str(num_points)+' points')
 
-time = 0
-while True:
+        self.lons_grid = np.linspace(0, 2*np.pi, 2*PLOTTING_RESOLUTION)
+        self.lats_grid = np.linspace(0, np.pi, PLOTTING_RESOLUTION)
+        self.lons_grid_gridded, self.lats_grid_gridded = np.meshgrid(self.lons_grid, self.lats_grid)
+        return
 
-    print('TIME: ',str(time/day).zfill(2), "days")
+    def _interpolate(self, planet: Planet):
+        """Private method to interpolate the temperature and velocity fields using Smooth Sphere Bivariate Spline."""
+        interpolated_temperatures = interpolate.SmoothSphereBivariateSpline(planet.latitudes, planet.longitudes, planet.get_temperatures(), s=4)
+        interpolated_zonal_velocities = interpolate.SmoothSphereBivariateSpline(planet.latitudes, planet.longitudes, planet.get_zonal_velocities(), s=4)
+        interpolated_merdional_velocities = interpolate.SmoothSphereBivariateSpline(planet.latitudes, planet.longitudes, planet.get_merdional_velocities(), s=4)
 
-    plt.cla()
+        interpolated_temperatures = interpolated_temperatures(self.lats_grid, self.lons_grid)
+        interpolated_zonal_velocities = interpolated_zonal_velocities(self.lats_grid, self.lons_grid)
+        interpolated_merdional_velocities = interpolated_merdional_velocities(self.lats_grid, self.lons_grid)
 
-    ###
+        return interpolated_temperatures, interpolated_zonal_velocities, interpolated_merdional_velocities
 
-    temps_list = get_temps(atmosp)
-    u_list = get_u(atmosp)
-    v_list = get_v(atmosp)
+    def plot(self, planet: Planet) -> None:
+        """Call after updating planet to plot the most up-to-date data."""
+        plt.cla()
 
-    temps = interpolate.SmoothSphereBivariateSpline(lats, lons, temps_list,s=0.5)
-    us = interpolate.SmoothSphereBivariateSpline(lats, lons, u_list,s=0.5)
-    vs = interpolate.SmoothSphereBivariateSpline(lats, lons, v_list,s=0.5)
-    
-    # decrease weights of points near the poles?
-    # vary smoothing parameter
-    # different approach for velocities?
+        temperatures, zonal_velocities, merdional_velocities = self._interpolate(planet)
+        
+        quiver_resample = 4
+        plt.pcolormesh(self.lons_grid_gridded, self.lats_grid_gridded, temperatures)
+        plt.gca().add_patch(Rectangle((0,0), 2*np.pi, np.pi, linewidth=1, edgecolor='w', facecolor='none'))
+        plt.quiver(
+            self.lons_grid_gridded[::quiver_resample,::quiver_resample],
+            self.lats_grid_gridded[::quiver_resample,::quiver_resample], 
+            zonal_velocities[::quiver_resample,::quiver_resample], 
+            merdional_velocities[::quiver_resample,::quiver_resample]
+        )
+        plt.scatter(planet.longitudes, planet.latitudes, s=0.5, color='black')
+        
+        plt.pause(0.01)
 
-    for point in atmosp:
-        point.update_temp(dt,1370,sun_lon)
-        point.update_velocity(dt,temps,us,vs)
-        point.advect(dt,temps,us,vs)
+        print('T: ',round(temperatures.max()-273.15,1),' - ',round(temperatures.min()-273.15,1),' C')
+        print('zonal_velocity: ',round(zonal_velocities.max(),2),' - ',round(zonal_velocities.min(),2),' meridional_velocity: ',round(merdional_velocities.max(),2),' - ',round(merdional_velocities.min(),2))
+        
+        if np.isinf(temperatures.max()):
+            sys.exit()
+        if np.isnan(zonal_velocities.max()):
+            sys.exit()
 
-    ###
+        return
 
-    plotting()
+    def clear(self) -> None:
+        
 
-    ###
+if __name__ == "__main__":
+    # NOTE THIS DOES NOT FUNCTION PROPERLY - MORE IS AN EXAMPLE OF STYLE
 
-    sun_lon += dt*2*np.pi/day
-    time += dt
+    planet = Planet(2500)
+
+    plotter = Plotter()
+    plotter.plot(planet)
+
+    sun_lon = 0
+    time = 0
+    while True:
+        print('TIME: ',str(time/DAY_IN_SECONDS).zfill(2), "days")
+
+        planet.update(sun_lon)
+        plotter.plot(planet)
+
+        sun_lon += TIMESTEP * 2 * np.pi / DAY_IN_SECONDS
+        time += TIMESTEP
