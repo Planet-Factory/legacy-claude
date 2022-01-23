@@ -85,25 +85,29 @@ class Planet:
     def get_temperatures(self) -> list:
         """Get a list of temperatures for all locations."""
         self.temperatures = [pixel.temperature for pixel in self.atmosphere]
+        
         return self.temperatures
 
     def get_zonal_velocities(self) -> list:
         """Get a list of zonal velocities for all locations."""
         self.zonal_velocities = [pixel.zonal_velocity for pixel in self.atmosphere]
+        
         return self.zonal_velocities
 
     def get_merdional_velocities(self) -> list:
         """Get a list of meridonal velocities for all locations."""
         self.meridional_velocities = [pixel.meridional_velocity for pixel in self.atmosphere]
+        
         return self.meridional_velocities
 
     def update(self, sun_lon: float):
-        """Use to update the planet via an interation. Currently updates temperate, velocity and advects."""
+        """Use to update the planet via an iteration. Currently updates temperate, velocity and advects."""
         for location in self.atmosphere.locations:
             location.update_temp(sun_lon)
             location.update_velocity()
             location.advect()
-
+        
+        return
 @dataclass
 class Pixel:
     """Contains all location-specific properties and operations."""
@@ -115,7 +119,7 @@ class Pixel:
     meridional_velocity: float
     coreolis_force: float
     
-    def __init__(self, longitude, latitude):
+    def __init__(self, longitude: float, latitude: float) -> None:
         """Set initial property values for: latitude, longitude, temperature, zonal velocity, meridional velocity and coreolis force."""
         self.latitude = latitude
         self.longitude = longitude 
@@ -123,17 +127,20 @@ class Pixel:
 
         self.zonal_velocity = 0
         self.meridional_velocity = 0
-        
         self.coreolis_force = 1E-5 * np.cos(self.latitude)
+        
+        return
 
-    def update_temp(self, sun_lon):
+    def update_temp(self, sun_lon: float) -> None:
         """Perform an operation to update the temperate based on calculation <REF DOCS>."""
         self.temperature += TIMESTEP * (
             SOLAR_CONSTANT * (1-PLANET_ALBEDO) * max(0,np.sin(self.latitude)) * max(0,np.sin(self.longitude-sun_lon)) 
             - (5.67E-8) * (self.temperature ** 4)
             ) / HEAT_CAPACITY
+       
+        return
 
-    def update_velocity(self):
+    def update_velocity(self) -> None:
         """Perform an operation to update the zonal and meridional velocities based on calculation <REF DOCS>."""
         self.zonal_velocity -= TIMESTEP * ( 
             self.zonal_velocity * self._field_d_lon(self.zonal_velocity) 
@@ -147,8 +154,10 @@ class Pixel:
             - self.coreolis_force * self.zonal_velocity 
             + self._field_d_lat(self.temperature) 
             )
+        
+        return
 
-    def advect(self):
+    def advect(self) -> None:
         """Perform an operation to calculate advection effects based on calculation <REF DOCS>."""
         self.temperature -= TIMESTEP*( 
             self.temperature * self._field_d_lon(self.zonal_velocity) 
@@ -156,14 +165,22 @@ class Pixel:
             + self.temperature * self._field_d_lat(self.meridional_velocity) 
             + self.meridional_velocity * self._field_d_lat(self.temperature) 
             )
+        
+        return
 
     # PRIVATE
-    def _field_d_lat(self, interpolated_field: interpolate.SmoothSphereBivariateSpline):
-        """Do something stupid with an interpolated field for a proxy some shit idk."""
+    def _field_d_lat(self, interpolated_field: interpolate.SmoothSphereBivariateSpline) -> np.ndarray:
+        """PRIVATE.
+
+        Do something stupid with an interpolated field for a proxy some shit idk.
+        """
         return interpolated_field(self.latitude, self.longitude, dphi=1)[0] / PLANET_RADIUS
     
-    def _field_d_lon(self, interpolated_field: interpolate.SmoothSphereBivariateSpline):
-        """Do something stupid with an interpolated field for a proxy some shit idk."""
+    def _field_d_lon(self, interpolated_field: interpolate.SmoothSphereBivariateSpline) -> np.ndarray:
+        """PRIVATE.
+
+        Do something stupid with an interpolated field for a proxy some shit idk.
+        """
         return interpolated_field(self.latitude, self.longitude, dphi=1)[0] / (PLANET_RADIUS * np.sin(self.latitude))
 
 class Plotter:
@@ -179,9 +196,10 @@ class Plotter:
         self.lons_grid = np.linspace(0, 2*np.pi, 2*PLOTTING_RESOLUTION)
         self.lats_grid = np.linspace(0, np.pi, PLOTTING_RESOLUTION)
         self.lons_grid_gridded, self.lats_grid_gridded = np.meshgrid(self.lons_grid, self.lats_grid)
+        
         return
 
-    def _interpolate(self, planet: Planet):
+    def _interpolate(self, planet: Planet) -> np.ndarray:
         """Private method to interpolate the temperature and velocity fields using Smooth Sphere Bivariate Spline."""
         interpolated_temperatures = interpolate.SmoothSphereBivariateSpline(planet.latitudes, planet.longitudes, planet.get_temperatures(), s=4)
         interpolated_zonal_velocities = interpolate.SmoothSphereBivariateSpline(planet.latitudes, planet.longitudes, planet.get_zonal_velocities(), s=4)
@@ -222,19 +240,18 @@ class Plotter:
 
         return
 
-    def clear(self) -> None:
-        
+# Main ------------------------------------------------------------------------
 
 if __name__ == "__main__":
     # NOTE THIS DOES NOT FUNCTION PROPERLY - MORE IS AN EXAMPLE OF STYLE
-
+    sun_lon = 0
+    time = 0
+    
     planet = Planet(2500)
 
     plotter = Plotter()
     plotter.plot(planet)
-
-    sun_lon = 0
-    time = 0
+    
     while True:
         print('TIME: ',str(time/DAY_IN_SECONDS).zfill(2), "days")
 
